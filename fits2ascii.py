@@ -6,10 +6,11 @@ from astropy import cosmology
 from astropy.cosmology import Planck13
 from astropy.io import ascii
 from os.path import join
+import argparse
 
-def main(catalogue, colnames, outfile):
+def main(catalog, colnames, step, outfile):
 	# read table
-	hdulist = fits.open(catalogue)
+	hdulist = fits.open(catalog)
 	data = hdulist[1].data
 	columns = hdulist[1].columns.names
 
@@ -19,7 +20,12 @@ def main(catalogue, colnames, outfile):
 		data = data[pgm_cut]
 	else:
 		x = len(data)//10
-		data = data[:x] 		# PARALLELISE IF NECESSARY
+		if step == 10:
+			step *= x
+			data = data[step-x:]
+		else:
+			step *= x
+			data = data[step-x:step]
 
 	# compute comoving distances
 	z_colname = colnames[2]
@@ -51,7 +57,25 @@ def main(catalogue, colnames, outfile):
 	return None
 
 if __name__ == "__main__":
-	catalogue = '/share/data1/kids/catalogues/randoms/RandomsWindowedV01.fits'
-	colnames = ['RA', 'DEC', 'Z']
-	outfile = '/share/splinter/ug_hj/PhD/RandomsWindowedV01.ascii'
-	main(catalogue, colnames, outfile)
+	parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
+	parser.add_argument(
+		'catalog',
+		help='path/catalog.fits to be converted to ascii')
+	parser.add_argument(
+		'colnames',
+		nargs=5,
+		help='[RA, DEC, redshift, e1, e2] column headers')
+	parser.add_argument(
+		'--step',
+		type=int,
+		choices=range(1, 11),
+		help='int from 1-10, for parallelisation',
+		default=None)
+	parser.add_argument(
+		'outfile',
+		help='path/out_catalog.ascii')
+	args = parser.parse_args()
+	# catalog = '/share/data1/kids/catalogs/randoms/RandomsWindowedV01.fits'
+	# colnames = ['RA', 'DEC', 'Z']
+	# outfile = '/share/splinter/ug_hj/PhD/RandomsWindowedV01.ascii'
+	main(args.catalog, args.colnames, args.step, args.outfile)
