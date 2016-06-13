@@ -17,6 +17,9 @@ def main(catalogue, colnames, outfile):
 	if 'e1c' in columns:
 		pgm_cut = data['pgm'] > 0.1
 		data = data[pgm_cut]
+	else:
+		x = len(data)//10
+		data = data[:x] 		# PARALLELISE IF NECESSARY
 
 	# compute comoving distances
 	z_colname = colnames[2]
