@@ -46,3 +46,8 @@ def main(catalogue, colnames):
 
 	print('# objects = ', len(data))
 	return None
+
+if __name__ == "__main__":
+	catalogue = '/share/data1/kids/catalogues/randoms/RandomsWindowedV01.fits'
+	colnames = ['RA', 'DEC', 'Z']
+	main(catalogue, colnames)
