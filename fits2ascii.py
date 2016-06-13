@@ -5,10 +5,11 @@ import csv
 from astropy import cosmology
 from astropy.cosmology import Planck13
 from astropy.io import ascii
+from os.path import join
 
-def main(catalogue, colnames):
+def main(path, catalogue, colnames):
 	# read table
-	hdulist = fits.open(catalogue)
+	hdulist = fits.open(join(path, catalogue))
 	data = hdulist[1].data
 	columns = hdulist[1].columns.names
 
@@ -40,7 +41,8 @@ def main(catalogue, colnames):
 
 	# stack columns & save as ascii table
 	table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
-	out_cat = catalogue[:-4] + 'ascii'
+	home_path = '/share/splinter/ug_hj/PhD'
+	out_cat = join(home_path, catalogue[:-4], 'ascii')
 	ascii.write(table, out_cat, names=[
 		'RA/rad','DEC/rad','comov_dist/h^{-1}Mpc','e1','e2','e_weight'])
 
@@ -48,6 +50,7 @@ def main(catalogue, colnames):
 	return None
 
 if __name__ == "__main__":
-	catalogue = '/share/data1/kids/catalogues/randoms/RandomsWindowedV01.fits'
+	path = '/share/data1/kids/catalogues/randoms/'
+	catalogue = 'RandomsWindowedV01.fits'
 	colnames = ['RA', 'DEC', 'Z']
 	main(catalogue, colnames)
