@@ -50,8 +50,11 @@ def main(catalog, colnames, step, outfile):
 
 	# stack columns & save as ascii table
 	table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
-	ascii.write(table, outfile, names=[
+	if step == 1:
+		ascii.write(table, outfile, names=[
 		'RA/rad','DEC/rad','comov_dist/h^{-1}Mpc','e1','e2','e_weight'])
+	else:
+		ascii.write(table, outfile)
 
 	print('# objects = ', len(data))
 	return None
