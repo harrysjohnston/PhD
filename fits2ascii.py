@@ -5,10 +5,11 @@ import csv
 from astropy import cosmology
 from astropy.cosmology import Planck13
 from astropy.io import ascii
-from os.path import join
+from os.path import join, isdir
+from os import listdir, mkdir
 import argparse
 
-def main(catalog, colnames, step, outfile):
+def main(catalog, colnames, step, outdir):
 	# read table
 	hdulist = fits.open(catalog)
 	data = hdulist[1].data
@@ -50,8 +51,15 @@ def main(catalog, colnames, step, outfile):
 
 	# stack columns & save as ascii table
 	table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
-	ascii.write(table, outfile) 
-	# names=['RA/rad','DEC/rad','comov_dist/h^{-1}Mpc','e1','e2','e_weight']
+
+	if 'e1c' in columns:
+		ascii.write(table, outdir, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
+	else:
+		if not isdir(outdir):
+			mkdir(outdir)
+		
+		outfile = join(outdir, "step" + str(step) + "_rand.ascii")
+		ascii.write(table, outfile, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
 
 	print('# objects = ', len(data))
 	return None
@@ -72,10 +80,10 @@ if __name__ == "__main__":
 		help='int from 1-10, for parallelisation',
 		default=None)
 	parser.add_argument(
-		'outfile',
-		help='path/out_catalog.ascii')
+		'outdir',
+		help='complete path of destination directory for random steps, or outfilename for real catalog')
 	args = parser.parse_args()
 	# catalog = '/share/data1/kids/catalogs/randoms/RandomsWindowedV01.fits'
 	# colnames = ['RA', 'DEC', 'Z']
-	# outfile = '/share/splinter/ug_hj/PhD/RandomsWindowedV01.ascii'
-	main(args.catalog, args.colnames, args.step, args.outfile)
+	# outdir = '/share/splinter/ug_hj/PhD/RandomsWindowedV01.ascii'
+	main(args.catalog, args.colnames, args.step, args.outdir)
