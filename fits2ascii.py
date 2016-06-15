@@ -65,7 +65,7 @@ def main(catalog, colnames, step, outdir):
 		outfile = join(outdir, "step" + str(step) + "_rand.ascii")
 		ascii.write(table, outfile, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
 
-	print('# objects = ', len(data))
+	print('# objects = ', len(table))
 	return None
 
 if __name__ == "__main__":
