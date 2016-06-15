@@ -24,11 +24,11 @@ def main(catalog, colnames, step, outdir):
 		data = data[rand_cut]
 		x = len(data)//10
 		if step == 10:
-			step *= x
-			data = data[step-x:]
+			step1 = step*x
+			data = data[step1-x:]
 		else:
-			step *= x
-			data = data[step-x:step]
+			step1 = step*x
+			data = data[step1-x:step1]
 
 	# compute comoving distances
 	z_colname = colnames[2]
