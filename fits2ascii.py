@@ -1,13 +1,13 @@
 from __future__ import print_function, division
 from astropy.io import fits
 import numpy as np
-import csv
-from astropy import cosmology
-from astropy.cosmology import Planck13
 from astropy.io import ascii
 from os.path import join, isdir
 from os import listdir, mkdir
 import argparse
+import csv
+from astropy import cosmology
+from astropy.cosmology import Planck13
 
 def main(catalog, colnames, step, outdir):
 	# read table
@@ -19,6 +19,15 @@ def main(catalog, colnames, step, outdir):
 	if 'e1c' in columns:
 		pgm_cut = data['pgm'] > 0.1
 		data = data[pgm_cut]
+
+		ra = data['ALPHA_J2000']
+		uniqra = np.unique(ra, return_inverse=True, return_counts=True)
+		ra_inv_uniq = uniqra[1]
+		ra_count_uniq = uniqra[2]
+		ra_dupes = ra_count_uniq[ra_inv_uniq]
+		dupe_cut = ra_dupes == 1
+		print('RA duplicates:', len(data), '-', len(ra_count_uniq), '=', len(data)-len(ra_count_uniq))
+		data = data[dupe_cut]
 	else:
 		rand_cut = (data['RAND_NUM'] > 0.01) & (data['RAND_NUM'] <= 0.02)
 		data = data[rand_cut]
@@ -46,6 +55,7 @@ def main(catalog, colnames, step, outdir):
 		pgm = data['pgm']
 		e1 = np.array(data[str(colnames[3])])/pgm
 		e2 = np.array(data[str(colnames[4])])/pgm
+		e2 *= -1 	# RA increasing left, c.f. x-axis increasing right
 	else:
 		e1 = 2*np.random.random(len(data)) #- 1
 		e2 = 2*np.random.random(len(data)) #- 1
@@ -62,7 +72,7 @@ def main(catalog, colnames, step, outdir):
 		if not isdir(outdir):
 			mkdir(outdir)
 		
-		outfile = join(outdir, "step" + str(step) + "_rand.ascii")
+		outfile = join(outdir, "step" + str(step.zfill(2)) + "_rand.ascii")
 		ascii.write(table, outfile, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
 
 	print('# objects = ', len(table))
