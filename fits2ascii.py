@@ -20,6 +20,8 @@ def main(catalog, colnames, step, outdir):
 		pgm_cut = data['pgm'] > 0.1
 		data = data[pgm_cut]
 	else:
+		rand_cut = (data['RAND_NUM'] > 0.01) & (data['RAND_NUM'] <= 0.02)
+		data = data[rand_cut]
 		x = len(data)//10
 		if step == 10:
 			step *= x
@@ -45,12 +47,14 @@ def main(catalog, colnames, step, outdir):
 		e1 = np.array(data[str(colnames[3])])/pgm
 		e2 = np.array(data[str(colnames[4])])/pgm
 	else:
-		e1 = 2*np.random.random(len(data)) - 1
-		e2 = 2*np.random.random(len(data)) - 1
+		e1 = 2*np.random.random(len(data)) #- 1
+		e2 = 2*np.random.random(len(data)) #- 1
 	e_weight = np.array([1]*len(data))
 
 	# stack columns & save as ascii table
 	table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
+	for i in np.arange(len(table[0])):
+		table = table[table[:,i]!=0.]
 
 	if 'e1c' in columns:
 		ascii.write(table, outdir, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
