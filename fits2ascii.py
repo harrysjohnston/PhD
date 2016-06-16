@@ -19,6 +19,9 @@ def main(catalog, colnames, step, outdir):
 	if 'e1c' in columns:
 		pgm_cut = data['pgm'] > 0.1
 		data = data[pgm_cut]
+	elif 'E1C' in columns:
+		pgm_cut = data['PGM'] > 0.1
+		data = data[pgm_cut]
 
 		# DUPLICATE REMOVAL OBSOLETE
 		# ra = data['ALPHA_J2000']
@@ -53,7 +56,7 @@ def main(catalog, colnames, step, outdir):
 	DEC = np.array(data[str(colnames[1])])
 	RA = np.deg2rad(RA)
 	DEC = np.deg2rad(DEC)
-	if 'e1c' in columns:
+	if 'e1c' in columns or 'E1C' in columns:
 		pgm = data['pgm']
 		e1 = np.array(data[str(colnames[3])])/pgm
 		e2 = np.array(data[str(colnames[4])])/pgm
@@ -68,7 +71,7 @@ def main(catalog, colnames, step, outdir):
 	# for i in np.arange(len(table[0])):
 	# 	table = table[table[:,i]!=0.]
 
-	if 'e1c' in columns:
+	if 'e1c' in columns or 'E1C' in columns:
 		ascii.write(table, outdir, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
 	else:
 		if not isdir(outdir):
