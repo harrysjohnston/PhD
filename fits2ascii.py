@@ -56,11 +56,16 @@ def main(catalog, colnames, step, outdir):
 	DEC = np.array(data[str(colnames[1])])
 	RA = np.deg2rad(RA)
 	DEC = np.deg2rad(DEC)
-	if 'e1c' in columns or 'E1C' in columns:
+	if 'e1c' in columns:
 		pgm = data['pgm']
 		e1 = np.array(data[str(colnames[3])])/pgm
 		e2 = np.array(data[str(colnames[4])])/pgm
 		e2 *= -1 	# RA increasing left, c.f. x-axis increasing right
+	elif 'E1C' in columns:
+		pgm = data['PGM']
+		e1 = np.array(data[str(colnames[3])])/pgm
+		e2 = np.array(data[str(colnames[4])])/pgm
+		e2 *= -1
 	else:
 		e1 = 2*np.random.random(len(data)) #- 1
 		e2 = 2*np.random.random(len(data)) #- 1
