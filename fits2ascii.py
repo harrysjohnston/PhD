@@ -20,14 +20,15 @@ def main(catalog, colnames, step, outdir):
 		pgm_cut = data['pgm'] > 0.1
 		data = data[pgm_cut]
 
-		ra = data['ALPHA_J2000']
-		uniqra = np.unique(ra, return_inverse=True, return_counts=True)
-		ra_inv_uniq = uniqra[1]
-		ra_count_uniq = uniqra[2]
-		ra_dupes = ra_count_uniq[ra_inv_uniq]
-		dupe_cut = ra_dupes == 1
-		print('RA duplicates:', len(data), '-', len(ra_count_uniq), '=', len(data)-len(ra_count_uniq))
-		data = data[dupe_cut]
+		# DUPLICATE REMOVAL OBSOLETE
+		# ra = data['ALPHA_J2000']
+		# uniqra = np.unique(ra, return_inverse=True, return_counts=True)
+		# ra_inv_uniq = uniqra[1]
+		# ra_count_uniq = uniqra[2]
+		# ra_dupes = ra_count_uniq[ra_inv_uniq]
+		# dupe_cut = ra_dupes == 1
+		# print('RA duplicates:', len(data), '-', len(ra_count_uniq), '=', len(data)-len(ra_count_uniq))
+		# data = data[dupe_cut]
 	else:
 		rand_cut = (data['RAND_NUM'] > 0.01) & (data['RAND_NUM'] <= 0.02)
 		data = data[rand_cut]
@@ -42,6 +43,7 @@ def main(catalog, colnames, step, outdir):
 	# compute comoving distances
 	z_colname = colnames[2]
 	z_col = data[z_colname]
+	# CUT REDSHIFTS TO PREVENT SELECTION BIAS LOW VS HIGH; CUTS TBC
 	comov = Planck13.comoving_distance(z_col)
 	h = 0.7
 	comov *= h
@@ -63,8 +65,8 @@ def main(catalog, colnames, step, outdir):
 
 	# stack columns & save as ascii table
 	table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
-	for i in np.arange(len(table[0])):
-		table = table[table[:,i]!=0.]
+	# for i in np.arange(len(table[0])):
+	# 	table = table[table[:,i]!=0.]
 
 	if 'e1c' in columns:
 		ascii.write(table, outdir, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
