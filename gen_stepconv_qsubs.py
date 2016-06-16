@@ -11,7 +11,7 @@ def main(rand_cat, qsub_dir):
 	for i in range(1,11):
 		shell_script = [
 		'#!/bin/tcsh',
-		'#PBS -q smp',
+		'#PBS -q compute',
 		'#PBS -N fits2ascii',
 		'#PBS -l nodes=1:ppn=1',
 		'#PBS -l mem=30gb',
@@ -23,7 +23,7 @@ def main(rand_cat, qsub_dir):
 		'',
 		'cd $PBS_O_WORKDIR',
 		'',
-		'python /share/splinter/ug_hj/PhD/fits2ascii.py' + str(rand_cat) + '@/share/splinter/ug_hj/PhD/random_cols /share/splinter/ug_hj/PhD/steps_randcats --step' + str(i)
+		'python /share/splinter/ug_hj/PhD/fits2ascii.py ' + str(rand_cat) + ' @/share/splinter/ug_hj/PhD/random_cols /share/splinter/ug_hj/PhD/steps_randcats --step ' + str(i)
 		]
 
 		shell_script.append("")

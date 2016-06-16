@@ -13,7 +13,7 @@ def main(cat_dir):
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument(
-		'cat-dir',
+		'cat_dir',
 		help='steps of random catalog to be de-column-headed')
 	args = parser.parse_args()
 
