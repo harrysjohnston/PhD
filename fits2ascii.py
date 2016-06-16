@@ -74,7 +74,7 @@ def main(catalog, colnames, step, outdir):
 		if not isdir(outdir):
 			mkdir(outdir)
 		
-		outfile = join(outdir, "step" + str(step.zfill(2)) + "_rand.ascii")
+		outfile = join(outdir, "step" + str(step).zfill(2) + "_rand.ascii")
 		ascii.write(table, outfile, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
 
 	print('# objects = ', len(table))
