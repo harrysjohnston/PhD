@@ -9,7 +9,7 @@ import csv
 from astropy import cosmology
 from astropy.cosmology import Planck13
 
-def main(catalog, colnames, step, outdir):
+def main(catalog, colnames, step, mid_z, outdir):
 	# read table
 	hdulist = fits.open(catalog)
 	data = hdulist[1].data
@@ -73,19 +73,42 @@ def main(catalog, colnames, step, outdir):
 
 	# stack columns & save as ascii table
 	table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
-	# for i in np.arange(len(table[0])):
-	# 	table = table[table[:,i]!=0.]
+	if mid_z != None:
+		z_cut = z_col < mid_z
+		lowz_table = table[z_cut]
+		highz_table = table[np.invert(z_cut)]
 
-	if 'e1c' in columns or 'E1C' in columns:
-		ascii.write(table, outdir, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
+		if 'e1c' in columns or 'E1C' in columns:
+			ascii.write(lowz_table, (outdir + "_lowZ"), names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
+			ascii.write(highz_table, (outdir + "_highZ"), names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
+		else:
+			if not isdir(outdir):
+				mkdir(outdir)
+				highz_dir = join(outdir, 'highZ')
+				lowz_dir = join(outdir, 'lowZ')
+				mkdir(highz_dir)
+				mkdir(lowz_dir)
+			
+			outfile_highz = join(highz_dir, "step" + str(step).zfill(2) + ".ascii")
+			ascii.write(highz_table, outfile_highz, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
+
+			outfile_lowz = join(lowz_dir, "step" + str(step).zfill(2) + ".ascii")
+			ascii.write(lowz_table, outfile_lowz, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
+
+		print('# low-z objects = ', len(lowz_table))
+		print('# high-z objects = ', len(highz_table))
+
 	else:
-		if not isdir(outdir):
-			mkdir(outdir)
-		
-		outfile = join(outdir, "step" + str(step).zfill(2) + "_rand.ascii")
-		ascii.write(table, outfile, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
+		if 'e1c' in columns or 'E1C' in columns:
+			ascii.write(table, outdir, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
+		else:
+			if not isdir(outdir):
+				mkdir(outdir)
+			
+			outfile = join(outdir, "step" + str(step).zfill(2) + "_rand.ascii")
+			ascii.write(table, outfile, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
 
-	print('# objects = ', len(table))
+		print('# objects = ', len(table))
 	return None
 
 if __name__ == "__main__":
@@ -104,10 +127,15 @@ if __name__ == "__main__":
 		help='int from 1-10, for parallelisation',
 		default=None)
 	parser.add_argument(
+		'-mid_z',
+		type=np.float32,
+		help='low-z/high-z redshift threshold, omit for no redshift cuts',
+		default=None)
+	parser.add_argument(
 		'outdir',
 		help='complete path of destination directory for random steps, or outfilename for real catalog')
 	args = parser.parse_args()
 	# catalog = '/share/data1/kids/catalogs/randoms/RandomsWindowedV01.fits'
 	# colnames = ['RA', 'DEC', 'Z']
 	# outdir = '/share/splinter/ug_hj/PhD/RandomsWindowedV01.ascii'
-	main(args.catalog, args.colnames, args.step, args.outdir)
+	main(args.catalog, args.colnames, args.step, args.mid_z, args.outdir)

@@ -44,6 +44,6 @@ if __name__ == "__main__":
 		help='random fits catalog to be converted to ascii in parallel steps')
 	parser.add_argument(
 		'qsub_dir',
-		help='desintation directory for generated shell scripts')
+		help='destination directory for generated shell scripts')
 	args = parser.parse_args()
 	main(args.rand_cat, args.qsub_dir)
