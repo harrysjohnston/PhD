@@ -1,0 +1,35 @@
+   CATAID_1_1      LONG            GAMA id
+   RA_1            DOUBLE          right ascension [deg]
+   DEC_1           DOUBLE          declination [deg] 
+   Z_1_1           FLOAT           spectroscopic redshift
+   RPETRO_1        DOUBLE          apparent Petrosian magnitude in r0band
+   GROUPID_1A      LONG            GAMA groupID
+   FLUXSCALE_1     FLOAT           fluxscale parameter (e.g. needed to correct stellar masses for flux loss)
+   LOGMSTAR_1      FLOAT           stellar mass
+   ABSMAG_U_1      FLOAT           Absolute magnitude in restframe u-band from SPS SED fits
+   DELABSMAG_U_1   FLOAT           Error on absolute magnitude in restframe u-band from SPS SED fits
+   ABSMAG_G_1      FLOAT           Absolute magnitude in restframe g-band from SPS SED fits
+   DELABSMAG_G_1   FLOAT           Error on absolute magnitude in restframe g-band from SPS SED fits
+   ABSMAG_R_1      FLOAT           Absolute magnitude in restframe r-band from SPS SED fits
+   DELABSMAG_R_1   FLOAT           Error on absolute magnitude in restframe r-band from SPS SED fits
+   ABSMAG_I_1      FLOAT           Absolute magnitude in restframe i-band from SPS SED fits
+   DELABSMAG_I_1   FLOAT           Error on absolute magnitude in restframe i-band from SPS SED fits
+   ABSMAG_Z_1      FLOAT           Absolute magnitude in restframe (VISTA) z-band from SPS SED fits
+   DELABSMAG_Z_1   FLOAT           Error on absolute magnitude in restframe z-band from SPS SED fits
+   ABSMAG_ZZ_1     FLOAT           Absolute magnitude in restframe (VISTA) zz-band from SPS SED fits
+   DELABSMAG_ZZ_1  FLOAT           Error on absolute magnitude in restframe zz-band from SPS SED fits
+   ABSMAG_Y_1      FLOAT           Absolute magnitude in restframe Y-band from SPS SED fits
+   DELABSMAG_Y_1   FLOAT           Error on absolute magnitude in restframe Y-band from SPS SED fits
+   ABSMAG_J_1      FLOAT           Absolute magnitude in restframe J-band from SPS SED fits
+   DELABSMAG_J_1   FLOAT           Error on absolute magnitude in restframe J-band from SPS SED fits
+   ABSMAG_H_1      FLOAT           Absolute magnitude in restframe H-band from SPS SED fits
+   DELABSMAG_H_1   FLOAT           Error on absolute magnitude in restframe H-band from SPS SED fits
+   ABSMAG_K_1      FLOAT           Absolute magnitude in restframe K-band from SPS SED fits
+   DELABSMAG_K_1   FLOAT           Error on absolute magnitude in restframe K-band from SPS SED fits
+   NFOF            INT             Number of group members
+   MGM             FLOAT           r-band apparent magnitude from Henk
+   E1C             FLOAT           polarization (E1C/PGM is the elliptiticty)
+   E2C             FLOAT           polarizaiont (E2C/PGM is the elliptiticty)
+   DEM             FLOAT           shape measurement error
+   PGM             FLOAT           shear polarizability
+   COL3            INT             KiDS binary mask (0=unmasked)
