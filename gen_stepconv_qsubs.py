@@ -37,6 +37,12 @@ def main(rand_cat, qsub_dir):
 			# os.system("qsub " + F)
 			# os.system("sleep 1")
 
+	for q in os.listdir(qsub_dir):
+        if q.endswith("sh"):
+            os.system("qsub " + join(qsub_dir, q))
+
+    os.system("rm -r " + str(qsub_dir))
+
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument(
