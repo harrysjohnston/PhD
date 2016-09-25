@@ -4,6 +4,7 @@ import numpy as np
 from astropy.io import ascii
 from os.path import join, isdir
 from os import listdir, mkdir
+import os
 import argparse
 import csv
 from astropy import cosmology
@@ -20,6 +21,7 @@ class RealCatalogue:
 		hdulist = fits.open(path)
 		self.data = hdulist[1].data
 		self.columns = hdulist[1].columns.names
+		self.labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
 
 	def cut_data(self, pgm_, z_, colour_, *bitmask_): 
 		"""""
@@ -82,11 +84,18 @@ class RealCatalogue:
 		self.highz = self.data[z_cut]
 		self.lowz = self.data[z_cut_r]
 
-		print('len highz_r: ', len(self.highz_R))
-		print('len highz_b: ', len(self.highz_B))
-		print('len lowz_r: ', len(self.lowz_R))
-		print('len lowz_b: ', len(self.lowz_B))
-		
+		self.samplecounts = [len(self.highz_R), len(self.highz_B),
+								len(self.lowz_R), len(self.lowz_B),
+								len(self.highz), len(self.lowz)]
+
+		[print('# objects %s: '%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
+
+		self.wcorr_combos = [
+		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[0]+'.asc', self.samplecounts[0], 'hiZ_vs_hiZ_R.dat'],
+		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[1]+'.asc', self.samplecounts[1], 'hiZ_vs_hiZ_B.dat'],
+		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[2]+'.asc', self.samplecounts[2], 'loZ_vs_loZ_R.dat'],
+		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[3]+'.asc', self.samplecounts[3], 'loZ_vs_loZ_B.dat']
+		]
 
 	def cut_columns(self, subsample, h): 
 		"""""
@@ -104,7 +113,7 @@ class RealCatalogue:
 		RA = np.deg2rad(table['RA_1'])
 		DEC = np.deg2rad(table['DEC_1'])
 		Z = table['Z_1_1']
-		print('Z : ', Z)
+		# print('Z : ', Z)
 		e1 = table['e1c']/table['pgm']
 		e2 = table['e2c']/table['pgm']
 		e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
@@ -134,8 +143,54 @@ class RealCatalogue:
 			mkdir(outfile_root)
 		ascii.write(new_table, join(outfile_root, label + ".asc"), names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
 		sample_no = str(label) + " # objects: " + str(len(new_table))
-		print(sample_no)
+		# print(sample_no)
 		return sample_no
+
+	def prep_wcorr(self, files_path, wcorr_combos, rp_bins, rp_lims, los_bins, los_lim, nproc, large_pi, out_sh):
+
+		shell_script = [
+		'#!/bin/tcsh',
+		'#PBS -q compute',
+		'#PBS -N wcorr',
+		'#PBS -l nodes=1',
+		'#PBS -l walltime=120:00:00',
+		'#PBS -l mem=50gb',
+		'',
+		'module load dev_tools/nov2014/python-anaconda',
+		'',
+		'cd $PBS_O_WORKDIR',
+		'',
+		'setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/share/splinter/hj/PhD/CosmoFisherForecast/bjutils/lib/',
+		'',
+		'date']
+
+		for combo in wcorr_combos:
+			shell_script.append('')
+			outfile = combo[4]
+			if large_pi == 1:
+				outfile = outfile[:-4]
+				outfile += '_largePi.dat'
+			shell_script.append('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s %s 0' %	(files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile, nproc, large_pi)
+				)
+			shell_script.append('')
+
+		File = join(files_path, '%s.sh'%out_sh)
+		Write = open(File, 'w')
+		Text = '\n'.join(shell_script)
+		Write.write(str(Text))
+		Write.close()
+
+		wcorr_spec = []
+		wcorr_spec.append('Comoving transverse separation r_p: %s - %s Mpc/h in %s log-spaced bins'%(rp_lims[0], rp_lims[1], rp_bins))
+		wcorr_spec.append('Comoving line-of-sight separation \Pi: %s - %s Mpc/h in %s bins'%(los_lim*(-1), los_lim, los_bins))
+		wcorr_spec.append('No. processors: %s'%nproc)
+		wcorr_spec.append('Large-Pi systematics testing: %s'%large_pi)
+
+		File = join(files_path, 'wcorr_spec')
+		Write = open(File, 'w')
+		Text = '\n'.join(wcorr_spec)
+		Write.write(str(Text))
+		Write.close()
 
 class RandomCatalogue(RealCatalogue):
 
@@ -148,6 +203,7 @@ class RandomCatalogue(RealCatalogue):
 		hdulist = fits.open(path)
 		self.data = hdulist[1].data
 		self.columns = hdulist[1].columns.names
+		self.labels = ['highZ_rand', 'lowZ_rand']
 
 	def cut_data(self, z_): 
 		"""""
@@ -167,6 +223,7 @@ class RandomCatalogue(RealCatalogue):
 
 		self.highz = self.data[z_cut]
 		self.lowz = self.data[z_cut_r]
+		self.samplecounts = [len(self.highz), len(self.lowz)]
 
 	def cut_columns(self, subsample, h): 
 		"""""
@@ -197,11 +254,14 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
 	parser.add_argument(
 		'Catalog',
-		help='full path of catalogue to be sampled into ascii table(s)')
+		help='full path of REAL catalogue to be sampled into ascii table(s)')
 	parser.add_argument(
-		'Type',
-		choices=['real', 'random'],
-		help="Type of catalogue to be converted to ascii")
+		'Outfile_root',
+		help='full path of destination directory for subsample ascii catalogues, where further directories will be created and appended with "_z_<z_cut>_c_<colour_cut>" if applicable')
+	parser.add_argument(
+		'-Random',
+		help="optional; path to RANDOM catalogue to be correspondingly sampled",
+		default=None)
 	parser.add_argument(
 		'-pgm_cut',
 		type=np.float32,
@@ -225,51 +285,104 @@ if __name__ == "__main__":
 		default=None)
 	parser.add_argument(
 		'-_h',
-		type=list,
+		type=np.float32,
 		help='reduced Planck constant, defaults to 0.7',
 		default=0.7)
 	parser.add_argument(
-		'Outfile_root',
-		help='full path of destination directory for subsample ascii catalogues, will be appended with "_z_<z_cut>_c_<colour_cut>" if applicable')
+		'-rp_bins',
+		type=int,
+		help='specify no. of (log-spaced) bins in comoving transverse separation r_p (Mpc/h), for measurement of density-shape correlations. Defaults to 10',
+		default=10)
+	parser.add_argument(
+		'-rp_lims',
+		nargs=2,
+		type=np.float32,
+		help='specify upper & lower (2 args, space-separated) limit in comoving transverse separation r_p (Mpc/h), for measurement of density-shape correlations. Defaults to 0.3, 60 Mpc/h',
+		default=[0.3, 60])
+	parser.add_argument(
+		'-los_bins',
+		type=int,
+		help='specify no. of bins (positive branch) in comoving line-of-sight separation \Pi (Mpc/h), for measurement of density-shape correlations. Defaults to 15; i.e. 30 bins in total',
+		default=15)
+	parser.add_argument(
+		'-los_lim',
+		type=np.float32,
+		help='specify cut-off in comoving line-of-sight separation \Pi (Mpc/h), for measurement of density-shape correlations. Defaults to 60; s/t range is -60 to 60 Mpc/h',
+		default=60)
+	parser.add_argument(
+		'-nproc',
+		type=int,
+		help='no. processors to be used in correlation measurement, default = 12',
+		default=12)
+	parser.add_argument(
+		'-large_pi',
+		choices=[0,1],
+		help='specify regular (0) or large-Pi systematics tests (1), defaults to 0',
+		default=0)
+	parser.add_argument(
+		'-wcorr',
+		choices=[0,1],
+		help='initiate wcorr density-shape correlation measurements (1) or not (0), defaults to 0',
+		default=0)
 	args = parser.parse_args()
 
-	if args.Type == 'real':
-		catalog = RealCatalogue(args.Catalog)
-		catalog.cut_data(args.pgm_cut, args.z_cut, args.c_cut, args.bitmask_cut)
-		samples = [catalog.highz_R, catalog.highz_B, 									catalog.lowz_R, catalog.lowz_B,										catalog.highz, catalog.lowz]
-		labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
-		cuts = 'z-cut: ' + str(args.z_cut) + ', colour-cut (g-i): ' + str(args.c_cut)
-		sample_numbers = [cuts]
+	catalog = RealCatalogue(args.Catalog)
+	catalog.cut_data(args.pgm_cut, args.z_cut, args.c_cut, args.bitmask_cut)
+	samples = [catalog.highz_R, catalog.highz_B, 									catalog.lowz_R, catalog.lowz_B,										catalog.highz, catalog.lowz]
+	# labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
+	cuts = 'z-cut: ' + str(args.z_cut) + ', colour-cut (g-i): ' + str(args.c_cut)
+	sample_numbers = [cuts]
+	outfile_root = join(args.Outfile_root, 'GamaGal_subsample')
 
-		for i, sample in enumerate(samples):
-			new_table = catalog.cut_columns(sample, args._h)
-			sample_num = catalog.save_tables(new_table, args.Outfile_root, (labels[i]), args.z_cut, args.c_cut)
-			sample_numbers.append(sample_num)
+	for i, sample in enumerate(samples):
+		new_table = catalog.cut_columns(sample, args._h)
+		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.z_cut, args.c_cut)
+		sample_numbers.append(sample_num)
 
-		File = join(catalog.new_root, 'Sample_popns')
-		Write = open(File, "w")
-		Text = "\n".join(sample_numbers)
-		Write.write(str(Text))
-		Write.close()
+	File = join(catalog.new_root, 'Sample_popns')
+	Write = open(File, "w")
+	Text = "\n".join(sample_numbers)
+	Write.write(str(Text))
+	Write.close()
 
-	if args.Type == 'random':
-		catalog = RandomCatalogue(args.Catalog)
-		catalog.cut_data(args.z_cut)
-		samples = [catalog.highz, catalog.lowz]
-		labels = ['highZ', 'lowZ']
+	catalog.prep_wcorr(catalog.new_root, catalog.wcorr_combos, args.rp_bins, args.rp_lims, args.los_bins, args.los_lim, args.nproc, args.large_pi, 'real_wcorr')
+
+	if args.wcorr == 1:
+		os.system('qsub '+ join(catalog.new_root, 'real_wcorr.sh'))
+
+	if args.Random != None:
+		catalog2 = RandomCatalogue(args.Random)
+		catalog2.cut_data(args.z_cut)
+		samples = [catalog2.highz, catalog2.lowz]
+		# labels = ['highZ_rand', 'lowZ_rand']
 		cuts = 'z-cut: ' + str(args.z_cut)
 		sample_numbers = [cuts]
+		# outfile_root = join(args.Outfile_root, 'Random_subsample')
 
 		for i, sample in enumerate(samples):
-			new_table = catalog.cut_columns(sample, args._h)
-			sample_num = catalog.save_tables(new_table, args.Outfile_root, (labels[i]), args.z_cut, args.c_cut)
+			new_table = catalog2.cut_columns(sample, args._h)
+			sample_num = catalog2.save_tables(new_table, outfile_root, catalog2.labels[i], args.z_cut, args.c_cut)
 			sample_numbers.append(sample_num)
 
-		File = join(catalog.new_root, 'Sample_popns')
+		File = join(catalog.new_root, 'Sample_rand_popns')
 		Write = open(File, "w")
 		Text = "\n".join(sample_numbers)
 		Write.write(str(Text))
 		Write.close()
+
+		rand_combos = [
+		[catalog2.labels[0]+'.asc', catalog2.samplecounts[0], catalog.labels[0]+'.asc', catalog.samplecounts[0], 'rand_hiZ_vs_hiZ_R.dat'],
+		[catalog2.labels[0]+'.asc', catalog2.samplecounts[0], catalog.labels[1]+'.asc', catalog.samplecounts[1], 'rand_hiZ_vs_hiZ_B.dat'],
+		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[2]+'.asc', catalog.samplecounts[2], 'rand_loZ_vs_loZ_R.dat'],
+		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[3]+'.asc', catalog.samplecounts[3], 'rand_loZ_vs_loZ_B.dat']
+		]
+
+		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rp_bins, args.rp_lims, args.los_bins, args.los_lim, args.nproc, args.large_pi, 'rand_wcorr')
+
+		if args.wcorr == 1:
+			os.system('qsub '+ join(catalog.new_root, 'rand_wcorr.sh'))
+
+
 
 
 
