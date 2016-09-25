@@ -128,6 +128,8 @@ class RealCatalogue:
 		else:
 			outfile_root = outfile_root_
 
+		self.new_root = outfile_root
+
 		if not isdir(outfile_root):
 			mkdir(outfile_root)
 		ascii.write(new_table, join(outfile_root, label + ".asc"), names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
@@ -244,7 +246,7 @@ if __name__ == "__main__":
 			sample_num = catalog.save_tables(new_table, args.Outfile_root, (labels[i]), args.z_cut, args.c_cut)
 			sample_numbers.append(sample_num)
 
-		File = join(args.Outfile_root, 'Sample_popns')
+		File = join(catalog.new_root, 'Sample_popns')
 		Write = open(File, "w")
 		Text = "\n".join(sample_numbers)
 		Write.write(str(Text))
@@ -263,7 +265,7 @@ if __name__ == "__main__":
 			sample_num = catalog.save_tables(new_table, args.Outfile_root, (labels[i]), args.z_cut, args.c_cut)
 			sample_numbers.append(sample_num)
 
-		File = join(args.Outfile_root, 'Sample_popns')
+		File = join(catalog.new_root, 'Sample_popns')
 		Write = open(File, "w")
 		Text = "\n".join(sample_numbers)
 		Write.write(str(Text))
