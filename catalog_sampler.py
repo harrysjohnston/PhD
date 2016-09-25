@@ -33,21 +33,6 @@ class RealCatalogue:
 		assert 'absmag_i_1' in self.columns, "'absmag_i_1' not in columns, see column headers: "+ str(self.columns)
 		assert 'col3' in self.columns, "'col3' not in columns, see column headers: "+ str(self.columns)
 
-
-		# if type(bitmask_) != None:
-		# 	bitmask_ = bitmask_[0]
-		# 	total_bitmasks = self.data['col3']
-		# 	bitmask_cut = []
-		# 	for bit_test in total_bitmasks:
-		# 		for mask_ in bitmask_:
-		# 			if (mask_ & bit_test == mask_):
-		# 				bitmask_cut.append(False)
-		# 				break
-		# 			if mask_ == bitmask_[-1]:
-		# 				bitmask_cut.append(True)
-		# 	assert len(bitmask_cut) == len(total_bitmasks), "bitmask testing broken"
-		# 	print('bitmask cut: ', np.unique(bitmask_cut))
-
 		total_bitmasks = self.data['col3']
 		if type(bitmask_) != None:
 			bitmask_ = bitmask_[0]
@@ -131,11 +116,18 @@ class RealCatalogue:
 		new_table = np.column_stack((RA, DEC, comov, e1, e2, e_weight))
 		return new_table
 
-	def save_tables(self, new_table, outfile_root, label):
+	def save_tables(self, new_table, outfile_root_, label, z_cut, c_cut):
 		"""""
 		save subsample tables to ascii
 
 		"""""
+		if (z_cut != None) & (c_cut != None):
+			outfile_root = outfile_root_ + "_z_" + str(z_cut) + "_c_" + str(c_cut)
+		elif z_cut != None:
+			outfile_root = outfile_root_ + "_z_" + str(z_cut)
+		else:
+			outfile_root = outfile_root_
+
 		if not isdir(outfile_root):
 			mkdir(outfile_root)
 		ascii.write(new_table, join(outfile_root, label + ".asc"), names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
@@ -203,31 +195,31 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
 	parser.add_argument(
 		'Catalog',
-		help='full path of catalogue to be sampled into ascii table(s).')
+		help='full path of catalogue to be sampled into ascii table(s)')
 	parser.add_argument(
 		'Type',
 		choices=['real', 'random'],
-		help="Type of catalogue to be converted to ascii; 'real' or 'random'.")
+		help="Type of catalogue to be converted to ascii")
 	parser.add_argument(
 		'-pgm_cut',
 		type=np.float32,
-		help='Shear polarizability cut, defaults to 0.1',
+		help='shear polarizability cut, defaults to 0.1',
 		default=0.1)
 	parser.add_argument(
 		'-z_cut',
 		type=np.float32,
-		help='lowZ vs. highZ redshift threshold, between 0 - 0.5. Omit for no redshift cut.',
+		help='lowZ vs. highZ redshift threshold, between 0 - 0.5. Omit for no redshift cut',
 		default=None)
 	parser.add_argument(
 		'-c_cut',
 		type=np.float32,
-		help='Red vs. Blue colour threshold, between 0 - 1.4 (meaningfully, between approx 0.7 - 1.1). Omit for no colour cut.',
+		help='red vs. blue colour threshold, between 0 - 1.4 (meaningfully, between approx 0.7 - 1.1). Omit for no colour cut',
 		default=None)
 	parser.add_argument(
 		'-bitmask_cut',
 		nargs='*',
 		type=int,
-		help='Array of bitmask IDs (powers of 2) to exclude from catalogue, eg. [4, 16, 4096,...].',
+		help='list of bitmask IDs (powers of 2) to exclude from catalogue, eg. text-file w/ ROWS; \n4\n16\n4096\n...etc...',
 		default=None)
 	parser.add_argument(
 		'-_h',
@@ -236,7 +228,7 @@ if __name__ == "__main__":
 		default=0.7)
 	parser.add_argument(
 		'Outfile_root',
-		help='full path of destination directory for subsample ascii catalogues.')
+		help='full path of destination directory for subsample ascii catalogues, will be appended with "_z_<z_cut>_c_<colour_cut>" if applicable')
 	args = parser.parse_args()
 
 	if args.Type == 'real':
@@ -244,14 +236,15 @@ if __name__ == "__main__":
 		catalog.cut_data(args.pgm_cut, args.z_cut, args.c_cut, args.bitmask_cut)
 		samples = [catalog.highz_R, catalog.highz_B, 									catalog.lowz_R, catalog.lowz_B,										catalog.highz, catalog.lowz]
 		labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
-		sample_numbers = []
+		cuts = 'z-cut: ' + str(args.z_cut) + ', colour-cut (g-i): ' + str(args.c_cut)
+		sample_numbers = [cuts]
 
 		for i, sample in enumerate(samples):
 			new_table = catalog.cut_columns(sample, args._h)
-			sample_num = catalog.save_tables(new_table, args.Outfile_root, (labels[i]))
+			sample_num = catalog.save_tables(new_table, args.Outfile_root, (labels[i]), args.z_cut, args.c_cut)
 			sample_numbers.append(sample_num)
 
-		File = join(args.Outfile_root, 'Sample_numbers')
+		File = join(args.Outfile_root, 'Sample_popns')
 		Write = open(File, "w")
 		Text = "\n".join(sample_numbers)
 		Write.write(str(Text))
@@ -262,14 +255,15 @@ if __name__ == "__main__":
 		catalog.cut_data(args.z_cut)
 		samples = [catalog.highz, catalog.lowz]
 		labels = ['highZ', 'lowZ']
-		sample_numbers = []
+		cuts = 'z-cut: ' + str(args.z_cut)
+		sample_numbers = [cuts]
 
 		for i, sample in enumerate(samples):
 			new_table = catalog.cut_columns(sample, args._h)
-			sample_num = catalog.save_tables(new_table, args.Outfile_root, (labels[i]))
+			sample_num = catalog.save_tables(new_table, args.Outfile_root, (labels[i]), args.z_cut, args.c_cut)
 			sample_numbers.append(sample_num)
 
-		File = join(args.Outfile_root, 'Sample_numbers')
+		File = join(args.Outfile_root, 'Sample_popns')
 		Write = open(File, "w")
 		Text = "\n".join(sample_numbers)
 		Write.write(str(Text))
