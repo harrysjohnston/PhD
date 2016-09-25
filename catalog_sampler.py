@@ -316,11 +316,13 @@ if __name__ == "__main__":
 		default=12)
 	parser.add_argument(
 		'-large_pi',
+		type=int,
 		choices=[0,1],
 		help='specify regular (0) or large-Pi systematics tests (1), defaults to 0',
 		default=0)
 	parser.add_argument(
 		'-wcorr',
+		type=int,
 		choices=[0,1],
 		help='initiate wcorr density-shape correlation measurements (1) or not (0), defaults to 0',
 		default=0)
