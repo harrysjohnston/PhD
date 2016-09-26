@@ -174,6 +174,8 @@ class RealCatalogue:
 				)
 			shell_script.append('')
 
+		shell_script.append('date')
+
 		File = join(files_path, '%s.sh'%out_sh)
 		Write = open(File, 'w')
 		Text = '\n'.join(shell_script)
