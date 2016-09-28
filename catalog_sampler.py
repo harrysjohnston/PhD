@@ -396,7 +396,7 @@ if __name__ == "__main__":
 	cuts = 'z-cut: ' + str(args.zCut) + ', colour-cut (g-i): ' + str(args.cCut)
 	sample_numbers = [cuts]
 	if args.notes != None:
-		appendage = '_%s' % str(notes)
+		appendage = '_%s' % str(args.notes)
 		outfile_root = join(args.Outfile_root, 'Wcorr%s'%appendage)
 	else:
 		outfile_root = join(args.Outfile_root, 'Wcorr')
