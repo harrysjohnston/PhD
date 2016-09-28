@@ -9,6 +9,7 @@ import argparse
 import csv
 from astropy import cosmology
 from astropy.cosmology import Planck13
+import matplotlib.pyplot as plt
 
 class RealCatalogue:
 
@@ -29,6 +30,8 @@ class RealCatalogue:
 		PGM, & into subsamples
 		
 		"""""
+		assert 'RA_1' in self.columns, "'RA_1' not in columns, see column headers: "+ str(self.columns)
+		assert 'DEC_1' in self.columns, "'DEC_1' not in columns, see column headers: "+ str(self.columns)
 		assert 'pgm' in self.columns, "'pgm' not in columns, see column headers: "+ str(self.columns)
 		assert 'Z_1_1' in self.columns, "'Z_1_1' not in columns, see column headers: "+ str(self.columns)
 		assert 'absmag_g_1' in self.columns, "'absmag_g_1' not in columns, see column headers: "+ str(self.columns)
@@ -56,6 +59,20 @@ class RealCatalogue:
 		self.data = self.data[pgm_cut]
 		print('pgm cut: ', np.unique(pgm_cut))
 
+		# Remove duplicates in RA/DEC:
+		RA = self.data['RA_1']
+		DEC = self.data['DEC_1']
+		coordStrings = ['RA', 'DEC']
+		for i, coords in enumerate([RA, DEC]):
+			uniqCoords = np.unique(coords, return_inverse=True, return_count=True)
+			inverse = uniqCoords[1]
+			count = uniqCoords[2]
+			orderedCount = count[inverse]
+			duplicateCut = orderedCount == 1
+			self.data = self.data[duplicateCut]
+			print('Removed %s duplicates in %s' % ((len(self.data)-len(duplicateCut)), coordStrings[i]))
+
+		self.pre_count = len(self.data)
 		z = self.data['z_1_1']
 		colour = self.data['absmag_g_1'] - self.data['absmag_i_1']
 
@@ -91,10 +108,10 @@ class RealCatalogue:
 		[print('# objects %s: '%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
 
 		self.wcorr_combos = [
-		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[0]+'.asc', self.samplecounts[0], 'hiZ_vs_hiZ_R.dat'],
-		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[1]+'.asc', self.samplecounts[1], 'hiZ_vs_hiZ_B.dat'],
-		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[2]+'.asc', self.samplecounts[2], 'loZ_vs_loZ_R.dat'],
-		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[3]+'.asc', self.samplecounts[3], 'loZ_vs_loZ_B.dat']
+		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[0]+'.asc', self.samplecounts[0], 'hiZ_vs_hiZ_R'],
+		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[1]+'.asc', self.samplecounts[1], 'hiZ_vs_hiZ_B'],
+		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[2]+'.asc', self.samplecounts[2], 'loZ_vs_loZ_R'],
+		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[3]+'.asc', self.samplecounts[3], 'loZ_vs_loZ_B']
 		]
 
 	def cut_columns(self, subsample, h): 
@@ -168,8 +185,8 @@ class RealCatalogue:
 			shell_script.append('')
 			outfile = combo[4]
 			if large_pi == 1:
-				outfile = outfile[:-4]
-				outfile += '_largePi.dat'
+				# outfile = outfile[:-4]
+				outfile += '_largePi'
 			shell_script.append('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s %s 0' %	(files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile, nproc, large_pi)
 				)
 			shell_script.append('')
@@ -194,6 +211,12 @@ class RealCatalogue:
 		Write.write(str(Text))
 		Write.close()
 
+	# def plot_wcorr(self, files_path, combos, ): # NEED TO WORK IN RANDOM-SUBTRACTION SOMEHOW
+	# 	data_files = []
+	# 	[data_files.append(('wcorr_' + item[4] + '.dat') for item in combos)]
+	# 	f, axarr = plt.subplots(2, 2)
+
+
 class RandomCatalogue(RealCatalogue):
 
 	def __init__(self, path):
@@ -205,14 +228,40 @@ class RandomCatalogue(RealCatalogue):
 		hdulist = fits.open(path)
 		self.data = hdulist[1].data
 		self.columns = hdulist[1].columns.names
-		self.labels = ['highZ_rand', 'lowZ_rand']
+		self.labels = ['rand_highZ', 'rand_lowZ']
 
-	def cut_data(self, z_): 
+	def cut_data(self, z_, len_reals): 
 		"""""
 		cut catalogue into redshift subsamples
 		
 		"""""
+		assert 'RA' in self.columns, "'RA' not in columns, see column headers: "+ str(self.columns)
+		assert 'DEC' in self.columns, "'DEC' not in columns, see column headers: "+ str(self.columns)
 		assert 'Z' in self.columns, "'Z' not in columns, see column headers: "+ str(self.columns)
+		assert 'RAND_NUM' in self.columns, "'RAND_NUM' not in columns, see column headers: "+ str(self.columns)
+
+		# cut down (randomly) for correlation
+		randNum = self.data['RAND_NUM']
+		current = len(randNum)
+		target = len_reals*10
+		fraction = target/current
+		randCut = (randNum > fraction) & (randNum <= 2*fraction)
+		self.data = self.data[randCut]
+		print('Randoms cut down from %s objects to %s' % (len(randNum), len(self.data)))
+
+		# Remove duplicates in RA/DEC:
+		RA = self.data['RA']
+		DEC = self.data['DEC']
+		coordStrings = ['RA', 'DEC']
+		for i, coords in enumerate([RA, DEC]):
+			uniqCoords = np.unique(coords, return_inverse=True, return_count=True)
+			inverse = uniqCoords[1]
+			count = uniqCoords[2]
+			orderedCount = count[inverse]
+			duplicateCut = orderedCount == 1
+			self.data = self.data[duplicateCut]
+			print('Removed %s duplicates in %s' % ((len(self.data)-len(duplicateCut)), coordStrings[i]))
+
 		z = self.data['z']
 
 		if z_ != None:
@@ -226,6 +275,8 @@ class RandomCatalogue(RealCatalogue):
 		self.highz = self.data[z_cut]
 		self.lowz = self.data[z_cut_r]
 		self.samplecounts = [len(self.highz), len(self.lowz)]
+
+		[print('# objects %s: '%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
 
 	def cut_columns(self, subsample, h): 
 		"""""
@@ -352,11 +403,14 @@ if __name__ == "__main__":
 	catalog.prep_wcorr(catalog.new_root, catalog.wcorr_combos, args.rp_bins, args.rp_lims, args.los_bins, args.los_lim, args.nproc, args.large_pi, 'real_wcorr')
 
 	if args.wcorr == 1:
+		os.system('cd /share/splinter/hj/PhD/CosmoFisherForecast/obstools')
+		os.system('gcc wcorr.c -fopenmp -lgsl -lgslcblas -lm -I../bjutils/include/ -L../bjutils/lib/ -lbjutils -O3 -Wall -o wcorr')
+		os.system('cd ../..')
 		os.system('qsub '+ join(catalog.new_root, 'real_wcorr.sh'))
 
 	if args.Random != None:
 		catalog2 = RandomCatalogue(args.Random)
-		catalog2.cut_data(args.z_cut)
+		catalog2.cut_data(args.z_cut, catalog.pre_count)
 		samples = [catalog2.highz, catalog2.lowz]
 		# labels = ['highZ_rand', 'lowZ_rand']
 		cuts = 'z-cut: ' + str(args.z_cut)
@@ -375,10 +429,10 @@ if __name__ == "__main__":
 		Write.close()
 
 		rand_combos = [
-		[catalog2.labels[0]+'.asc', catalog2.samplecounts[0], catalog.labels[0]+'.asc', catalog.samplecounts[0], 'rand_hiZ_vs_hiZ_R.dat'],
-		[catalog2.labels[0]+'.asc', catalog2.samplecounts[0], catalog.labels[1]+'.asc', catalog.samplecounts[1], 'rand_hiZ_vs_hiZ_B.dat'],
-		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[2]+'.asc', catalog.samplecounts[2], 'rand_loZ_vs_loZ_R.dat'],
-		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[3]+'.asc', catalog.samplecounts[3], 'rand_loZ_vs_loZ_B.dat']
+		[catalog2.labels[0]+'.asc', catalog2.samplecounts[0], catalog.labels[0]+'.asc', catalog.samplecounts[0], 'rand_hiZ_vs_hiZ_R'],
+		[catalog2.labels[0]+'.asc', catalog2.samplecounts[0], catalog.labels[1]+'.asc', catalog.samplecounts[1], 'rand_hiZ_vs_hiZ_B'],
+		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[2]+'.asc', catalog.samplecounts[2], 'rand_loZ_vs_loZ_R'],
+		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[3]+'.asc', catalog.samplecounts[3], 'rand_loZ_vs_loZ_B']
 		]
 
 		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rp_bins, args.rp_lims, args.los_bins, args.los_lim, args.nproc, args.large_pi, 'rand_wcorr')
