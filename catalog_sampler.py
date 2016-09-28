@@ -60,7 +60,7 @@ class RealCatalogue:
 		print('pgm cut: ', np.unique(pgm_cut))
 
 		# Remove duplicates in RA/DEC:
-		coordStrings = ['RA', 'DEC']
+		coordStrings = ['RA_1', 'DEC_1']
 		for i, col in enumerate(coordStrings):
 			coords = self.data[col]
 			uniqCoords = np.unique(coords, return_inverse=True, return_counts=True)
@@ -69,7 +69,7 @@ class RealCatalogue:
 			orderedCount = count[inverse]
 			duplicateCut = orderedCount == 1
 			self.data = self.data[duplicateCut]
-			print('Removed %s duplicates in %s' % ((len(duplicateCut)-len(self.data)), col))
+			print('Removed %s duplicates in %s' % ((len(duplicateCut)-len(self.data)), col[:-2]))
 
 		self.pre_count = len(self.data)
 		z = self.data['z_1_1']
