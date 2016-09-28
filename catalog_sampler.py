@@ -74,6 +74,9 @@ class RealCatalogue:
 
 		self.pre_count = len(self.data)
 		z = self.data['z_1_1']
+		self.data = self.data[(z >= 0.02)]
+		z = self.data['z_1_1']
+		self.pre_z = z
 		colour = self.data['absmag_g_1'] - self.data['absmag_i_1']
 
 
@@ -230,7 +233,7 @@ class RandomCatalogue(RealCatalogue):
 		self.columns = hdulist[1].columns.names
 		self.labels = ['rand_highZ', 'rand_lowZ']
 
-	def cut_data(self, z_, len_reals): 
+	def cut_data(self, z_, len_reals, z_reals): 
 		"""""
 		cut catalogue into redshift subsamples
 		
@@ -262,6 +265,9 @@ class RandomCatalogue(RealCatalogue):
 			self.data = self.data[duplicateCut]
 			print('Removed %s duplicates in %s' % ((len(self.data)-len(duplicateCut)), coordStrings[i]))
 
+		z = self.data['z']
+		pre_z_cut = (z >= z_reals.min()) & (z <= z_reals.max())
+		self.data = self.data[pre_z_cut]
 		z = self.data['z']
 
 		if z_ != None:
@@ -321,44 +327,44 @@ if __name__ == "__main__":
 		help='shear polarizability cut, defaults to 0.1',
 		default=0.1)
 	parser.add_argument(
-		'-z_cut',
+		'-zCut',
 		type=np.float32,
 		help='lowZ vs. highZ redshift threshold, between 0 - 0.5. Omit for no redshift cut',
 		default=None)
 	parser.add_argument(
-		'-c_cut',
+		'-cCut',
 		type=np.float32,
 		help='red vs. blue colour threshold, between 0 - 1.4 (meaningfully, between approx 0.7 - 1.1). Omit for no colour cut',
 		default=None)
 	parser.add_argument(
-		'-bitmask_cut',
+		'-bitmaskCut',
 		nargs='*',
 		type=int,
-		help='list of bitmask IDs (powers of 2) to exclude from catalogue, eg. text-file w/ ROWS; \n4\n16\n4096\n...etc...',
+		help='list of bitmask IDs (powers of 2) to exclude from catalogue, eg. text-file w/ ROWS; 4, 16, 4096...etc...',
 		default=None)
 	parser.add_argument(
-		'-_h',
+		'-H',
 		type=np.float32,
 		help='reduced Planck constant, defaults to 0.7',
 		default=0.7)
 	parser.add_argument(
-		'-rp_bins',
+		'-rpBins',
 		type=int,
 		help='specify no. of (log-spaced) bins in comoving transverse separation r_p (Mpc/h), for measurement of density-shape correlations. Defaults to 10',
 		default=10)
 	parser.add_argument(
-		'-rp_lims',
+		'-rpLims',
 		nargs=2,
 		type=np.float32,
 		help='specify upper & lower (2 args, space-separated) limit in comoving transverse separation r_p (Mpc/h), for measurement of density-shape correlations. Defaults to 0.3, 60 Mpc/h',
 		default=[0.3, 60])
 	parser.add_argument(
-		'-los_bins',
+		'-losBins',
 		type=int,
 		help='specify no. of bins (positive branch) in comoving line-of-sight separation \Pi (Mpc/h), for measurement of density-shape correlations. Defaults to 15; i.e. 30 bins in total',
 		default=15)
 	parser.add_argument(
-		'-los_lim',
+		'-losLim',
 		type=np.float32,
 		help='specify cut-off in comoving line-of-sight separation \Pi (Mpc/h), for measurement of density-shape correlations. Defaults to 60; s/t range is -60 to 60 Mpc/h',
 		default=60)
@@ -368,7 +374,7 @@ if __name__ == "__main__":
 		help='no. processors to be used in correlation measurement, default = 12',
 		default=12)
 	parser.add_argument(
-		'-large_pi',
+		'-largePi',
 		type=int,
 		choices=[0,1],
 		help='specify regular (0) or large-Pi systematics tests (1), defaults to 0',
@@ -379,19 +385,28 @@ if __name__ == "__main__":
 		choices=[0,1],
 		help='initiate wcorr density-shape correlation measurements (1) or not (0), defaults to 0',
 		default=0)
+	parser.add_argument(
+		'-notes',
+		type=str,
+		help='notes on any changed wcorr parameters, for appendage to directory name',
+		default=None)
 	args = parser.parse_args()
 
 	catalog = RealCatalogue(args.Catalog)
-	catalog.cut_data(args.pgm_cut, args.z_cut, args.c_cut, args.bitmask_cut)
+	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.bitmaskCut)
 	samples = [catalog.highz_R, catalog.highz_B, 									catalog.lowz_R, catalog.lowz_B,										catalog.highz, catalog.lowz]
 	# labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
-	cuts = 'z-cut: ' + str(args.z_cut) + ', colour-cut (g-i): ' + str(args.c_cut)
+	cuts = 'z-cut: ' + str(args.zCut) + ', colour-cut (g-i): ' + str(args.cCut)
 	sample_numbers = [cuts]
-	outfile_root = join(args.Outfile_root, 'GamaGal_subsample')
+	if args.notes != None:
+		appendage = '_%s' % str(notes)
+		outfile_root = join(args.Outfile_root, 'Wcorr%s'%appendage)
+	else:
+		outfile_root = join(args.Outfile_root, 'Wcorr')
 
 	for i, sample in enumerate(samples):
-		new_table = catalog.cut_columns(sample, args._h)
-		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.z_cut, args.c_cut)
+		new_table = catalog.cut_columns(sample, args.H)
+		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut)
 		sample_numbers.append(sample_num)
 
 	File = join(catalog.new_root, 'Sample_popns')
@@ -400,7 +415,7 @@ if __name__ == "__main__":
 	Write.write(str(Text))
 	Write.close()
 
-	catalog.prep_wcorr(catalog.new_root, catalog.wcorr_combos, args.rp_bins, args.rp_lims, args.los_bins, args.los_lim, args.nproc, args.large_pi, 'real_wcorr')
+	catalog.prep_wcorr(catalog.new_root, catalog.wcorr_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'real_wcorr')
 
 	if args.wcorr == 1:
 		os.system('cd /share/splinter/hj/PhD/CosmoFisherForecast/obstools')
@@ -410,16 +425,16 @@ if __name__ == "__main__":
 
 	if args.Random != None:
 		catalog2 = RandomCatalogue(args.Random)
-		catalog2.cut_data(args.z_cut, catalog.pre_count)
+		catalog2.cut_data(args.zCut, catalog.pre_count, catalog.pre_z)
 		samples = [catalog2.highz, catalog2.lowz]
 		# labels = ['highZ_rand', 'lowZ_rand']
-		cuts = 'z-cut: ' + str(args.z_cut)
+		cuts = 'z-cut: ' + str(args.zCut)
 		sample_numbers = [cuts]
 		# outfile_root = join(args.Outfile_root, 'Random_subsample')
 
 		for i, sample in enumerate(samples):
-			new_table = catalog2.cut_columns(sample, args._h)
-			sample_num = catalog2.save_tables(new_table, outfile_root, catalog2.labels[i], args.z_cut, args.c_cut)
+			new_table = catalog2.cut_columns(sample, args.H)
+			sample_num = catalog2.save_tables(new_table, outfile_root, catalog2.labels[i], args.zCut, args.cCut)
 			sample_numbers.append(sample_num)
 
 		File = join(catalog.new_root, 'Sample_rand_popns')
@@ -435,7 +450,7 @@ if __name__ == "__main__":
 		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[3]+'.asc', catalog.samplecounts[3], 'rand_loZ_vs_loZ_B']
 		]
 
-		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rp_bins, args.rp_lims, args.los_bins, args.los_lim, args.nproc, args.large_pi, 'rand_wcorr')
+		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'rand_wcorr')
 
 		if args.wcorr == 1:
 			os.system('qsub '+ join(catalog.new_root, 'rand_wcorr.sh'))
