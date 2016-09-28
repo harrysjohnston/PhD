@@ -64,7 +64,7 @@ class RealCatalogue:
 		DEC = self.data['DEC_1']
 		coordStrings = ['RA', 'DEC']
 		for i, coords in enumerate([RA, DEC]):
-			uniqCoords = np.unique(coords, return_inverse=True, return_count=True)
+			uniqCoords = np.unique(coords, return_inverse=True, return_counts=True)
 			inverse = uniqCoords[1]
 			count = uniqCoords[2]
 			orderedCount = count[inverse]
@@ -257,7 +257,7 @@ class RandomCatalogue(RealCatalogue):
 		DEC = self.data['DEC']
 		coordStrings = ['RA', 'DEC']
 		for i, coords in enumerate([RA, DEC]):
-			uniqCoords = np.unique(coords, return_inverse=True, return_count=True)
+			uniqCoords = np.unique(coords, return_inverse=True, return_counts=True)
 			inverse = uniqCoords[1]
 			count = uniqCoords[2]
 			orderedCount = count[inverse]
