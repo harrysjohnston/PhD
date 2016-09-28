@@ -170,7 +170,7 @@ class RealCatalogue:
 		shell_script = [
 		'#!/bin/tcsh',
 		'#PBS -q compute',
-		'#PBS -N wcorr',
+		'#PBS -N %s'%out_sh,
 		'#PBS -l nodes=1',
 		'#PBS -l walltime=120:00:00',
 		'#PBS -l mem=50gb',
@@ -385,7 +385,6 @@ if __name__ == "__main__":
 		default=0)
 	parser.add_argument(
 		'-notes',
-		type=str,
 		help='notes on any changed wcorr parameters, for appendage to directory name',
 		default=None)
 	args = parser.parse_args()
@@ -417,7 +416,7 @@ if __name__ == "__main__":
 
 	if args.wcorr == 1:
 		os.system('cd /share/splinter/hj/PhD/CosmoFisherForecast/obstools')
-		os.system('gcc wcorr.c -fopenmp -lgsl -lgslcblas -lm -I../bjutils/include/ -L../bjutils/lib/ -lbjutils -O3 -Wall -o wcorr')
+		os.system('gcc ./wcorr.c -fopenmp -lgsl -lgslcblas -lm -I../bjutils/include/ -L../bjutils/lib/ -lbjutils -O3 -Wall -o wcorr')
 		os.system('cd ../..')
 		os.system('qsub '+ join(catalog.new_root, 'real_wcorr.sh'))
 
