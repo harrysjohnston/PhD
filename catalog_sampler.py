@@ -327,16 +327,16 @@ class RandomCatalogue(RealCatalogue):
 		print('Randoms cut down from %s objects to %s' % (len(randNum), len(self.data)))
 
 		# Remove duplicates in RA/DEC:
-		coordStrings = ['RA', 'DEC']
-		for i, col in enumerate(coordStrings):
-			coords = self.data[col]
-			uniqCoords = np.unique(coords, return_inverse=True, return_counts=True)
-			inverse = uniqCoords[1]
-			count = uniqCoords[2]
-			orderedCount = count[inverse]
-			duplicateCut = orderedCount == 1
-			self.data = self.data[duplicateCut]
-			print('Removed %s duplicates in %s' % ((len(duplicateCut)-len(self.data)), col))
+		# coordStrings = ['RA', 'DEC']
+		# for i, col in enumerate(coordStrings):
+		# 	coords = self.data[col]
+		# 	uniqCoords = np.unique(coords, return_inverse=True, return_counts=True)
+		# 	inverse = uniqCoords[1]
+		# 	count = uniqCoords[2]
+		# 	orderedCount = count[inverse]
+		# 	duplicateCut = orderedCount == 1
+		# 	self.data = self.data[duplicateCut]
+		# 	print('Removed %s duplicates in %s' % ((len(duplicateCut)-len(self.data)), col))
 
 		z = self.data['z']
 		pre_z_cut = (z >= z_reals.min()) & (z <= z_reals.max())
