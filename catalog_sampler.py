@@ -41,14 +41,20 @@ class RealCatalogue:
 		total_bitmasks = self.data['col3']
 		if type(bitmask_) != None:
 			bitmask_ = bitmask_[0]
-			bitmask_cut = []
-			for bit_test in total_bitmasks:
-				for mask_ in bitmask_:
-					if (mask_ & bit_test == mask_):
-						bitmask_cut.append(False)
-						break
-					if mask_ == bitmask_[-1]:
-						bitmask_cut.append(True)
+
+			# bitmask_cut = []
+			# for bit_test in total_bitmasks:
+			# 	for mask_ in bitmask_:
+			# 		if (mask_ & bit_test == mask_):
+			# 			bitmask_cut.append(False)
+			# 			break
+			# 		if mask_ == bitmask_[-1]:
+			# 			bitmask_cut.append(True)
+
+			bitmask_cut = [True]*len(total_bitmasks)
+			for i in np.arange(0,len(bitmask_)):
+			    bitmask_cut &= np.where(bitmask_[i] & total_bitmasks == bitmask_[i], False, True)
+
 			assert len(bitmask_cut) == len(total_bitmasks), "bitmask testing broken"
 			bitmask_cut = np.array(bitmask_cut)
 			self.data = self.data[bitmask_cut]
@@ -213,10 +219,79 @@ class RealCatalogue:
 		Write.write(str(Text))
 		Write.close()
 
-	# def plot_wcorr(self, files_path, combos, ): # NEED TO WORK IN RANDOM-SUBTRACTION SOMEHOW
-	# 	data_files = []
-	# 	[data_files.append(('wcorr_' + item[4] + '.dat') for item in combos)]
-	# 	f, axarr = plt.subplots(2, 2)
+	def plot_wcorr(self, files_path, combos):
+		# 0 = hiZ_Red
+		# 1 = hiZ_Blue
+		# 2 = loZ_Red
+		# 3 = loZ_Blue
+		wcorrOutputs = []
+		rand_wcorrOutputs = []
+		for item in combos:
+			wcorrOutputs.append('%s'%join(files_path, ('wcorr_' + item[4] + '.dat')))
+			rand_wcorrOutputs.append('%s'%join(files_path, ('wcorr_rand_' + item[4] + '.dat')))
+		realData = []
+		randData = []
+		wgplus = []
+		wgcross = []
+		wgerr = []
+		print(wcorrOutputs[0])
+		for i, path in enumerate(wcorrOutputs):
+			realData.append(np.loadtxt(path))
+			randData.append(np.loadtxt(rand_wcorrOutputs[i]))
+			realData[i][:,3] -= randData[i][:,3]
+			realData[i][:,4] -= randData[i][:,4]
+			wgplus.append(realData[i][:,3])
+			wgcross.append(realData[i][:,4])
+			wgerr.append(realData[i][:,6])
+		r_p = realData[0][:,0]
+		x = np.linspace(0, r_p.max()*1.8)
+		f, axarr = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(15,10))
+		f.subplots_adjust(hspace=0, wspace=0)
+		axarr[0,0].errorbar(r_p, wgplus[0], yerr=wgerr[0],
+							elinewidth=2, color='r', capsize=0,
+							label='w(g+)')
+		axarr[0,0].errorbar(r_p, wgcross[0], yerr=wgerr[0],
+							elinewidth=2, color='g', capsize=0,
+							label='w(gx)', alpha=0.5)
+		axarr[0,1].errorbar(r_p, wgplus[1], yerr=wgerr[1],
+							elinewidth=2, color='b', capsize=0,
+							label='w(g+)')
+		axarr[0,1].errorbar(r_p, wgcross[1], yerr=wgerr[1],
+							elinewidth=2, color='g', capsize=0,
+							label='w(gx)', alpha=0.5)
+		axarr[1,0].errorbar(r_p, wgplus[2], yerr=wgerr[2],
+							elinewidth=2, color='r', capsize=0,
+							label='w(g+)')
+		axarr[1,0].errorbar(r_p, wgcross[2], yerr=wgerr[2],
+							elinewidth=2, color='g', capsize=0,
+							label='w(gx)', alpha=0.5)
+		axarr[1,1].errorbar(r_p, wgplus[3], yerr=wgerr[3],
+							elinewidth=2, color='b', capsize=0,
+							label='w(g+)')
+		axarr[1,1].errorbar(r_p, wgcross[3], yerr=wgerr[3],
+							elinewidth=2, color='g', capsize=0,
+							label='w(gx)', alpha=0.5)
+		arr_ind = [(0,0), (0,1), (1,0), (1,1)]
+		for i, ind in enumerate(arr_ind):
+			a = axarr[ind]
+			a.set_xscale('log')
+			a.set_xlim(0.25,70)
+			a.set_ylim(-0.5,0.4)
+			a.plot(x, [0]*len(x), lw=2, ls='--', color='c')
+			# a.set_xlabel('Comoving transverse separation (Mpc/h)')
+			# a.set_ylabel('Correlations')
+			a.set_title('%s'%combos[i][4], fontsize=12)
+			a.legend(loc='upper right')
+			a.grid()
+		plt.setp([a.get_xticklabels() for a in axarr[0, :]], visible=False)
+		plt.setp([a.get_yticklabels() for a in axarr[:, 1]], visible=False)
+		axarr[1,0].set_xlabel('Comoving transverse separation (Mpc/h)')
+		axarr[1,0].set_ylabel('Correlations')
+		# if outimg:
+		# 	f.savefig(str(outimg))
+		# plt.setp([a.get_xlabels() for a in axarr[:, 1]], visible=False)
+
+		# return f
 
 
 class RandomCatalogue(RealCatalogue):
@@ -415,9 +490,9 @@ if __name__ == "__main__":
 	catalog.prep_wcorr(catalog.new_root, catalog.wcorr_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'real_wcorr')
 
 	if args.wcorr == 1:
-		os.system('cd /share/splinter/hj/PhD/CosmoFisherForecast/obstools')
-		os.system('gcc ./wcorr.c -fopenmp -lgsl -lgslcblas -lm -I../bjutils/include/ -L../bjutils/lib/ -lbjutils -O3 -Wall -o wcorr')
-		os.system('cd ../..')
+		# os.system('cd /share/splinter/hj/PhD/CosmoFisherForecast/obstools')
+		# os.system('gcc ./wcorr.c -fopenmp -lgsl -lgslcblas -lm -I../bjutils/include/ -L../bjutils/lib/ -lbjutils -O3 -Wall -o wcorr')
+		# os.system('cd ../..')
 		os.system('qsub '+ join(catalog.new_root, 'real_wcorr.sh'))
 
 	if args.Random != None:
@@ -448,6 +523,11 @@ if __name__ == "__main__":
 		]
 
 		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'rand_wcorr')
+
+		# with open('rand_wcorr.sh', 'a') as script:
+		# 	script.write(
+		# 		'<call python to plot wcorr results>'
+		# 		)
 
 		if args.wcorr == 1:
 			os.system('qsub '+ join(catalog.new_root, 'rand_wcorr.sh'))
