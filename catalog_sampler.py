@@ -10,6 +10,7 @@ import csv
 from astropy import cosmology
 from astropy.cosmology import Planck13
 import matplotlib.pyplot as plt
+import sys
 
 class RealCatalogue:
 
@@ -23,6 +24,7 @@ class RealCatalogue:
 		self.data = hdulist[1].data
 		self.columns = hdulist[1].columns.names
 		self.labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
+		self.wcorrLabels = ['hiZ_vs_hiZ_R', 'hiZ_vs_hiZ_B', 'loZ_vs_loZ_R', 'loZ_vs_loZ_B']
 
 	def cut_data(self, pgm_, z_, colour_, *bitmask_): 
 		"""""
@@ -192,9 +194,10 @@ class RealCatalogue:
 		for combo in wcorr_combos:
 			shell_script.append('')
 			outfile = combo[4]
-			if large_pi == 1:
+			if large_pi:
 				# outfile = outfile[:-4]
 				outfile += '_largePi'
+				out_sh += '_largePi'
 			shell_script.append('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s %s 0' %	(files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile, nproc, large_pi)
 				)
 			shell_script.append('')
@@ -219,22 +222,22 @@ class RealCatalogue:
 		Write.write(str(Text))
 		Write.close()
 
-	def plot_wcorr(self, files_path, combos):
+	def plot_wcorr(self, files_path, wcorrIDs):
 		# 0 = hiZ_Red
 		# 1 = hiZ_Blue
 		# 2 = loZ_Red
 		# 3 = loZ_Blue
 		wcorrOutputs = []
 		rand_wcorrOutputs = []
-		for item in combos:
-			wcorrOutputs.append('%s'%join(files_path, ('wcorr_' + item[4] + '.dat')))
-			rand_wcorrOutputs.append('%s'%join(files_path, ('wcorr_rand_' + item[4] + '.dat')))
+		for item in wcorrIDs:
+			wcorrOutputs.append('%s'%join(files_path, ('wcorr_' + item + '.dat')))
+			rand_wcorrOutputs.append('%s'%join(files_path, ('wcorr_rand_' + item + '.dat')))
 		realData = []
 		randData = []
 		wgplus = []
 		wgcross = []
 		wgerr = []
-		print(wcorrOutputs[0])
+		# print(wcorrOutputs[0])
 		for i, path in enumerate(wcorrOutputs):
 			realData.append(np.loadtxt(path))
 			randData.append(np.loadtxt(rand_wcorrOutputs[i]))
@@ -280,19 +283,26 @@ class RealCatalogue:
 			a.plot(x, [0]*len(x), lw=2, ls='--', color='c')
 			# a.set_xlabel('Comoving transverse separation (Mpc/h)')
 			# a.set_ylabel('Correlations')
-			a.set_title('%s'%combos[i][4], fontsize=12)
+			a.set_title('%s'%wcorrIDs[i], fontsize=12)
 			a.legend(loc='upper right')
 			a.grid()
 		plt.setp([a.get_xticklabels() for a in axarr[0, :]], visible=False)
 		plt.setp([a.get_yticklabels() for a in axarr[:, 1]], visible=False)
+		# plt.setp([a.get_xlabels() for a in axarr[:, 1]], visible=False)
 		axarr[1,0].set_xlabel('Comoving transverse separation (Mpc/h)')
 		axarr[1,0].set_ylabel('Correlations')
-		# if outimg:
-		# 	f.savefig(str(outimg))
-		# plt.setp([a.get_xlabels() for a in axarr[:, 1]], visible=False)
 
-		# return f
+		plotsDir = join(files_path, 'Plots')
+		if not isdir(plotsDir):
+			mkdir(plotsDir)
 
+		if 'largePi' in wcorrOutputs[0]:
+			outimg = join(plotsDir, 'wcorr_plots_largePi.pdf')
+		else:
+			outimg = join(plotsDir, 'wcorr_plots.pdf')
+		f.savefig(outimg)
+
+		return wcorrOutputs
 
 class RandomCatalogue(RealCatalogue):
 
@@ -388,8 +398,8 @@ if __name__ == "__main__":
 		'Catalog',
 		help='full path of REAL catalogue to be sampled into ascii table(s)')
 	parser.add_argument(
-		'Outfile_root',
-		help='full path of destination directory for subsample ascii catalogues, where further directories will be created and appended with "_z_<z_cut>_c_<colour_cut>" if applicable')
+		'Path',
+		help='full path of destination directory for subsample ascii catalogues, where further directories will be created and appended with "_z_<z_cut>_c_<colour_cut>" if applicable. ***If using -plotNow, give full path to wcorr output directory***')
 	parser.add_argument(
 		'-Random',
 		help="optional; path to RANDOM catalogue to be correspondingly sampled",
@@ -456,15 +466,34 @@ if __name__ == "__main__":
 		'-wcorr',
 		type=int,
 		choices=[0,1],
-		help='initiate wcorr density-shape correlation measurements (1) or not (0), defaults to 0',
+		help='initiate wcorr density-shape correlation measurements (1), or not (0), defaults to 0',
 		default=0)
 	parser.add_argument(
 		'-notes',
 		help='notes on any changed wcorr parameters, for appendage to directory name',
 		default=None)
+	parser.add_argument(
+		'-plot',
+		help='plot data & save figure after correlations completed (1), or not (0), defaults to 1',
+		default=1)
+	parser.add_argument(
+		'-plotNow',
+		help='plot ALREADY EXISTING correlation data (1), having given arg="Path" as the path to the .dat files (Catalog arg must still be path of readable .fits catalog). Bypasses all other sampling functions. Defaults to 0',
+		default=0)
 	args = parser.parse_args()
 
 	catalog = RealCatalogue(args.Catalog)
+
+	if args.plotNow:
+		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels)
+		largePi_outs = [(out[:-4] + '_largePi.dat') for out in wcorrOuts]
+		isIn = [i in listdir(args.Path) for i in largePi_outs]
+		uniq = np.unique(isIn)
+		if uniq.all() == True:
+			IDs = [outs[6:-4] for outs in largePi_outs]
+			a = catalog.plot_wcorr(args.Path, IDs)
+		sys.exit()
+
 	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.bitmaskCut)
 	samples = [catalog.highz_R, catalog.highz_B, 									catalog.lowz_R, catalog.lowz_B,										catalog.highz, catalog.lowz]
 	# labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
@@ -472,9 +501,9 @@ if __name__ == "__main__":
 	sample_numbers = [cuts]
 	if args.notes != None:
 		appendage = '_%s' % str(args.notes)
-		outfile_root = join(args.Outfile_root, 'Wcorr%s'%appendage)
+		outfile_root = join(args.Path, 'Wcorr%s'%appendage)
 	else:
-		outfile_root = join(args.Outfile_root, 'Wcorr')
+		outfile_root = join(args.Path, 'Wcorr')
 
 	for i, sample in enumerate(samples):
 		new_table = catalog.cut_columns(sample, args.H)
@@ -489,7 +518,7 @@ if __name__ == "__main__":
 
 	catalog.prep_wcorr(catalog.new_root, catalog.wcorr_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'real_wcorr')
 
-	if args.wcorr == 1:
+	if args.wcorr:
 		# os.system('cd /share/splinter/hj/PhD/CosmoFisherForecast/obstools')
 		# os.system('gcc ./wcorr.c -fopenmp -lgsl -lgslcblas -lm -I../bjutils/include/ -L../bjutils/lib/ -lbjutils -O3 -Wall -o wcorr')
 		# os.system('cd ../..')
@@ -502,7 +531,7 @@ if __name__ == "__main__":
 		# labels = ['highZ_rand', 'lowZ_rand']
 		cuts = 'z-cut: ' + str(args.zCut)
 		sample_numbers = [cuts]
-		# outfile_root = join(args.Outfile_root, 'Random_subsample')
+		# outfile_root = join(args.Path, 'Random_subsample')
 
 		for i, sample in enumerate(samples):
 			new_table = catalog2.cut_columns(sample, args.H)
@@ -524,13 +553,15 @@ if __name__ == "__main__":
 
 		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'rand_wcorr')
 
-		# with open('rand_wcorr.sh', 'a') as script:
-		# 	script.write(
-		# 		'<call python to plot wcorr results>'
-		# 		)
+		if args.plot:
+			with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
+				script.write(
+					'\npython /share/splinter/hj/PhD/catalog_sampler.py %s %s -plotNow 1'%(args.Catalog, catalog.new_root)
+					)
 
-		if args.wcorr == 1:
+		if args.wcorr:
 			os.system('qsub '+ join(catalog.new_root, 'rand_wcorr.sh'))
+
 
 
 
