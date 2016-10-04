@@ -248,6 +248,7 @@ class RealCatalogue:
 			wgerr.append(realData[i][:,6])
 		r_p = realData[0][:,0]
 		x = np.linspace(0, r_p.max()*1.8)
+		plt.ioff()
 		f, axarr = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(15,10))
 		f.subplots_adjust(hspace=0, wspace=0)
 		axarr[0,0].errorbar(r_p, wgplus[0], yerr=wgerr[0],
