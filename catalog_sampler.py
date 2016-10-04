@@ -2,7 +2,7 @@ from __future__ import print_function, division
 from astropy.io import fits
 import numpy as np
 from astropy.io import ascii
-from os.path import join, isdir
+from os.path import join, isdir, basename, normpath
 from os import listdir, mkdir
 import os
 import argparse
@@ -243,12 +243,15 @@ class RealCatalogue:
 			randData.append(np.loadtxt(rand_wcorrOutputs[i]))
 			realData[i][:,3] -= randData[i][:,3]
 			realData[i][:,4] -= randData[i][:,4]
+			realErr = realData[i][:,6]
+			randErr = randData[i][:,6]
+			propgErrs = np.sqrt((realErr**2) + (randErr**2))
 			wgplus.append(realData[i][:,3])
 			wgcross.append(realData[i][:,4])
-			wgerr.append(realData[i][:,6])
+			wgerr.append(propgErrs)
 		r_p = realData[0][:,0]
 		x = np.linspace(0, r_p.max()*1.8)
-		plt.ioff()
+		# plt.ioff()
 		f, axarr = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(15,10))
 		f.subplots_adjust(hspace=0, wspace=0)
 		axarr[0,0].errorbar(r_p, wgplus[0], yerr=wgerr[0],
@@ -487,7 +490,7 @@ if __name__ == "__main__":
 
 	if args.plotNow:
 		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels)
-		largePi_outs = [(out[:-4] + '_largePi.dat') for out in wcorrOuts]
+		largePi_outs = [basename(normpath(out[:-4] + '_largePi.dat')) for out in wcorrOuts]
 		isIn = [i in listdir(args.Path) for i in largePi_outs]
 		uniq = np.unique(isIn)
 		if uniq.all() == True:
