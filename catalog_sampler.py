@@ -485,7 +485,7 @@ if __name__ == "__main__":
 		'-largePi',
 		type=int,
 		choices=[0,1],
-		help='specify regular (0) or large-Pi systematics tests (1), defaults to 0',
+		help='specify regular (0) or regular + large-Pi systematics tests (1), defaults to 1',
 		default=0)
 	parser.add_argument(
 		'-wcorr',
@@ -541,8 +541,8 @@ if __name__ == "__main__":
 	catalog.prep_wcorr(catalog.new_root, catalog.wcorr_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'real_wcorr')
 
 	if args.wcorr:
-		list_dir = listdir(catalog.new_root)
-		shells = [i.endswith('.sh') for i in list_dir]
+		list_dir = np.array(listdir(catalog.new_root))
+		shells = np.array([i.endswith('.sh') for i in list_dir])
 		list_dir = list_dir[shells]
 		[os.system('qsub '+ join(catalog.new_root, shell)) for shell in list_dir]
 
@@ -580,9 +580,9 @@ if __name__ == "__main__":
 					)
 
 		if args.wcorr:
-			list_dir = listdir(catalog.new_root)
-			shells = [i.endswith('.sh') for i in list_dir]
-			r_shells = [i.startswith('rand') for i in list_dir]
+			list_dir = np.array(listdir(catalog.new_root))
+			shells = np.array([i.endswith('.sh') for i in list_dir])
+			r_shells = np.array([i.startswith('rand') for i in list_dir])
 			list_dir = list_dir[(shells&r_shells)]
 			[os.system('qsub '+ join(catalog.new_root, shell)) for shell in list_dir]
 
