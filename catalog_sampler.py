@@ -23,7 +23,9 @@ class RealCatalogue:
 		hdulist = fits.open(path)
 		self.data = hdulist[1].data
 		self.columns = hdulist[1].columns.names
+		# ascii (.asc) file IDs
 		self.labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
+		# bodies of wcorr output file IDs
 		self.wcorrLabels = ['hiZ_vs_hiZ_R', 'hiZ_vs_hiZ_B', 'loZ_vs_loZ_R', 'loZ_vs_loZ_B']
 
 	def cut_data(self, pgm_, z_, colour_, *bitmask_): 
@@ -55,6 +57,7 @@ class RealCatalogue:
 
 			bitmask_cut = [True]*len(total_bitmasks)
 			for i in np.arange(0,len(bitmask_)):
+				# construct bitmask cut
 			    bitmask_cut &= np.where(bitmask_[i] & total_bitmasks == bitmask_[i], False, True)
 
 			assert len(bitmask_cut) == len(total_bitmasks), "bitmask testing broken"
@@ -68,25 +71,26 @@ class RealCatalogue:
 		print('pgm cut: ', np.unique(pgm_cut))
 
 		# Remove duplicates in RA/DEC:
-		coordStrings = ['RA_1', 'DEC_1']
-		for i, col in enumerate(coordStrings):
-			coords = self.data[col]
-			uniqCoords = np.unique(coords, return_inverse=True, return_counts=True)
-			inverse = uniqCoords[1]
-			count = uniqCoords[2]
-			orderedCount = count[inverse]
-			duplicateCut = orderedCount == 1
-			self.data = self.data[duplicateCut]
-			print('Removed %s duplicates in %s' % ((len(duplicateCut)-len(self.data)), col[:-2]))
+		# coordStrings = ['RA_1', 'DEC_1']
+		# for i, col in enumerate(coordStrings):
+		# 	coords = self.data[col]
+		# 	uniqCoords = np.unique(coords, return_inverse=True, return_counts=True)
+		# 	inverse = uniqCoords[1]
+		# 	count = uniqCoords[2]
+		# 	orderedCount = count[inverse]
+		# 	duplicateCut = orderedCount == 1
+		# 	self.data = self.data[duplicateCut]
+		# 	print('Removed %s duplicates in %s' % ((len(duplicateCut)-len(self.data)), col[:-2]))
 
 		self.pre_count = len(self.data)
 		z = self.data['z_1_1']
+		# define minimum redshift
 		self.data = self.data[(z >= 0.02)]
 		z = self.data['z_1_1']
 		self.pre_z = z
 		colour = self.data['absmag_g_1'] - self.data['absmag_i_1']
 
-
+		# define colour & redshift cuts
 		if colour_ != None:
 			colour_cut = np.array((colour > colour_))
 			colour_cut_r = np.invert(colour_cut)
@@ -104,6 +108,7 @@ class RealCatalogue:
 			print('highZ catalog == lowZ catalog')
 		print('z cut: ', z_, np.unique(z_cut))
 
+		# apply cuts
 		self.highz_R = self.data[(z_cut & colour_cut)]
 		self.highz_B = self.data[(z_cut & colour_cut_r)]
 		self.lowz_R = self.data[(z_cut_r & colour_cut)]
@@ -117,6 +122,7 @@ class RealCatalogue:
 
 		[print('# objects %s: '%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
 
+		# construct sets of filenames, counts, & IDs for wcorr-calls
 		self.wcorr_combos = [
 		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[0]+'.asc', self.samplecounts[0], 'hiZ_vs_hiZ_R'],
 		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[1]+'.asc', self.samplecounts[1], 'hiZ_vs_hiZ_B'],
@@ -140,7 +146,6 @@ class RealCatalogue:
 		RA = np.deg2rad(table['RA_1'])
 		DEC = np.deg2rad(table['DEC_1'])
 		Z = table['Z_1_1']
-		# print('Z : ', Z)
 		e1 = table['e1c']/table['pgm']
 		e2 = table['e2c']/table['pgm']
 		e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
@@ -152,15 +157,17 @@ class RealCatalogue:
 		new_table = np.column_stack((RA, DEC, comov, e1, e2, e_weight))
 		return new_table
 
-	def save_tables(self, new_table, outfile_root_, label, z_cut, c_cut):
+	def save_tables(self, new_table, outfile_root_, label, z_cut, c_cut, notes):
 		"""""
 		save subsample tables to ascii
 
 		"""""
+		if notes != None:
+			outfile_root_ += '_%s'%notes
 		if (z_cut != None) & (c_cut != None):
-			outfile_root = outfile_root_ + "_z_" + str(z_cut) + "_c_" + str(c_cut)
+			outfile_root = outfile_root_ + "_z" + str(z_cut) + "_c" + str(c_cut)
 		elif z_cut != None:
-			outfile_root = outfile_root_ + "_z_" + str(z_cut)
+			outfile_root = outfile_root_ + "_z" + str(z_cut)
 		else:
 			outfile_root = outfile_root_
 
@@ -170,7 +177,6 @@ class RealCatalogue:
 			mkdir(outfile_root)
 		ascii.write(new_table, join(outfile_root, label + ".asc"), names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
 		sample_no = str(label) + " # objects: " + str(len(new_table))
-		# print(sample_no)
 		return sample_no
 
 	def prep_wcorr(self, files_path, wcorr_combos, rp_bins, rp_lims, los_bins, los_lim, nproc, large_pi, out_sh):
@@ -191,16 +197,19 @@ class RealCatalogue:
 		'',
 		'date']
 
-		for combo in wcorr_combos:
+		for combo in wcorr_combos: 
+		# write 4x wcorr-calls to .sh script, & another 4x if largePi
 			shell_script.append('')
 			outfile = combo[4]
-			if large_pi:
-				# outfile = outfile[:-4]
-				outfile += '_largePi'
-				out_sh += '_largePi'
-			shell_script.append('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s %s 0' %	(files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile, nproc, large_pi)
+			shell_script.append('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0' %	(files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile, nproc)
 				)
 			shell_script.append('')
+			if large_pi:				
+				outfile += '_largePi'
+				shell_script.append('')
+				shell_script.append('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s %s 0' %	(files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile, nproc, large_pi)
+				)
+				shell_script.append('')
 
 		shell_script.append('date')
 
@@ -210,7 +219,7 @@ class RealCatalogue:
 		Write.write(str(Text))
 		Write.close()
 
-		wcorr_spec = []
+		wcorr_spec = [] # record parameters used in wcorr
 		wcorr_spec.append('Comoving transverse separation r_p: %s - %s Mpc/h in %s log-spaced bins'%(rp_lims[0], rp_lims[1], rp_bins))
 		wcorr_spec.append('Comoving line-of-sight separation \Pi: %s - %s Mpc/h in %s bins'%(los_lim*(-1), los_lim, los_bins))
 		wcorr_spec.append('No. processors: %s'%nproc)
@@ -230,6 +239,7 @@ class RealCatalogue:
 		wcorrOutputs = []
 		rand_wcorrOutputs = []
 		for item in wcorrIDs:
+			# construct filenames.dat
 			wcorrOutputs.append('%s'%join(files_path, ('wcorr_' + item + '.dat')))
 			rand_wcorrOutputs.append('%s'%join(files_path, ('wcorr_rand_' + item + '.dat')))
 		realData = []
@@ -237,74 +247,85 @@ class RealCatalogue:
 		wgplus = []
 		wgcross = []
 		wgerr = []
-		# print(wcorrOutputs[0])
+		rand_wgplus = []
+		rand_wgcross = []
+		rand_wgerr = []
 		for i, path in enumerate(wcorrOutputs):
 			realData.append(np.loadtxt(path))
 			randData.append(np.loadtxt(rand_wcorrOutputs[i]))
+			# subtract randoms from +/x
 			realData[i][:,3] -= randData[i][:,3]
 			realData[i][:,4] -= randData[i][:,4]
 			realErr = realData[i][:,6]
 			randErr = randData[i][:,6]
+			# propagate errors
 			propgErrs = np.sqrt((realErr**2) + (randErr**2))
 			wgplus.append(realData[i][:,3])
 			wgcross.append(realData[i][:,4])
 			wgerr.append(propgErrs)
+			rand_wgplus.append(randData[i][:,3])
+			rand_wgcross.append(randData[i][:,4])
+			rand_wgerr.append(randData[i][:,6])
 		r_p = realData[0][:,0]
 		x = np.linspace(0, r_p.max()*1.8)
 		# plt.ioff()
-		f, axarr = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(15,10))
-		f.subplots_adjust(hspace=0, wspace=0)
-		axarr[0,0].errorbar(r_p, wgplus[0], yerr=wgerr[0],
-							elinewidth=2, color='r', capsize=0,
-							label='w(g+)')
-		axarr[0,0].errorbar(r_p, wgcross[0], yerr=wgerr[0],
-							elinewidth=2, color='g', capsize=0,
-							label='w(gx)', alpha=0.5)
-		axarr[0,1].errorbar(r_p, wgplus[1], yerr=wgerr[1],
-							elinewidth=2, color='b', capsize=0,
-							label='w(g+)')
-		axarr[0,1].errorbar(r_p, wgcross[1], yerr=wgerr[1],
-							elinewidth=2, color='g', capsize=0,
-							label='w(gx)', alpha=0.5)
-		axarr[1,0].errorbar(r_p, wgplus[2], yerr=wgerr[2],
-							elinewidth=2, color='r', capsize=0,
-							label='w(g+)')
-		axarr[1,0].errorbar(r_p, wgcross[2], yerr=wgerr[2],
-							elinewidth=2, color='g', capsize=0,
-							label='w(gx)', alpha=0.5)
-		axarr[1,1].errorbar(r_p, wgplus[3], yerr=wgerr[3],
-							elinewidth=2, color='b', capsize=0,
-							label='w(g+)')
-		axarr[1,1].errorbar(r_p, wgcross[3], yerr=wgerr[3],
-							elinewidth=2, color='g', capsize=0,
-							label='w(gx)', alpha=0.5)
-		arr_ind = [(0,0), (0,1), (1,0), (1,1)]
-		for i, ind in enumerate(arr_ind):
-			a = axarr[ind]
-			a.set_xscale('log')
-			a.set_xlim(0.25,70)
-			a.set_ylim(-0.5,0.4)
-			a.plot(x, [0]*len(x), lw=2, ls='--', color='c')
-			# a.set_xlabel('Comoving transverse separation (Mpc/h)')
-			# a.set_ylabel('Correlations')
-			a.set_title('%s'%wcorrIDs[i], fontsize=12)
-			a.legend(loc='upper right')
-			a.grid()
-		plt.setp([a.get_xticklabels() for a in axarr[0, :]], visible=False)
-		plt.setp([a.get_yticklabels() for a in axarr[:, 1]], visible=False)
-		# plt.setp([a.get_xlabels() for a in axarr[:, 1]], visible=False)
-		axarr[1,0].set_xlabel('Comoving transverse separation (Mpc/h)')
-		axarr[1,0].set_ylabel('Correlations')
+		dataPoints = [[wgplus, wgcross, wgerr], [rand_wgplus, rand_wgcross, rand_wgerr]]
+		prefix = ['','rand_']
+		for j, set_ in enumerate(dataPoints): 
+		# plot/save random-subtracted-reals, AND randoms
+			f, axarr = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(15,10))
+			f.subplots_adjust(hspace=0, wspace=0)
+			axarr[0,0].errorbar(r_p, set_[0][0], yerr=set_[2][0],
+								elinewidth=2, color='r', capsize=0,
+								label='w(g+)')
+			axarr[0,0].errorbar(r_p, set_[1][0], yerr=set_[2][0],
+								elinewidth=2, color='g', capsize=0,
+								label='w(gx)', alpha=0.5)
+			axarr[0,1].errorbar(r_p, set_[0][1], yerr=set_[2][1],
+								elinewidth=2, color='b', capsize=0,
+								label='w(g+)')
+			axarr[0,1].errorbar(r_p, set_[1][1], yerr=set_[2][1],
+								elinewidth=2, color='g', capsize=0,
+								label='w(gx)', alpha=0.5)
+			axarr[1,0].errorbar(r_p, set_[0][2], yerr=set_[2][2],
+								elinewidth=2, color='r', capsize=0,
+								label='w(g+)')
+			axarr[1,0].errorbar(r_p, set_[1][2], yerr=set_[2][2],
+								elinewidth=2, color='g', capsize=0,
+								label='w(gx)', alpha=0.5)
+			axarr[1,1].errorbar(r_p, set_[0][3], yerr=set_[2][3],
+								elinewidth=2, color='b', capsize=0,
+								label='w(g+)')
+			axarr[1,1].errorbar(r_p, set_[1][3], yerr=set_[2][3],
+								elinewidth=2, color='g', capsize=0,
+								label='w(gx)', alpha=0.5)
+			arr_ind = [(0,0), (0,1), (1,0), (1,1)]
+			for i, ind in enumerate(arr_ind):
+				a = axarr[ind]
+				a.set_xscale('log')
+				a.set_xlim(0.25,70)
+				a.set_ylim(-0.5,0.4)
+				a.plot(x, [0]*len(x), lw=2, ls='--', color='c')
+				# a.set_xlabel('Comoving transverse separation (Mpc/h)')
+				# a.set_ylabel('Correlations')
+				a.set_title('%s'%wcorrIDs[i], fontsize=12)
+				a.legend(loc='upper right')
+				a.grid()
+			plt.setp([a.get_xticklabels() for a in axarr[0, :]], visible=False)
+			plt.setp([a.get_yticklabels() for a in axarr[:, 1]], visible=False)
+			# plt.setp([a.get_xlabels() for a in axarr[:, 1]], visible=False)
+			axarr[1,0].set_xlabel('Comoving transverse separation (Mpc/h)')
+			axarr[1,0].set_ylabel('Correlations')
 
-		plotsDir = join(files_path, 'Plots')
-		if not isdir(plotsDir):
-			mkdir(plotsDir)
+			plotsDir = join(files_path, 'Plots')
+			if not isdir(plotsDir):
+				mkdir(plotsDir)
 
-		if 'largePi' in wcorrOutputs[0]:
-			outimg = join(plotsDir, 'wcorr_plots_largePi.pdf')
-		else:
-			outimg = join(plotsDir, 'wcorr_plots.pdf')
-		f.savefig(outimg)
+			if 'largePi' in wcorrOutputs[0]:
+				outimg = join(plotsDir, '%swcorr_plots_largePi.pdf'%prefix[j])
+			else:
+				outimg = join(plotsDir, '%swcorr_plots.pdf'%prefix[j])
+			f.savefig(outimg)
 
 		return wcorrOutputs
 
@@ -489,8 +510,10 @@ if __name__ == "__main__":
 	catalog = RealCatalogue(args.Catalog)
 
 	if args.plotNow:
+	# plot .dat files, returning filename-list
 		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels)
 		largePi_outs = [basename(normpath(out[:-4] + '_largePi.dat')) for out in wcorrOuts]
+		# check for largePi .dat files
 		isIn = [i in listdir(args.Path) for i in largePi_outs]
 		uniq = np.unique(isIn)
 		if uniq.all() == True:
@@ -500,18 +523,13 @@ if __name__ == "__main__":
 
 	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.bitmaskCut)
 	samples = [catalog.highz_R, catalog.highz_B, 									catalog.lowz_R, catalog.lowz_B,										catalog.highz, catalog.lowz]
-	# labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
 	cuts = 'z-cut: ' + str(args.zCut) + ', colour-cut (g-i): ' + str(args.cCut)
 	sample_numbers = [cuts]
-	if args.notes != None:
-		appendage = '_%s' % str(args.notes)
-		outfile_root = join(args.Path, 'Wcorr%s'%appendage)
-	else:
-		outfile_root = join(args.Path, 'Wcorr')
+	outfile_root = join(args.Path, 'Wcorr')
 
 	for i, sample in enumerate(samples):
 		new_table = catalog.cut_columns(sample, args.H)
-		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut)
+		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
 		sample_numbers.append(sample_num)
 
 	File = join(catalog.new_root, 'Sample_popns')
@@ -523,23 +541,21 @@ if __name__ == "__main__":
 	catalog.prep_wcorr(catalog.new_root, catalog.wcorr_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'real_wcorr')
 
 	if args.wcorr:
-		# os.system('cd /share/splinter/hj/PhD/CosmoFisherForecast/obstools')
-		# os.system('gcc ./wcorr.c -fopenmp -lgsl -lgslcblas -lm -I../bjutils/include/ -L../bjutils/lib/ -lbjutils -O3 -Wall -o wcorr')
-		# os.system('cd ../..')
-		os.system('qsub '+ join(catalog.new_root, 'real_wcorr.sh'))
+		list_dir = listdir(catalog.new_root)
+		shells = [i.endswith('.sh') for i in list_dir]
+		list_dir = list_dir[shells]
+		[os.system('qsub '+ join(catalog.new_root, shell)) for shell in list_dir]
 
 	if args.Random != None:
 		catalog2 = RandomCatalogue(args.Random)
 		catalog2.cut_data(args.zCut, catalog.pre_count, catalog.pre_z)
 		samples = [catalog2.highz, catalog2.lowz]
-		# labels = ['highZ_rand', 'lowZ_rand']
 		cuts = 'z-cut: ' + str(args.zCut)
 		sample_numbers = [cuts]
-		# outfile_root = join(args.Path, 'Random_subsample')
 
 		for i, sample in enumerate(samples):
 			new_table = catalog2.cut_columns(sample, args.H)
-			sample_num = catalog2.save_tables(new_table, outfile_root, catalog2.labels[i], args.zCut, args.cCut)
+			sample_num = catalog2.save_tables(new_table, outfile_root, catalog2.labels[i], args.zCut, args.cCut, args.notes)
 			sample_numbers.append(sample_num)
 
 		File = join(catalog.new_root, 'Sample_rand_popns')
@@ -564,7 +580,11 @@ if __name__ == "__main__":
 					)
 
 		if args.wcorr:
-			os.system('qsub '+ join(catalog.new_root, 'rand_wcorr.sh'))
+			list_dir = listdir(catalog.new_root)
+			shells = [i.endswith('.sh') for i in list_dir]
+			r_shells = [i.startswith('rand') for i in list_dir]
+			list_dir = list_dir[(shells&r_shells)]
+			[os.system('qsub '+ join(catalog.new_root, shell)) for shell in list_dir]
 
 
 
