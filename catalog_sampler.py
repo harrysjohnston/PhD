@@ -43,7 +43,7 @@ class RealCatalogue:
 		assert 'col3' in self.columns, "'col3' not in columns, see column headers: "+ str(self.columns)
 
 		total_bitmasks = self.data['col3']
-		if type(bitmask_) != None:
+		if (type(bitmask_) != None) & (type(bitmask_[0]) != None):
 			bitmask_ = bitmask_[0]
 
 			# bitmask_cut = []
@@ -63,12 +63,12 @@ class RealCatalogue:
 			assert len(bitmask_cut) == len(total_bitmasks), "bitmask testing broken"
 			bitmask_cut = np.array(bitmask_cut)
 			self.data = self.data[bitmask_cut]
-			print('bitmask cut: ', np.unique(bitmask_cut))
+			print('bitmask cut: \t', np.unique(bitmask_cut))
 
 		pgm = self.data['pgm']
 		pgm_cut = np.array((pgm > pgm_))
 		self.data = self.data[pgm_cut]
-		print('pgm cut: ', np.unique(pgm_cut))
+		print('pgm cut: \t', np.unique(pgm_cut))
 
 		# Remove duplicates in RA/DEC:
 		# coordStrings = ['RA_1', 'DEC_1']
@@ -92,27 +92,28 @@ class RealCatalogue:
 
 		# define colour & redshift cuts
 		if colour_ != None:
-			colour_cut = np.array((colour > colour_))
-			colour_cut_r = np.invert(colour_cut)
+			red_cut = np.array((colour > colour_)) 
+			# larger (B-V) <-> redder colour
+			blue_cut = np.invert(red_cut)
 		else:
-			colour_cut = np.array([True]*len(self.data))
-			colour_cut_r = colour_cut
+			red_cut = np.array([True]*len(self.data))
+			blue_cut = red_cut
 			print('Red catalog == Blue catalog')
-		print('c cut: ', colour_, np.unique(colour_cut))
+		print('c cut: \t', colour_, np.unique(red_cut))
 		if z_ != None:
-			z_cut = np.array((z > z_))
-			z_cut_r = np.invert(z_cut)
+			z_cut = np.array((z > z_)) # HIGH-Z
+			z_cut_r = np.invert(z_cut) # LOW-Z
 		else:
 			z_cut = np.array([True]*len(self.data))
 			z_cut_r = z_cut
 			print('highZ catalog == lowZ catalog')
-		print('z cut: ', z_, np.unique(z_cut))
+		print('z cut: \t', z_, np.unique(z_cut))
 
 		# apply cuts
-		self.highz_R = self.data[(z_cut & colour_cut)]
-		self.highz_B = self.data[(z_cut & colour_cut_r)]
-		self.lowz_R = self.data[(z_cut_r & colour_cut)]
-		self.lowz_B = self.data[(z_cut_r & colour_cut_r)]
+		self.highz_R = self.data[(z_cut & red_cut)]
+		self.highz_B = self.data[(z_cut & blue_cut)]
+		self.lowz_R = self.data[(z_cut_r & red_cut)]
+		self.lowz_B = self.data[(z_cut_r & blue_cut)]
 		self.highz = self.data[z_cut]
 		self.lowz = self.data[z_cut_r]
 
@@ -120,7 +121,7 @@ class RealCatalogue:
 								len(self.lowz_R), len(self.lowz_B),
 								len(self.highz), len(self.lowz)]
 
-		[print('# objects %s: '%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
+		[print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
 
 		# construct sets of filenames, counts, & IDs for wcorr-calls
 		self.wcorr_combos = [
@@ -578,6 +579,7 @@ if __name__ == "__main__":
 				script.write(
 					'\npython /share/splinter/hj/PhD/catalog_sampler.py %s %s -plotNow 1'%(args.Catalog, catalog.new_root)
 					)
+				script.write('\n')
 
 		if args.wcorr:
 			list_dir = np.array(listdir(catalog.new_root))
