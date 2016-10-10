@@ -346,7 +346,7 @@ class RealCatalogue:
 		datCut = np.array([i.endswith('.dat') for i in filesList])
 		dataList = filesList[datCut]
 		dataArr = [np.loadtxt(join(path2data, i)) for i in dataList]
-		dataArr = [[i[:,3], i[:,4], i[:,6]] for i in dataArr]
+		dataArr = np.array([[i[:,3], i[:,4], i[:,6]] for i in dataArr])
 		randCut = np.array([i.startswith('wcorr_rand') for i in dataList])
 		realCut = np.invert(randCut)
 		randData = dataArr[randCut]
