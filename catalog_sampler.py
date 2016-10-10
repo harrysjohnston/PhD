@@ -336,10 +336,10 @@ class RealCatalogue:
 		return wcorrOutputs
 
 	def chiFunc(self, y):
-    	return chi2.pdf(y, 10)
+		return chi2.pdf(y, 10)
 
 	def normFunc(self, y):
-    	return stat.norm(0,1).pdf(y)
+		return stat.norm(0,1).pdf(y)
 
 	def chi2(self, path2data, expec):
 		filesList = np.array(listdir(path2data))
