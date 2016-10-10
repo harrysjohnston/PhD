@@ -373,7 +373,7 @@ class RealCatalogue:
 			pVals.append(pVal)
 
 			xSigs = []
-		    for p in [pVal_pl, pVal_cr]:
+			for p in [pVal_pl, pVal_cr]:
 				x = p/10
 				int_x = scint.quad(self.normFunc,x,np.inf)
 				gauss_p = 1-(2*int_x[0])
