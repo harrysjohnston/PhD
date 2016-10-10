@@ -356,33 +356,33 @@ class RealCatalogue:
 		xSigma = []
 
 		for j, data in enumerate(dataArr):
-			plus = data[0] - randData[j][0]
-		    cross = data[1] - randData[j][1]
-		    err = np.sqrt(data[2]**2 + randData[j][2]**2)#[1]*df
-		    plusChi_i = [((v-expec)/err[i])**2 for i, v in enumerate(plus)]
-		    crossChi_i = [((v-expec)/err[i])**2 for i, v in enumerate(cross)]
-		    chiSq_pl = np.sum(plusChi_i)
-		    chiSq_cr = np.sum(crossChi_i)
-		    intgrl_pl = scint.quad(self.chiFunc, chiSq_pl, np.inf)
-		    intgrl_cr = scint.quad(self.chiFunc, chiSq_cr, np.inf)
-		    pVal_pl = intgrl_pl[0]
-		    pVal_cr = intgrl_cr[0]
-		    pVal = ['%.5f'%pVal_pl, '%.5f'%pVal_cr]
-		    chiSq = ['%.5f'%chiSq_pl, '%.5f'%chiSq_cr]
-		    chiSqs.append(chiSq)
-		    pVals.append(pVal)
+			plus = data[0]-randData[j][0]
+			cross = data[1]-randData[j][1]
+			err = np.sqrt(data[2]**2+randData[j][2]**2)#[1]*df
+			plusChi_i = [((v-expec)/err[i])**2 for i, v in enumerate(plus)]
+			crossChi_i = [((v-expec)/err[i])**2 for i, v in enumerate(cross)]
+			chiSq_pl = np.sum(plusChi_i)
+			chiSq_cr = np.sum(crossChi_i)
+			intgrl_pl = scint.quad(self.chiFunc, chiSq_pl, np.inf)
+			intgrl_cr = scint.quad(self.chiFunc, chiSq_cr, np.inf)
+			pVal_pl = intgrl_pl[0]
+			pVal_cr = intgrl_cr[0]
+			pVal = ['%.5f'%pVal_pl, '%.5f'%pVal_cr]
+			chiSq = ['%.5f'%chiSq_pl, '%.5f'%chiSq_cr]
+			chiSqs.append(chiSq)
+			pVals.append(pVal)
 
 		    xSigs = []
 		    for p in [pVal_pl, pVal_cr]:
-			    x = p/10
-			    int_x = scint.quad(self.normFunc,x,np.inf)
-			    gauss_p = 1-(2*int_x[0])
-			    gaussOver_p = gauss_p/p
-			    while abs(1-gaussOver_p) > 0.01:
-			    	x += x/20
-			    	int_x = scint.quad(self.normFunc,x,np.inf)
-				    gauss_p = 1-(2*int_x[0])
-				    gaussOver_p = gauss_p/p
+				x = p/10
+				int_x = scint.quad(self.normFunc,x,np.inf)
+				gauss_p = 1-(2*int_x[0])
+				gaussOver_p = gauss_p/p
+				while abs(1-gaussOver_p) > 0.01:
+					x += x/20
+					int_x = scint.quad(self.normFunc,x,np.inf)
+					gauss_p = 1-(2*int_x[0])
+					gaussOver_p = gauss_p/p
 				else:
 					xSigs.append(['%.5f'%x, '%.5f'%gauss_p])
 			xSigma.append(xSigs)
