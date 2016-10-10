@@ -586,7 +586,7 @@ if __name__ == "__main__":
 
 	if args.plotNow:
 		# calculate chi^2 statistics & save to csv
-		catalog.chi2(catalog.Path, args.expec)
+		catalog.chi2(args.Path, args.expec)
 		# plot .dat files, returning filename-list
 		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels)
 		largePi_outs = [basename(normpath(out[:-4] + '_largePi.dat')) for out in wcorrOuts]
