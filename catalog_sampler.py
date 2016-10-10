@@ -13,6 +13,9 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import sys
+import scipy.integrate as scint
+import scipy.stats as stat
+from scipy.stats import chi2
 
 class RealCatalogue:
 
@@ -332,6 +335,71 @@ class RealCatalogue:
 
 		return wcorrOutputs
 
+	def chiFunc(self, y):
+    	return chi2.pdf(y, 10)
+
+	def normFunc(self, y):
+    	return stat.norm(0,1).pdf(y)
+
+	def chi2(self, path2data, expec):
+		filesList = np.array(listdir(path2data))
+		datCut = np.array([i.endswith('.dat') for i in filesList])
+		dataList = filesList[datCut]
+		dataArr = [np.loadtxt(join(path2data, i)) for i in dataList]
+		dataArr = [[i[:,3], i[:,4], i[:,6]] for i in dataArr]
+		randCut = np.array([i.startswith('wcorr_rand') for i in dataList])
+		realCut = np.invert(randCut)
+		randData = dataArr[randCut]
+		dataArr = dataArr[realCut]
+		pVals = []
+		chiSqs = []
+		xSigma = []
+
+		for j, data in enumerate(dataArr):
+			plus = data[0] - randData[j][0]
+		    cross = data[1] - randData[j][1]
+		    err = np.sqrt(data[2]**2 + randData[j][2]**2)#[1]*df
+		    plusChi_i = [((v-expec)/err[i])**2 for i, v in enumerate(plus)]
+		    crossChi_i = [((v-expec)/err[i])**2 for i, v in enumerate(cross)]
+		    chiSq_pl = np.sum(plusChi_i)
+		    chiSq_cr = np.sum(crossChi_i)
+		    intgrl_pl = scint.quad(self.chiFunc, chiSq_pl, np.inf)
+		    intgrl_cr = scint.quad(self.chiFunc, chiSq_cr, np.inf)
+		    pVal_pl = intgrl_pl[0]
+		    pVal_cr = intgrl_cr[0]
+		    pVal = ['%.5f'%pVal_pl, '%.5f'%pVal_cr]
+		    chiSq = ['%.5f'%chiSq_pl, '%.5f'%chiSq_cr]
+		    chiSqs.append(chiSq)
+		    pVals.append(pVal)
+
+		    xSigs = []
+		    for p in [pVal_pl, pVal_cr]:
+			    x = p/10
+			    int_x = scint.quad(self.normFunc,x,np.inf)
+			    gauss_p = 1-(2*int_x[0])
+			    gaussOver_p = gauss_p/p
+			    while abs(1-gaussOver_p) > 0.01:
+			    	x += x/20
+			    	int_x = scint.quad(self.normFunc,x,np.inf)
+				    gauss_p = 1-(2*int_x[0])
+				    gaussOver_p = gauss_p/p
+				else:
+					xSigs.append(['%.5f'%x, '%.5f'%gauss_p])
+			xSigma.append(xSigs)
+
+		for l in [pVals,chiSqs,xSigma]:
+			l = np.array(l)
+		chi2Stats = zip(dataList,chiSq[:,0],pVal[:,0],xSigma[:,0,0],xSigma[:,0,1],chiSq[:,1],pVal[:,1],xSigma[:,1,0],xSigma[:,1,1])
+		fl = open(join(path2data, 'chisquares.csv'))
+		writer = csv.writer(fl)
+		writer.writerow(['data','chi^2(plus)','p-val','x-sigma','(gauss-p)','chi^2(cross)','p-val','x-sigma','(gauss-p)'])
+		for vals in chi2Stats:
+			writer.writerow(vals)
+		fl.close()
+
+		return None
+
+
 class RandomCatalogue(RealCatalogue):
 
 	def __init__(self, path):
@@ -508,12 +576,18 @@ if __name__ == "__main__":
 		'-plotNow',
 		help='plot ALREADY EXISTING correlation data (1), having given arg="Path" as the path to the .dat files (Catalog arg must still be path of readable .fits catalog). Bypasses all other sampling functions. Defaults to 0',
 		default=0)
+	parser.add_argument(
+		'-expec',
+		help='expectation values for chi^2 statistics, defaults to zeros at all points',
+		default=0)
 	args = parser.parse_args()
 
 	catalog = RealCatalogue(args.Catalog)
 
 	if args.plotNow:
-	# plot .dat files, returning filename-list
+		# calculate chi^2 statistics & save to csv
+		catalog.chi2(catalog.new_root, args.expec)
+		# plot .dat files, returning filename-list
 		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels)
 		largePi_outs = [basename(normpath(out[:-4] + '_largePi.dat')) for out in wcorrOuts]
 		# check for largePi .dat files
