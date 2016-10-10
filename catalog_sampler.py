@@ -9,6 +9,8 @@ import argparse
 import csv
 from astropy import cosmology
 from astropy.cosmology import Planck13
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import sys
 
@@ -43,7 +45,7 @@ class RealCatalogue:
 		assert 'col3' in self.columns, "'col3' not in columns, see column headers: "+ str(self.columns)
 
 		total_bitmasks = self.data['col3']
-		if (type(bitmask_) != None) & (type(bitmask_[0]) != None):
+		if type(bitmask_) != None:
 			bitmask_ = bitmask_[0]
 
 			# bitmask_cut = []
