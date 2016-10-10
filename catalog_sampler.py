@@ -577,6 +577,10 @@ if __name__ == "__main__":
 		help='plot ALREADY EXISTING correlation data (1), having given arg="Path" as the path to the .dat files (Catalog arg must still be path of readable .fits catalog). Bypasses all other sampling functions. Defaults to 0',
 		default=0)
 	parser.add_argument(
+		'-chiSqu',
+		help='calc chi^2 stats for ALREADY EXISTING correlation data (1), having given arg="Path" as the path to the .dat files (Catalog arg must still be path of readable .fits catalog). Bypasses all other sampling functions. Defaults to 0',
+		default=0)
+	parser.add_argument(
 		'-expec',
 		help='expectation values for chi^2 statistics, defaults to zeros at all points',
 		default=0)
@@ -585,8 +589,6 @@ if __name__ == "__main__":
 	catalog = RealCatalogue(args.Catalog)
 
 	if args.plotNow:
-		# calculate chi^2 statistics & save to csv
-		catalog.chi2(args.Path, args.expec)
 		# plot .dat files, returning filename-list
 		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels)
 		largePi_outs = [basename(normpath(out[:-4] + '_largePi.dat')) for out in wcorrOuts]
@@ -596,6 +598,15 @@ if __name__ == "__main__":
 		if uniq.all() == True:
 			IDs = [outs[6:-4] for outs in largePi_outs]
 			a = catalog.plot_wcorr(args.Path, IDs)
+
+		if args.chiSqu:
+			# calculate chi^2 statistics & save to csv
+			catalog.chi2(args.Path, args.expec)
+		sys.exit()
+
+	if args.chiSqu:
+		# calculate chi^2 statistics & save to csv
+		catalog.chi2(args.Path, args.expec)
 		sys.exit()
 
 	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.bitmaskCut)
@@ -653,7 +664,7 @@ if __name__ == "__main__":
 		if args.plot:
 			with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
 				script.write(
-					'\npython /share/splinter/hj/PhD/catalog_sampler.py %s %s -plotNow 1'%(args.Catalog, catalog.new_root)
+					'\npython /share/splinter/hj/PhD/catalog_sampler.py %s %s -plotNow 1 -chiSqu 1'%(args.Catalog, catalog.new_root)
 					)
 				script.write('\n')
 
