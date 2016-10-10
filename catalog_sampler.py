@@ -372,7 +372,7 @@ class RealCatalogue:
 			chiSqs.append(chiSq)
 			pVals.append(pVal)
 
-		    xSigs = []
+			xSigs = []
 		    for p in [pVal_pl, pVal_cr]:
 				x = p/10
 				int_x = scint.quad(self.normFunc,x,np.inf)
