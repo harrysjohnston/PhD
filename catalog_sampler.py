@@ -655,7 +655,8 @@ if __name__ == "__main__":
 	if args.wcorr:
 		list_dir = np.array(listdir(catalog.new_root))
 		shells = np.array([i.endswith('.sh') for i in list_dir])
-		list_dir = list_dir[shells]
+		r_shells = np.array([i.startswith('real') for i in list_dir])
+		list_dir = list_dir[(shells&r_shells)]
 		[os.system('qsub '+ join(catalog.new_root, shell)) for shell in list_dir]
 
 	if args.Random != None:
