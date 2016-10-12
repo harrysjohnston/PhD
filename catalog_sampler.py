@@ -47,29 +47,6 @@ class RealCatalogue:
 		assert 'absmag_i_1' in self.columns, "'absmag_i_1' not in columns, see column headers: "+ str(self.columns)
 		assert 'col3' in self.columns, "'col3' not in columns, see column headers: "+ str(self.columns)
 
-		# total_bitmasks = self.data['col3']
-		# if bitmask_[0] != None:
-		# 	bitmask_ = bitmask_[0]
-
-		# 	# bitmask_cut = []
-		# 	# for bit_test in total_bitmasks:
-		# 	# 	for mask_ in bitmask_:
-		# 	# 		if (mask_ & bit_test == mask_):
-		# 	# 			bitmask_cut.append(False)
-		# 	# 			break
-		# 	# 		if mask_ == bitmask_[-1]:
-		# 	# 			bitmask_cut.append(True)
-
-		# 	bitmask_cut = [True]*len(total_bitmasks)
-		# 	for i in np.arange(0,len(bitmask_)):
-		# 		# construct bitmask cut
-		# 	    bitmask_cut &= np.where(bitmask_[i] & total_bitmasks == bitmask_[i], False, True)
-
-		# 	assert len(bitmask_cut) == len(total_bitmasks), "bitmask testing broken"
-		# 	bitmask_cut = np.array(bitmask_cut)
-		# 	self.data = self.data[bitmask_cut]
-		# 	print('bitmask cut: \t', np.unique(bitmask_cut))
-
 		# Remove duplicates in RA/DEC:
 		# coordStrings = ['RA_1', 'DEC_1']
 		# for i, col in enumerate(coordStrings):
@@ -84,13 +61,13 @@ class RealCatalogue:
 
 		pgm = self.data['pgm']
 		pgm_cut = np.array((pgm > pgm_))
-		self.data = self.data[pgm_cut]
+		# self.data = self.data[pgm_cut]
 		print('pgm cut: \t', np.unique(pgm_cut))
 
 		self.pre_count = len(self.data)
 		z = self.data['z_1_1']
-		self.data = self.data[(z >= 0.02)]	# define minimum redshift
-		z = self.data['z_1_1']
+		# self.data = self.data[(z >= 0.02)]	# define minimum redshift
+		# z = self.data['z_1_1']
 		self.pre_z = z
 		colour = self.data['absmag_g_1'] - self.data['absmag_i_1']
 		total_bitmasks = self.data['col3']
@@ -137,10 +114,10 @@ class RealCatalogue:
 			print('bitmask cut: \t', np.unique(bitmask_cut))
 
 		# apply cuts
-		self.highz_R = self.data[(z_cut & red_cut & bitmask_cut)]
-		self.highz_B = self.data[(z_cut & blue_cut & bitmask_cut)]
-		self.lowz_R = self.data[(z_cut_r & red_cut & bitmask_cut)]
-		self.lowz_B = self.data[(z_cut_r & blue_cut & bitmask_cut)]
+		self.highz_R = self.data[(z_cut & red_cut & bitmask_cut & pgm_cut)]
+		self.highz_B = self.data[(z_cut & blue_cut & bitmask_cut & pgm_cut)]
+		self.lowz_R = self.data[(z_cut_r & red_cut & bitmask_cut & pgm_cut)]
+		self.lowz_B = self.data[(z_cut_r & blue_cut & bitmask_cut & pgm_cut)]
 		self.highz = self.data[z_cut]
 		self.lowz = self.data[z_cut_r]
 
@@ -308,8 +285,8 @@ class RealCatalogue:
 			rand_wgerr.append(randData[i][:,6])
 		r_p = realData[0][:,0]
 		x = np.linspace(0, r_p.max()*1.8)
-		# plt.ioff()
 		dataPoints = [[wgplus, wgcross, wgerr], [rand_wgplus, rand_wgcross, rand_wgerr]]
+		# newData = zip(r_p,wgplus,wgcross,wgerr)
 		prefix = ['','rand_']
 		for j, set_ in enumerate(dataPoints): 
 		# plot/save random-subtracted-reals, AND randoms
