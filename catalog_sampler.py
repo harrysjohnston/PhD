@@ -402,6 +402,7 @@ class RealCatalogue:
 						gaussOver_p = gauss_p/p
 					else:
 						xSigs.append(['%.5f'%x, '%.5f'%gauss_p])
+						print('%.5f'%x, '%.5f'%gauss_p, '%.5f'%p)
 				else:
 					while gaussOver_p > 1:
 						x *= 0.99
@@ -410,6 +411,7 @@ class RealCatalogue:
 						gaussOver_p = gauss_p/p
 					else:
 						xSigs.append(['%.5f'%x, '%.5f'%gauss_p])
+						print('%.5f'%x, '%.5f'%gauss_p, '%.5f'%p)
 			xSigma.append(xSigs)
 
 		for l in [pVals,chiSqs,xSigma]:
