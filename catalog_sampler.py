@@ -47,7 +47,73 @@ class RealCatalogue:
 		assert 'absmag_i_1' in self.columns, "'absmag_i_1' not in columns, see column headers: "+ str(self.columns)
 		assert 'col3' in self.columns, "'col3' not in columns, see column headers: "+ str(self.columns)
 
+		# total_bitmasks = self.data['col3']
+		# if bitmask_[0] != None:
+		# 	bitmask_ = bitmask_[0]
+
+		# 	# bitmask_cut = []
+		# 	# for bit_test in total_bitmasks:
+		# 	# 	for mask_ in bitmask_:
+		# 	# 		if (mask_ & bit_test == mask_):
+		# 	# 			bitmask_cut.append(False)
+		# 	# 			break
+		# 	# 		if mask_ == bitmask_[-1]:
+		# 	# 			bitmask_cut.append(True)
+
+		# 	bitmask_cut = [True]*len(total_bitmasks)
+		# 	for i in np.arange(0,len(bitmask_)):
+		# 		# construct bitmask cut
+		# 	    bitmask_cut &= np.where(bitmask_[i] & total_bitmasks == bitmask_[i], False, True)
+
+		# 	assert len(bitmask_cut) == len(total_bitmasks), "bitmask testing broken"
+		# 	bitmask_cut = np.array(bitmask_cut)
+		# 	self.data = self.data[bitmask_cut]
+		# 	print('bitmask cut: \t', np.unique(bitmask_cut))
+
+		# Remove duplicates in RA/DEC:
+		# coordStrings = ['RA_1', 'DEC_1']
+		# for i, col in enumerate(coordStrings):
+		# 	coords = self.data[col]
+		# 	uniqCoords = np.unique(coords, return_inverse=True, return_counts=True)
+		# 	inverse = uniqCoords[1]
+		# 	count = uniqCoords[2]
+		# 	orderedCount = count[inverse]
+		# 	duplicateCut = orderedCount == 1
+		# 	self.data = self.data[duplicateCut]
+		# 	print('Removed %s duplicates in %s' % ((len(duplicateCut)-len(self.data)), col[:-2]))
+
+		pgm = self.data['pgm']
+		pgm_cut = np.array((pgm > pgm_))
+		self.data = self.data[pgm_cut]
+		print('pgm cut: \t', np.unique(pgm_cut))
+
+		self.pre_count = len(self.data)
+		z = self.data['z_1_1']
+		self.data = self.data[(z >= 0.02)]	# define minimum redshift
+		z = self.data['z_1_1']
+		self.pre_z = z
+		colour = self.data['absmag_g_1'] - self.data['absmag_i_1']
 		total_bitmasks = self.data['col3']
+
+		# define colour, redshift & bitmask cuts
+		if colour_ != None:
+			red_cut = np.array((colour > colour_)) 
+			# larger (B-V) <-> 'redder' colour
+			blue_cut = np.invert(red_cut)
+		else:
+			red_cut = np.array([True]*len(self.data))
+			blue_cut = red_cut
+			print('Red catalog == Blue catalog')
+		print('c cut: \t', colour_, np.unique(red_cut))
+		if z_ != None:
+			z_cut = np.array((z > z_)) # HIGH-Z
+			z_cut_r = np.invert(z_cut) # LOW-Z
+		else:
+			z_cut = np.array([True]*len(self.data))
+			z_cut_r = z_cut
+			print('highZ catalog == lowZ catalog')
+		print('z cut: \t', z_, np.unique(z_cut))
+
 		if bitmask_[0] != None:
 			bitmask_ = bitmask_[0]
 
@@ -67,58 +133,14 @@ class RealCatalogue:
 
 			assert len(bitmask_cut) == len(total_bitmasks), "bitmask testing broken"
 			bitmask_cut = np.array(bitmask_cut)
-			self.data = self.data[bitmask_cut]
+			# self.data = self.data[bitmask_cut]
 			print('bitmask cut: \t', np.unique(bitmask_cut))
 
-		pgm = self.data['pgm']
-		pgm_cut = np.array((pgm > pgm_))
-		self.data = self.data[pgm_cut]
-		print('pgm cut: \t', np.unique(pgm_cut))
-
-		# Remove duplicates in RA/DEC:
-		# coordStrings = ['RA_1', 'DEC_1']
-		# for i, col in enumerate(coordStrings):
-		# 	coords = self.data[col]
-		# 	uniqCoords = np.unique(coords, return_inverse=True, return_counts=True)
-		# 	inverse = uniqCoords[1]
-		# 	count = uniqCoords[2]
-		# 	orderedCount = count[inverse]
-		# 	duplicateCut = orderedCount == 1
-		# 	self.data = self.data[duplicateCut]
-		# 	print('Removed %s duplicates in %s' % ((len(duplicateCut)-len(self.data)), col[:-2]))
-
-		self.pre_count = len(self.data)
-		z = self.data['z_1_1']
-		# define minimum redshift
-		self.data = self.data[(z >= 0.02)]
-		z = self.data['z_1_1']
-		self.pre_z = z
-		colour = self.data['absmag_g_1'] - self.data['absmag_i_1']
-
-		# define colour & redshift cuts
-		if colour_ != None:
-			red_cut = np.array((colour > colour_)) 
-			# larger (B-V) <-> redder colour
-			blue_cut = np.invert(red_cut)
-		else:
-			red_cut = np.array([True]*len(self.data))
-			blue_cut = red_cut
-			print('Red catalog == Blue catalog')
-		print('c cut: \t', colour_, np.unique(red_cut))
-		if z_ != None:
-			z_cut = np.array((z > z_)) # HIGH-Z
-			z_cut_r = np.invert(z_cut) # LOW-Z
-		else:
-			z_cut = np.array([True]*len(self.data))
-			z_cut_r = z_cut
-			print('highZ catalog == lowZ catalog')
-		print('z cut: \t', z_, np.unique(z_cut))
-
 		# apply cuts
-		self.highz_R = self.data[(z_cut & red_cut)]
-		self.highz_B = self.data[(z_cut & blue_cut)]
-		self.lowz_R = self.data[(z_cut_r & red_cut)]
-		self.lowz_B = self.data[(z_cut_r & blue_cut)]
+		self.highz_R = self.data[(z_cut & red_cut & bitmask_cut)]
+		self.highz_B = self.data[(z_cut & blue_cut & bitmask_cut)]
+		self.lowz_R = self.data[(z_cut_r & red_cut & bitmask_cut)]
+		self.lowz_B = self.data[(z_cut_r & blue_cut & bitmask_cut)]
 		self.highz = self.data[z_cut]
 		self.lowz = self.data[z_cut_r]
 
@@ -379,7 +401,7 @@ class RealCatalogue:
 				gauss_p = 1-(2*int_x[0])
 				gaussOver_p = gauss_p/p
 				while abs(1-gaussOver_p) > 0.01:
-					x += x/20
+					x *= 1.01
 					int_x = scint.quad(self.normFunc,x,np.inf)
 					gauss_p = 1-(2*int_x[0])
 					gaussOver_p = gauss_p/p
@@ -599,15 +621,15 @@ if __name__ == "__main__":
 			IDs = [outs[6:-4] for outs in largePi_outs]
 			a = catalog.plot_wcorr(args.Path, IDs)
 
-		if args.chiSqu:
-			# calculate chi^2 statistics & save to csv
-			catalog.chi2(args.Path, args.expec)
-		sys.exit()
+	# 	if args.chiSqu:
+	# 		# calculate chi^2 statistics & save to csv
+	# 		catalog.chi2(args.Path, args.expec)
+	# 	sys.exit()
 
-	if args.chiSqu:
-		# calculate chi^2 statistics & save to csv
-		catalog.chi2(args.Path, args.expec)
-		sys.exit()
+	# if args.chiSqu:
+	# 	# calculate chi^2 statistics & save to csv
+	# 	catalog.chi2(args.Path, args.expec)
+	# 	sys.exit()
 
 	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.bitmaskCut)
 	samples = [catalog.highz_R, catalog.highz_B, 									catalog.lowz_R, catalog.lowz_B,										catalog.highz, catalog.lowz]
