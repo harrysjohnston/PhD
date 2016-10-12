@@ -178,7 +178,17 @@ class RealCatalogue:
 		Z = table['Z_1_1']
 		e1 = table['e1c']/table['pgm']
 		e2 = table['e2c']/table['pgm']
+
+		# random re-shuffle test - density-shape corr should now ~ 0
+		e12 = list(zip(e1,e2))
+		np.random.shuffle(e12)
+		e12 = np.array(e12)
+		e1 = e12[:,0]
+		e2 = e12[:,1]
+		#	#	#	#	#	#	#	#	#	#	#	#	#	#	#	
+
 		e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
+		
 		e_weight = np.array([1]*len(table))
 
 		comov = Planck13.comoving_distance(Z)
