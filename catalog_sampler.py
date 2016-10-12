@@ -149,6 +149,8 @@ class RealCatalogue:
 								len(self.highz), len(self.lowz)]
 
 		[print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
+		print('total shapes: \t%s'%np.sum(self.samplecounts[:4]))
+		print('total density: \t%s'%np.sum(self.samplecounts[4:]))
 
 		# construct sets of filenames, counts, & IDs for wcorr-calls
 		self.wcorr_combos = [
@@ -483,7 +485,7 @@ class RandomCatalogue(RealCatalogue):
 		self.lowz = self.data[z_cut_r]
 		self.samplecounts = [len(self.highz), len(self.lowz)]
 
-		[print('# objects %s: '%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
+		[print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
 
 	def cut_columns(self, subsample, h): 
 		"""""
