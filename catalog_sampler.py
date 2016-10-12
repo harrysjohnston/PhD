@@ -180,11 +180,11 @@ class RealCatalogue:
 		e2 = table['e2c']/table['pgm']
 
 		# random re-shuffle test - density-shape corr should now ~ 0
-		e12 = list(zip(e1,e2))
-		np.random.shuffle(e12)
-		e12 = np.array(e12)
-		e1 = e12[:,0]
-		e2 = e12[:,1]
+		# e12 = list(zip(e1,e2))
+		# np.random.shuffle(e12)
+		# e12 = np.array(e12)
+		# e1 = e12[:,0]
+		# e2 = e12[:,1]
 		#	#	#	#	#	#	#	#	#	#	#	#	#	#	#	
 
 		e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
@@ -624,6 +624,7 @@ if __name__ == "__main__":
 
 	if args.plotNow:
 		# plot .dat files, returning filename-list
+		print('PLOTTING NOW')
 		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels)
 		largePi_outs = [basename(normpath(out[:-4] + '_largePi.dat')) for out in wcorrOuts]
 		# check for largePi .dat files
@@ -632,6 +633,8 @@ if __name__ == "__main__":
 		if uniq.all() == True:
 			IDs = [outs[6:-4] for outs in largePi_outs]
 			a = catalog.plot_wcorr(args.Path, IDs)
+
+		sys.exit()
 
 	# 	if args.chiSqu:
 	# 		# calculate chi^2 statistics & save to csv
