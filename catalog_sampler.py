@@ -47,6 +47,9 @@ class RealCatalogue:
 		assert 'absmag_i_1' in self.columns, "'absmag_i_1' not in columns, see column headers: "+ str(self.columns)
 		assert 'col3' in self.columns, "'col3' not in columns, see column headers: "+ str(self.columns)
 
+		self.zstr = 'z%.f'%z_
+		self.cstr = 'c%.f'%colour_
+
 		# Remove duplicates in RA/DEC:
 		# coordStrings = ['RA_1', 'DEC_1']
 		# for i, col in enumerate(coordStrings):
@@ -61,6 +64,7 @@ class RealCatalogue:
 
 		pgm = self.data['pgm']
 		pgm_cut = np.array((pgm > pgm_))
+		zeroPgm_cut = np.array((pgm != 0))
 		# self.data = self.data[pgm_cut]
 		print('pgm cut: \t', np.unique(pgm_cut))
 
@@ -118,8 +122,8 @@ class RealCatalogue:
 		self.highz_B = self.data[(z_cut & blue_cut & bitmask_cut & pgm_cut)]
 		self.lowz_R = self.data[(z_cut_r & red_cut & bitmask_cut & pgm_cut)]
 		self.lowz_B = self.data[(z_cut_r & blue_cut & bitmask_cut & pgm_cut)]
-		self.highz = self.data[z_cut]
-		self.lowz = self.data[z_cut_r]
+		self.highz = self.data[(z_cut & zeroPgm_cut)]
+		self.lowz = self.data[(z_cut_r & zeroPgm_cut)]
 
 		self.samplecounts = [len(self.highz_R), len(self.highz_B),
 								len(self.lowz_R), len(self.lowz_B),
@@ -248,7 +252,7 @@ class RealCatalogue:
 		Write.write(str(Text))
 		Write.close()
 
-	def plot_wcorr(self, files_path, wcorrIDs):
+	def plot_wcorr(self, files_path, wcorrIDs, z_, c_):
 		# 0 = hiZ_Red
 		# 1 = hiZ_Blue
 		# 2 = loZ_Red
@@ -333,15 +337,16 @@ class RealCatalogue:
 			# plt.setp([a.get_xlabels() for a in axarr[:, 1]], visible=False)
 			axarr[1,0].set_xlabel('Comoving transverse separation (Mpc/h)')
 			axarr[1,0].set_ylabel('Correlations')
+			axarr[0,0].set_title('Cuts: %s, %s'%(z_,c_))
 
 			plotsDir = join(files_path, 'Plots')
 			if not isdir(plotsDir):
 				mkdir(plotsDir)
 
 			if 'largePi' in wcorrOutputs[0]:
-				outimg = join(plotsDir, '%swcorr_plots_largePi.pdf'%prefix[j])
+				outimg = join(plotsDir, '%swcorr_%s_%s_largePi.pdf'%(prefix[j],z_,c_))
 			else:
-				outimg = join(plotsDir, '%swcorr_plots.pdf'%prefix[j])
+				outimg = join(plotsDir, '%swcorr_%s_%s.pdf'%(prefix[j],z_,c_))
 			f.savefig(outimg)
 
 		return wcorrOutputs
@@ -389,13 +394,22 @@ class RealCatalogue:
 				int_x = scint.quad(self.normFunc,x,np.inf)
 				gauss_p = 1-(2*int_x[0])
 				gaussOver_p = gauss_p/p
-				while abs(1-gaussOver_p) > 0.01:
-					x *= 1.01
-					int_x = scint.quad(self.normFunc,x,np.inf)
-					gauss_p = 1-(2*int_x[0])
-					gaussOver_p = gauss_p/p
+				if gaussOver_p < 1:
+					while gaussOver_p < 1:
+						x *= 1.01
+						int_x = scint.quad(self.normFunc,x,np.inf)
+						gauss_p = 1-(2*int_x[0])
+						gaussOver_p = gauss_p/p
+					else:
+						xSigs.append(['%.5f'%x, '%.5f'%gauss_p])
 				else:
-					xSigs.append(['%.5f'%x, '%.5f'%gauss_p])
+					while gaussOver_p > 1:
+						x *= 0.99
+						int_x = scint.quad(self.normFunc,x,np.inf)
+						gauss_p = 1-(2*int_x[0])
+						gaussOver_p = gauss_p/p
+					else:
+						xSigs.append(['%.5f'%x, '%.5f'%gauss_p])
 			xSigma.append(xSigs)
 
 		for l in [pVals,chiSqs,xSigma]:
@@ -601,27 +615,27 @@ if __name__ == "__main__":
 
 	if args.plotNow:
 		# plot .dat files, returning filename-list
-		print('PLOTTING NOW')
-		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels)
+		print('PLOTTING')
+		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels, args.zCut, args.cCut)
 		largePi_outs = [basename(normpath(out[:-4] + '_largePi.dat')) for out in wcorrOuts]
 		# check for largePi .dat files
 		isIn = [i in listdir(args.Path) for i in largePi_outs]
 		uniq = np.unique(isIn)
 		if uniq.all() == True:
 			IDs = [outs[6:-4] for outs in largePi_outs]
-			a = catalog.plot_wcorr(args.Path, IDs)
+			a = catalog.plot_wcorr(args.Path, IDs, args.zCut, args.cCut)
 
+		if args.chiSqu:
+			print('CALC CHI^2')
+			# calculate chi^2 statistics & save to csv
+			catalog.chi2(args.Path, args.expec)
 		sys.exit()
 
-	# 	if args.chiSqu:
-	# 		# calculate chi^2 statistics & save to csv
-	# 		catalog.chi2(args.Path, args.expec)
-	# 	sys.exit()
-
-	# if args.chiSqu:
-	# 	# calculate chi^2 statistics & save to csv
-	# 	catalog.chi2(args.Path, args.expec)
-	# 	sys.exit()
+	if args.chiSqu:
+		print('CALC CHI^2')
+		# calculate chi^2 statistics & save to csv
+		catalog.chi2(args.Path, args.expec)
+		sys.exit()
 
 	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.bitmaskCut)
 	samples = [catalog.highz_R, catalog.highz_B, 									catalog.lowz_R, catalog.lowz_B,										catalog.highz, catalog.lowz]
