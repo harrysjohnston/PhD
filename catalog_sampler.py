@@ -1,3 +1,4 @@
+#!/user/bin/env python
 from __future__ import print_function, division
 from astropy.io import fits
 import numpy as np
@@ -389,6 +390,7 @@ class RealCatalogue:
 			pVals.append(pVal)
 
 			xSigs = []
+			print('x-sigma, gauss_p, p-val(chi^2)')
 			for p in [pVal_pl, pVal_cr]:
 				x = p/10
 				int_x = scint.quad(self.normFunc,x,np.inf)
