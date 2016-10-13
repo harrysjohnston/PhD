@@ -295,12 +295,11 @@ class RealCatalogue:
 			rand_wgerr.append(randData[i][:,6])
 			# save reduced data to csv for easy plotting
 			reducedData = zip(realData[0][:,0], realData[i][:,3], realData[i][:,4], propgErrs) # = [r_p, wgplus, wgcross, wgerr]
-			np.savetxt(join(easyPlotDir, path[6:-4]), reducedData, delimiter=',', fmt="%f,%f,%f,%f")
-			
+			np.savetxt(join(easyPlotDir, basename(normpath(path[6:-4]))), reducedData, delimiter=',', fmt="%f,%f,%f,%f")
+
 		r_p = realData[0][:,0]
 		x = np.linspace(0, r_p.max()*1.8)
 		dataPoints = [[wgplus, wgcross, wgerr], [rand_wgplus, rand_wgcross, rand_wgerr]]
-		# newData = zip(r_p,wgplus,wgcross,wgerr)
 		prefix = ['','rand_']
 		for j, set_ in enumerate(dataPoints): 
 		# plot/save random-subtracted-reals, AND randoms
@@ -347,7 +346,7 @@ class RealCatalogue:
 			# plt.setp([a.get_xlabels() for a in axarr[:, 1]], visible=False)
 			axarr[1,0].set_xlabel('Comoving transverse separation (Mpc/h)')
 			axarr[1,0].set_ylabel('Correlations')
-			axarr[0,0].set_title('Cuts: %s, %s'%(z_,c_))
+			axarr[0,0].set_title('Cuts: z%s, c%s'%(ZC[0],ZC[1]))
 
 			plotsDir = join(files_path, 'Plots')
 			if not isdir(plotsDir):

@@ -70,7 +70,7 @@ def plot(path):
 	axarr[1,0].set_ylabel('Correlations')
 	# DO CUTS!!
 	ZC = np.loadtxt('%s/../ZC_cuts'%path, delimiter=',')
-	axarr[0,0].set_title('Cuts: %s, %s'%(ZC[0],ZC[1]))
+	axarr[0,0].set_title('Cuts: z%s, c%s'%(ZC[0],ZC[1]))
 	plt.show()
 
 if __name__ == "__main__":
