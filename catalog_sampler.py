@@ -411,9 +411,10 @@ class RealCatalogue:
 				print('%s :'%pl_cr[k], '%.5f'%p, '%.5f'%x)
 			xSigma.append(xSigs)
 
-		for l in [pVals,chi2s,xSigma]:
-			l = np.array(l)
-		chi2Stats = zip(dataList,chi2s[:,0],pVals[:,0],xSigma[:,0,1],chi2s[:,1],pVals[:,1],xSigma[:,1,1])
+		pVals = np.array(pVals)
+		chi2s = np.array(chi2s)
+		xSigma = np.array(xSigma)
+		chi2Stats = np.column_stack((dataList,chi2s[:,0],pVals[:,0],xSigma[:,0,1],chi2s[:,1],pVals[:,1],xSigma[:,1,1]))
 		fl = open(join(path2data, 'chi2.csv'))
 		writer = csv.writer(fl)
 		writer.writerow(['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'])
