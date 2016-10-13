@@ -346,13 +346,12 @@ class RealCatalogue:
 			# plt.setp([a.get_xlabels() for a in axarr[:, 1]], visible=False)
 			axarr[1,0].set_xlabel('Comoving transverse separation (Mpc/h)')
 			axarr[1,0].set_ylabel('Correlations')
+			ZC = np.loadtxt(join(files_path, 'ZC_cuts'), delimiter=',')
 			axarr[0,0].set_title('Cuts: z%s, c%s'%(ZC[0],ZC[1]))
 
 			plotsDir = join(files_path, 'Plots')
 			if not isdir(plotsDir):
 				mkdir(plotsDir)
-
-			ZC = np.loadtxt(join(files_path, 'ZC_cuts'), delimiter=',')
 
 			if 'largePi' in wcorrOutputs[0]:
 				outimg = join(plotsDir, '%swcorr_z%s_c%s_largePi.pdf'%(prefix[j],ZC[0],ZC[1]))
