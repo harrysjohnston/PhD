@@ -11,7 +11,7 @@ import csv
 from astropy import cosmology
 from astropy.cosmology import Planck13
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import sys
 import scipy.integrate as scint
@@ -194,6 +194,8 @@ class RealCatalogue:
 			outfile_root = outfile_root_
 
 		self.new_root = outfile_root
+		zcCuts = [self.zstr, self.cstr]
+		np.savetxt(join(outfile_root, 'ZC_cuts'), zcCuts, delimiter=',', fmt="%f")
 
 		if not isdir(outfile_root):
 			mkdir(outfile_root)
@@ -253,7 +255,7 @@ class RealCatalogue:
 		Write.write(str(Text))
 		Write.close()
 
-	def plot_wcorr(self, files_path, wcorrIDs, z_, c_):
+	def plot_wcorr(self, files_path, wcorrIDs):
 		# 0 = hiZ_Red
 		# 1 = hiZ_Blue
 		# 2 = loZ_Red
@@ -344,11 +346,14 @@ class RealCatalogue:
 			if not isdir(plotsDir):
 				mkdir(plotsDir)
 
+			ZC = np.loadtxt(join(files_path, 'ZC_cuts'), delimiter=',')
+
 			if 'largePi' in wcorrOutputs[0]:
-				outimg = join(plotsDir, '%swcorr_%s_%s_largePi.pdf'%(prefix[j],z_,c_))
+				outimg = join(plotsDir, '%swcorr_%s_%s_largePi.pdf'%(prefix[j],ZC[0],ZC[1]))
 			else:
-				outimg = join(plotsDir, '%swcorr_%s_%s.pdf'%(prefix[j],z_,c_))
+				outimg = join(plotsDir, '%swcorr_%s_%s.pdf'%(prefix[j],ZC[0],ZC[1]))
 			f.savefig(outimg)
+			plt.show()
 
 		return wcorrOutputs
 
@@ -620,14 +625,14 @@ if __name__ == "__main__":
 	if args.plotNow:
 		# plot .dat files, returning filename-list
 		print('PLOTTING')
-		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels, args.zCut, args.cCut)
+		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels)
 		largePi_outs = [basename(normpath(out[:-4] + '_largePi.dat')) for out in wcorrOuts]
 		# check for largePi .dat files
 		isIn = [i in listdir(args.Path) for i in largePi_outs]
 		uniq = np.unique(isIn)
 		if uniq.all() == True:
 			IDs = [outs[6:-4] for outs in largePi_outs]
-			a = catalog.plot_wcorr(args.Path, IDs, args.zCut, args.cCut)
+			a = catalog.plot_wcorr(args.Path, IDs)
 
 		if args.chiSqu:
 			print('CALC CHI^2')
