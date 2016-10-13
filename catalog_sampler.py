@@ -48,8 +48,8 @@ class RealCatalogue:
 		assert 'absmag_i_1' in self.columns, "'absmag_i_1' not in columns, see column headers: "+ str(self.columns)
 		assert 'col3' in self.columns, "'col3' not in columns, see column headers: "+ str(self.columns)
 
-		self.zstr = 'z%.f'%z_
-		self.cstr = 'c%.f'%colour_
+		self.zstr = '%.f'%z_
+		self.cstr = '%.f'%colour_
 
 		# Remove duplicates in RA/DEC:
 		# coordStrings = ['RA_1', 'DEC_1']
@@ -349,9 +349,9 @@ class RealCatalogue:
 			ZC = np.loadtxt(join(files_path, 'ZC_cuts'), delimiter=',')
 
 			if 'largePi' in wcorrOutputs[0]:
-				outimg = join(plotsDir, '%swcorr_%s_%s_largePi.pdf'%(prefix[j],ZC[0],ZC[1]))
+				outimg = join(plotsDir, '%swcorr_z%s_c%s_largePi.pdf'%(prefix[j],ZC[0],ZC[1]))
 			else:
-				outimg = join(plotsDir, '%swcorr_%s_%s.pdf'%(prefix[j],ZC[0],ZC[1]))
+				outimg = join(plotsDir, '%swcorr_z%s_c%s.pdf'%(prefix[j],ZC[0],ZC[1]))
 			f.savefig(outimg)
 			plt.show()
 
