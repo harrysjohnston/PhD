@@ -295,7 +295,7 @@ class RealCatalogue:
 			rand_wgerr.append(randData[i][:,6])
 			# save reduced data to csv for easy plotting
 			reducedData = zip(realData[0][:,0], realData[i][:,3], realData[i][:,4], propgErrs) # = [r_p, wgplus, wgcross, wgerr]
-			np.savetxt(join(easyPlotDir, basename(normpath(path))[6:-4]), reducedData, delimiter='\t', fmt="%f,%f,%f,%f")
+			ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wgplus', 'wgcross', 'wgerr'], formats={'r_p':np.float32, 'wgplus':np.float32, 'wgcross':np.float32, 'wgerr':np.float32})
 
 		r_p = realData[0][:,0]
 		x = np.linspace(0, r_p.max()*1.8)
@@ -422,6 +422,8 @@ class RealCatalogue:
 		for vals in chi2Stats:
 			writer.writerow(vals)
 		fl.close()
+
+		ascii.write(chi2Stats, join(path2data, 'chi2'), delimiter='\t', names=['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'], formats={'dataset':str,'chi^2(plus)':np.float32,'p-val':np.float32,'x-sigma':np.float32,'chi^2(cross)':np.float32,'p-val':np.float32,'x-sigma':np.float32})
 
 		return None
 

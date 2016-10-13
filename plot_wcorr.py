@@ -19,6 +19,9 @@ from scipy.stats import chi2
 
 def plot(path):
 	listDir = listdir(path)
+	cut = [i.startswith('largePi') for i in listDir]
+	cut = np.invert(cut)
+	listDir = listDir[cut]
 	listDir.sort()
 	listDir = np.array(listDir)[[1,0,3,2]]
 	dataArr = [np.loadtxt(join(path,i)) for i in listDir]
