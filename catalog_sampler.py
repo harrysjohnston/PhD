@@ -194,7 +194,7 @@ class RealCatalogue:
 			outfile_root = outfile_root_
 
 		self.new_root = outfile_root
-		zcCuts = [self.zstr, self.cstr]
+		zcCuts = [z_cut, c_cut]
 		np.savetxt(join(outfile_root, 'ZC_cuts'), zcCuts, delimiter=',', fmt="%f")
 
 		if not isdir(outfile_root):
@@ -274,6 +274,9 @@ class RealCatalogue:
 		rand_wgplus = []
 		rand_wgcross = []
 		rand_wgerr = []
+		easyPlotDir = join(files_path, 'to_plot')
+		if not isdir(easyPlotDir):
+			mkdir(easyPlotDir)
 		for i, path in enumerate(wcorrOutputs):
 			realData.append(np.loadtxt(path))
 			randData.append(np.loadtxt(rand_wcorrOutputs[i]))
@@ -290,6 +293,10 @@ class RealCatalogue:
 			rand_wgplus.append(randData[i][:,3])
 			rand_wgcross.append(randData[i][:,4])
 			rand_wgerr.append(randData[i][:,6])
+			# save reduced data to csv for easy plotting
+			reducedData = zip(realData[0][:,0], realData[i][:,3], realData[i][:,4], propgErrs) # = [r_p, wgplus, wgcross, wgerr]
+			np.savetxt(join(easyPlotDir, path[6:-4]), reducedData, delimiter=',', fmt="%f,%f,%f,%f")
+			
 		r_p = realData[0][:,0]
 		x = np.linspace(0, r_p.max()*1.8)
 		dataPoints = [[wgplus, wgcross, wgerr], [rand_wgplus, rand_wgcross, rand_wgerr]]
@@ -353,7 +360,10 @@ class RealCatalogue:
 			else:
 				outimg = join(plotsDir, '%swcorr_z%s_c%s.pdf'%(prefix[j],ZC[0],ZC[1]))
 			f.savefig(outimg)
-			plt.show()
+			try:
+				plt.show()
+			except RuntimeError:
+				continue
 
 		return wcorrOutputs
 
@@ -374,7 +384,7 @@ class RealCatalogue:
 		randData = dataArr[randCut]
 		dataArr = dataArr[realCut]
 		pVals = []
-		chiSqs = []
+		chi2s = []
 		xSigma = []
 
 		for j, data in enumerate(dataArr):
@@ -383,50 +393,32 @@ class RealCatalogue:
 			err = np.sqrt(data[2]**2+randData[j][2]**2)#[1]*df
 			plusChi_i = [((v-expec)/err[i])**2 for i, v in enumerate(plus)]
 			crossChi_i = [((v-expec)/err[i])**2 for i, v in enumerate(cross)]
-			chiSq_pl = np.sum(plusChi_i)
-			chiSq_cr = np.sum(crossChi_i)
-			intgrl_pl = scint.quad(self.chiFunc, chiSq_pl, np.inf)
-			intgrl_cr = scint.quad(self.chiFunc, chiSq_cr, np.inf)
+			chi2_pl = np.sum(plusChi_i)
+			chi2_cr = np.sum(crossChi_i)
+			intgrl_pl = scint.quad(self.chiFunc, chi2_pl, np.inf)
+			intgrl_cr = scint.quad(self.chiFunc, chi2_cr, np.inf)
 			pVal_pl = intgrl_pl[0]
 			pVal_cr = intgrl_cr[0]
 			pVal = ['%.5f'%pVal_pl, '%.5f'%pVal_cr]
-			chiSq = ['%.5f'%chiSq_pl, '%.5f'%chiSq_cr]
-			chiSqs.append(chiSq)
+			chi2 = ['%.5f'%chi2_pl, '%.5f'%chi2_cr]
+			chi2s.append(chi2)
 			pVals.append(pVal)
 
 			xSigs = []
-			print('x-sigma, gauss_p, p-val(chi^2)')
-			for p in [pVal_pl, pVal_cr]:
-				x = p/10
-				int_x = scint.quad(self.normFunc,x,np.inf)
-				gauss_p = 1-(2*int_x[0])
-				gaussOver_p = gauss_p/p
-				if gaussOver_p < 1:
-					while gaussOver_p < 1:
-						x *= 1.01
-						int_x = scint.quad(self.normFunc,x,np.inf)
-						gauss_p = 1-(2*int_x[0])
-						gaussOver_p = gauss_p/p
-					else:
-						xSigs.append(['%.5f'%x, '%.5f'%gauss_p])
-						print('%.5f'%x, '%.5f'%gauss_p, '%.5f'%p)
-				else:
-					while gaussOver_p > 1:
-						x *= 0.99
-						int_x = scint.quad(self.normFunc,x,np.inf)
-						gauss_p = 1-(2*int_x[0])
-						gaussOver_p = gauss_p/p
-					else:
-						xSigs.append(['%.5f'%x, '%.5f'%gauss_p])
-						print('%.5f'%x, '%.5f'%gauss_p, '%.5f'%p)
+			print('p-val(chi^2), x-sigma')
+			pl_cr = ['plus', 'cross']
+			for k, p in enumerate([pVal_pl, pVal_cr]):
+				x = abs(stat.norm.interval(p, loc=0, scale=1)[0])
+				xSigs.append(['%.5f'%p, '%.5f'%x])
+				print('%s :'%pl_cr[k], '%.5f'%p, '%.5f'%x)
 			xSigma.append(xSigs)
 
-		for l in [pVals,chiSqs,xSigma]:
+		for l in [pVals,chi2s,xSigma]:
 			l = np.array(l)
-		chi2Stats = zip(dataList,chiSq[:,0],pVal[:,0],xSigma[:,0,0],xSigma[:,0,1],chiSq[:,1],pVal[:,1],xSigma[:,1,0],xSigma[:,1,1])
-		fl = open(join(path2data, 'chisquares.csv'))
+		chi2Stats = zip(dataList,chi2s[:,0],pVals[:,0],xSigma[:,0,1],chi2s[:,1],pVals[:,1],xSigma[:,1,1])
+		fl = open(join(path2data, 'chi2.csv'))
 		writer = csv.writer(fl)
-		writer.writerow(['data','chi^2(plus)','p-val','x-sigma','(gauss-p)','chi^2(cross)','p-val','x-sigma','(gauss-p)'])
+		writer.writerow(['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'])
 		for vals in chi2Stats:
 			writer.writerow(vals)
 		fl.close()
