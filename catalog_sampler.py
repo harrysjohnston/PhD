@@ -295,7 +295,7 @@ class RealCatalogue:
 			rand_wgerr.append(randData[i][:,6])
 			# save reduced data to csv for easy plotting
 			reducedData = zip(realData[0][:,0], realData[i][:,3], realData[i][:,4], propgErrs) # = [r_p, wgplus, wgcross, wgerr]
-			np.savetxt(join(easyPlotDir, basename(normpath(path[6:-4]))), reducedData, delimiter=',', fmt="%f,%f,%f,%f")
+			np.savetxt(join(easyPlotDir, basename(normpath(path))[6:-4]), reducedData, delimiter='\t', fmt="%f,%f,%f,%f")
 
 		r_p = realData[0][:,0]
 		x = np.linspace(0, r_p.max()*1.8)
@@ -416,7 +416,7 @@ class RealCatalogue:
 		xSigma = np.array(xSigma)
 		dataList = np.array(dataList)
 		chi2Stats = np.column_stack((dataList[realCut],chi2s[:,0],pVals[:,0],xSigma[:,0,1],chi2s[:,1],pVals[:,1],xSigma[:,1,1]))
-		fl = open(join(path2data, 'chi2.csv'))
+		fl = open(join(path2data, 'chi2.csv'), 'w')
 		writer = csv.writer(fl)
 		writer.writerow(['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'])
 		for vals in chi2Stats:
