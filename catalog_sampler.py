@@ -17,6 +17,8 @@ import sys
 import scipy.integrate as scint
 import scipy.stats as stat
 from scipy.stats import chi2
+import healpy as hp
+import gc
 
 class RealCatalogue:
 
@@ -142,6 +144,14 @@ class RealCatalogue:
 		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[3]+'.asc', self.samplecounts[3], 'loZ_vs_loZ_B']
 		]
 
+		# save cuts for later use
+		self.zcut = z_cut
+		self.zcut_r = z_cut_r
+		self.redcut = red_cut
+		self.bluecut = blue_cut
+		self.bitmaskcut = bitmask_cut
+		self.pgmcut = pgm_cut
+
 	def cut_columns(self, subsample, h): 
 		"""""
 		take subsample data 
@@ -195,12 +205,16 @@ class RealCatalogue:
 
 		self.new_root = outfile_root
 		zcCuts = [z_cut, c_cut]
-		np.savetxt(join(outfile_root, 'ZC_cuts'), zcCuts, delimiter=',', fmt="%f")
 
 		if not isdir(outfile_root):
 			mkdir(outfile_root)
+
+		np.savetxt(join(outfile_root, 'ZC_cuts'), zcCuts, delimiter=',', fmt="%f")
+
 		ascii.write(new_table, join(outfile_root, label + ".asc"), names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
+
 		sample_no = str(label) + " # objects: " + str(len(new_table))
+
 		return sample_no
 
 	def prep_wcorr(self, files_path, wcorr_combos, rp_bins, rp_lims, los_bins, los_lim, nproc, large_pi, out_sh):
@@ -212,6 +226,8 @@ class RealCatalogue:
 		'#PBS -l nodes=1',
 		'#PBS -l walltime=120:00:00',
 		'#PBS -l mem=50gb',
+		'#PBS -o %s'%files_path,
+		'#PBS -e %s'%files_path,
 		'',
 		'module load dev_tools/nov2014/python-anaconda',
 		'',
@@ -347,7 +363,7 @@ class RealCatalogue:
 			axarr[1,0].set_xlabel('Comoving transverse separation (Mpc/h)')
 			axarr[1,0].set_ylabel('Correlations')
 			ZC = np.loadtxt(join(files_path, 'ZC_cuts'), delimiter=',')
-			axarr[0,0].set_title('Cuts: z%s, c%s'%(ZC[0],ZC[1]))
+			axarr[1,1].set_xlabel('Cuts: z%s, c%s'%(ZC[0],ZC[1]))
 
 			plotsDir = join(files_path, 'Plots')
 			if not isdir(plotsDir):
@@ -411,10 +427,8 @@ class RealCatalogue:
 				print('%s :'%pl_cr[k], '%.5f'%p, '%.5f'%x)
 			xSigma.append(xSigs)
 
-		pVals = np.array(pVals)
-		chi2s = np.array(chi2s)
-		xSigma = np.array(xSigma)
-		dataList = np.array(dataList)
+		pVals, chi2s, xSigma, dataList = map(lambda x: np.array(x),
+											[pVals, chi2s, xSigma, dataList])
 		chi2Stats = np.column_stack((dataList[realCut],chi2s[:,0],pVals[:,0],xSigma[:,0,1],chi2s[:,1],pVals[:,1],xSigma[:,1,1]))
 		fl = open(join(path2data, 'chi2.csv'), 'w')
 		writer = csv.writer(fl)
@@ -427,6 +441,147 @@ class RealCatalogue:
 
 		return None
 
+	def patch_data(self, patchSize):
+		# find survey area
+		nside = 2048
+		fullSky = 41252.96 # square degrees
+		npix = hp.nside2npix(nside)
+		ra = self.data['RA_1']
+		dec = self.data['DEC_1']
+		theta = np.deg2rad(90.-dec)
+		phi = np.deg2rad(ra)
+		pixIDs = hp.ang2pix(nside,theta,phi,nest=False)
+		GKmap = np.bincount(pixIDs,minlength=npix)
+		GKskyFrac = len(GKmap[GKmap!=0])
+		GKskyFrac /= npix
+		GKskyFrac *= fullSky
+		print('Survey area: %.2f deg^2'%GKskyFrac)
+
+		# divide catalog.data into patches of 2-3 sqdeg
+		raHist = np.histogram(ra, bins=100)
+		decHist = np.histogram(dec, bins=100)
+		raCounts, raEdges = raHist
+		decCounts, decEdges = decHist
+		Counts, Edges = [raCounts, decCounts], [raEdges, decEdges]
+		Lowers = [[],[]]
+		Uppers = [[],[]]
+		# find mins/maxs in ra/dec of surveyed areas
+		for i, count in enumerate(Counts):
+		    while len(count)!=0:
+		        nonz = np.nonzero(count)[0] # index of 1st populated bin
+		        Lowers[i].append(Edges[i][nonz[0]]) # corresponding min coord
+		        if 0 in count:
+		            leadz = list(count).index(0) # index of 1st empty bin
+		            Uppers[i].append(Edges[i][leadz]) # corresp. max coord
+		            # shorten counts/edges, & repeat...
+		            count = count[leadz:]
+		            Edges[i] = Edges[i][leadz:]
+		            nonz = np.nonzero(count)[0]
+		            count = count[nonz[0]:]
+		            Edges[i] = Edges[i][nonz[0]:]
+		        else: # ...until absolute maxs in ra/dec
+		            Uppers[i].append(Edges[i][-1])
+		            count=[]
+
+		raLs,raUs,decLs,decUs = map(lambda x: np.array(x),
+			[Lowers[0], Uppers[0], Lowers[1], Uppers[1]])
+		# ranges in ra/dec
+		deltaR = raUs-raLs
+		deltaD = decUs-decLs
+		RDratio = deltaR/deltaD
+		# use ratio to determine integer nos. of 'columns/rows' of patches
+		dLen = np.array([1]*len(RDratio))
+		rLen = dLen*np.round(RDratio)
+		rPatchside = deltaR/rLen
+		dPatchside = deltaD/dLen
+		patchAr = rPatchside*dPatchside
+		initDiff = abs(patchAr-patchSize)
+
+		while any(abs(patchAr-patchSize)>0.5):
+		    dLen += 1
+		    rLen = dLen*np.round(RDratio)
+		    rPatchside = deltaR/rLen
+		    dPatchside = deltaD/dLen
+		    patchAr = rPatchside*dPatchside
+		    if any(abs(patchAr-patchSize)>initDiff):
+		        print('PATCH LENGTH INF WHILE LOOP')
+		        break
+		        sys.exit()
+        [print('Patch sizes: %.2f'%i) for i in patchAr]
+
+        # contsruct patch edges = 'ra/decPatches'
+		raLims = np.column_stack((raLs,raUs))
+		decLims = np.column_stack((decLs,decUs))
+
+		raPatches = [np.linspace(raLims[i][0],raLims[i][1],num=rLen[i]) 
+		             for i in np.arange(0,len(raLims))]
+		decPatches = [np.linspace(decLims[i][0],decLims[i][1],num=dLen[i]) 
+		             for i in np.arange(0,len(decLims))]
+		raPatches,decPatches = map(lambda x: np.array(x), [raPatches,decPatches])
+
+		# create column/row cuts
+		raCuts = []
+		decCuts = []
+		for j in np.arange(0,len(raPatches)):
+		    raCuts.append(np.array(
+		            [np.where((ra>=raPatches[j][i])
+		                      &(ra<=raPatches[j][i+1]),
+		                    True,False)
+		         for i in np.arange(0,len(raPatches[j])-1)]))
+		for j in np.arange(0,len(decPatches)):
+		    decCuts.append(np.array(
+		            [np.where((dec>=decPatches[j][i])
+		                      &(dec<=decPatches[j][i+1]),
+		                    True,False)
+		         for i in np.arange(0,len(decPatches[j])-1)]))
+
+		raCuts, decCuts = map(lambda x: np.array(x), [raCuts, decCuts])
+		raCuts, decCuts = map(lambda x: x.reshape(-1,x.shape[-1]),
+		                      [raCuts,decCuts])        
+
+		# combine into patch-cuts
+		patchCuts = []
+		for j in decCuts:
+		    [patchCuts.append(i&j) for i in raCuts]
+	    patchCuts = np.array(patchCuts)
+	    assert patchCuts.shape[0] == raCuts.shape[0]*decCuts.shape[0], 'patch-cuts broken'
+
+	    # combine patch & z/colour cuts
+	    highzR_pcuts = [(self.zcut&self.redcut&self.bitmaskcut&self.pgmcut&pc for pc in patchCuts)]
+	    highzB_pcuts = [(self.zcut&self.bluecut&self.bitmaskcut&self.pgmcut&pc for pc in patchCuts)]
+	    lowzR_pcuts = [(self.zcut_r&self.redcut&self.bitmaskcut&self.pgmcut&pc for pc in patchCuts)]
+	    lowzB_pcuts = [(self.zcut_r&self.bluecut&self.bitmaskcut&self.pgmcut&pc for pc in patchCuts)]
+	    
+	    # cut data into 4xpatch-arrays, each element of which is a fits-table
+	    hizR_patches,hizB_patches,lozR_patches,lozB_patches = map(lambda x: [self.data[pc] for pc in x], [highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts])
+	    # and record galaxy counts for each patch in each subsample
+	    hizR_pcounts,hizB_pcounts,lozR_pcounts,lozB_pcounts = map(lambda x: [len(x[i]) for i in x], [hizR_patches,hizB_patches,lozR_patches,lozB_patches])
+
+	    self.patchedData = [hizR_patches,hizB_patches,lozR_patches,lozB_patches]
+	    self.patchCounts = [hizR_pcounts,hizB_pcounts,lozR_pcounts,lozB_pcounts]
+
+	    return self.patchedData
+
+    def save_patches(self, patch, outfile_root, label, p_num):
+    	patchDir = join(outfile_root,label)
+    	if not isdir(patchDir):
+    		mkdir(patchDir)
+    	patchName = join(patchDir,label+'%s.asc'%p_num.zfill(4))
+    	ascii.write(patch, patchName, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
+    	return patchDir
+
+    def wcorr_patches(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc):
+    	os.system('setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/share/splinter/hj/PhD/CosmoFisherForecast/bjutils/lib/')
+    	patches = [patch for patch in listdir(patchDir) if '0' in patch]
+    	density = [d for d in listdir(patchDir) if '0' not in d]
+    	dCount = len(np.loadtxt(join(patchDir,d)))
+    	for p in patches:
+    		pCount = len(np.loadtxt(join(patchDir,p)))
+    		os.system(
+    			'/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(patchDir,density,dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-4],nproc)
+    			)
+    		del pCount
+    		gc.collect()
 
 class RandomCatalogue(RealCatalogue):
 
@@ -599,18 +754,32 @@ if __name__ == "__main__":
 	parser.add_argument(
 		'-plot',
 		help='plot data & save figure after correlations completed (1), or not (0), defaults to 1',
+		choices=[0,1],
 		default=1)
 	parser.add_argument(
 		'-plotNow',
 		help='plot ALREADY EXISTING correlation data (1), having given arg="Path" as the path to the .dat files (Catalog arg must still be path of readable .fits catalog). Bypasses all other sampling functions. Defaults to 0',
+		choices=[0,1],
 		default=0)
 	parser.add_argument(
 		'-chiSqu',
 		help='calc chi^2 stats for ALREADY EXISTING correlation data (1), having given arg="Path" as the path to the .dat files (Catalog arg must still be path of readable .fits catalog). Bypasses all other sampling functions. Defaults to 0',
+		choices=[0,1],
 		default=0)
 	parser.add_argument(
 		'-expec',
 		help='expectation values for chi^2 statistics, defaults to zeros at all points',
+		default=0)
+	parser.add_argument(
+		'-bootstrap',
+		choices=[0,1],
+		help='perform bootstrap error determination (1) or not (0), defaults to 1',
+		type=int,
+		default=1)
+	parser.add_argument(
+		'-patchSize',
+		help='preferred mean patch size (deg^2) for bootstrap error determination, defaults to 2.5',
+		type=np.float32,
 		default=0)
 	args = parser.parse_args()
 
@@ -657,6 +826,21 @@ if __name__ == "__main__":
 	Write.write(str(Text))
 	Write.close()
 
+	# BOOTSTRAP FOR ERRORS
+	if bootstrap:
+		# patchData.shape = (4 subsamples, N patches)
+		patchData = catalog.patch_data(args.patchSize)
+		for i,s in enumerate(patchData):
+			for j,p in enumerate(s):
+				new_p = catalog.cut_columns(p, args.H)
+				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j) # save_patches returns str(patchDir)
+			# copy density samples into patchDirs for wcorr
+			[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[4]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[4]+'.asc'))) for d in [0,1]]
+			[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[5]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[5]+'.asc'))) for d in [2,3]]
+			catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc)
+
+
+		
 	catalog.prep_wcorr(catalog.new_root, catalog.wcorr_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'real_wcorr')
 
 	if args.wcorr:
