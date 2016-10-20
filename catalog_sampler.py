@@ -17,7 +17,7 @@ import sys
 import scipy.integrate as scint
 import scipy.stats as stat
 from scipy.stats import chi2
-import healpy as hp
+# import healpy as hp
 import gc
 
 class RealCatalogue:
@@ -171,6 +171,8 @@ class RealCatalogue:
 		Z = table['Z_1_1']
 		e1 = table['e1c']/table['pgm']
 		e2 = table['e2c']/table['pgm']
+		e1 = e1[np.invert(np.isnan(e1))]
+		e2 = e2[np.invert(np.isnan(e2))]
 
 		# random re-shuffle test - density-shape corr should now ~ 0
 		# e12 = list(zip(e1,e2))
@@ -509,7 +511,7 @@ class RealCatalogue:
 		        print('PATCH LENGTH INF WHILE LOOP')
 		        break
 		        sys.exit()
-        	[print('Patch areas (sqdeg): %.2f'%i) for i in patchAr]	
+		[print('Patch areas (sqdeg): %.2f'%i) for i in patchAr]	
 		print('rSides (#,deg): ',rLen,rPatchside)
 		print('dSides (#,deg): ',dLen,dPatchside)
 
@@ -547,47 +549,49 @@ class RealCatalogue:
 		patchCuts = []
 		for j in decCuts:
 		    [patchCuts.append(i&j) for i in raCuts]
-	    	patchCuts = np.array(patchCuts)
-	    	assert patchCuts.shape[0] == raCuts.shape[0]*decCuts.shape[0], 'patch-cuts broken'
+		patchCuts = np.array(patchCuts)
+		assert patchCuts.shape[0] == raCuts.shape[0]*decCuts.shape[0], 'patch-cuts broken'
 
-	    	# combine patch & z/colour cuts
-	   	highzR_pcuts = [(self.zcut&self.redcut&self.bitmaskcut&self.pgmcut&pc) for pc in patchCuts]
-	   	highzB_pcuts = [(self.zcut&self.bluecut&self.bitmaskcut&self.pgmcut&pc) for pc in patchCuts]
+		# combine patch & z/colour cuts
+		highzR_pcuts = [(self.zcut&self.redcut&self.bitmaskcut&self.pgmcut&pc) for pc in patchCuts]
+		highzB_pcuts = [(self.zcut&self.bluecut&self.bitmaskcut&self.pgmcut&pc) for pc in patchCuts]
 		lowzR_pcuts = [(self.zcut_r&self.redcut&self.bitmaskcut&self.pgmcut&pc) for pc in patchCuts]
 		lowzB_pcuts = [(self.zcut_r&self.bluecut&self.bitmaskcut&self.pgmcut&pc) for pc in patchCuts]
+
 		highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts = map(lambda x: np.array(x), [highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts])
-	    	# cut data into 4xpatch-arrays, each element of which is a fits-table
-	    	hizR_patches,hizB_patches,lozR_patches,lozB_patches = map(lambda x: np.array([self.data[pc] for pc in x]), [highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts])
+
+		# cut data into 4xpatch-arrays, each element of which is a fits-table
+		hizR_patches,hizB_patches,lozR_patches,lozB_patches = map(lambda x: np.array([self.data[pc] for pc in x]), [highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts])
+
 		del highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts
 		gc.collect()
-	    	# and record galaxy counts for each patch in each subsample
-	    	# hizR_pcounts,hizB_pcounts,lozR_pcounts,lozB_pcounts = map(lambda x: [len(x[i]) for i in x], [hizR_patches,hizB_patches,lozR_patches,lozB_patches])
-	    	self.patchedData = np.array([hizR_patches,hizB_patches,lozR_patches,lozB_patches])
-	    	# self.patchCounts = [hizR_pcounts,hizB_pcounts,lozR_pcounts,lozB_pcounts]
-		#print('patched data shape : ',self.patchedData.shape)
-	    	return self.patchedData
 
-    	def save_patches(self, patch, outfile_root, label, p_num):
-    		patchDir = join(outfile_root,label)
-    		if not isdir(patchDir):
-    			mkdir(patchDir)
-    		patchName = join(patchDir,label+'%s.asc'%str(p_num).zfill(4))
-    		ascii.write(patch, patchName, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
-    		return patchDir
+		# and record galaxy counts for each patch in each subsample
+		# hizR_pcounts,hizB_pcounts,lozR_pcounts,lozB_pcounts = map(lambda x: [len(x[i]) for i in x], [hizR_patches,hizB_patches,lozR_patches,lozB_patches])
 
-    	def wcorr_patches(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc):
-    		#os.system('export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/share/splinter/hj/PhD/CosmoFisherForecast/bjutils/lib/')
-		
-    		patches = [patch for patch in listdir(patchDir) if ('0' in patch)]
-    		density = [d for d in listdir(patchDir) if ('0' not in d)][0]
-    		dCount = len(np.loadtxt(join(patchDir,d)))
-    		for p in patches:
-    			pCount = len(np.loadtxt(join(patchDir,p)))
-    			os.system(
-    				'/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(patchDir,density,dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-4],nproc)
-    				)
-    			del pCount
-    			gc.collect()
+		self.patchedData = np.array([hizR_patches,hizB_patches,lozR_patches,lozB_patches])
+
+		return self.patchedData
+
+	def save_patches(self, patch, outfile_root, label, p_num):
+		patchDir = join(outfile_root,label)
+		if not isdir(patchDir):
+			mkdir(patchDir)
+		patchName = join(patchDir,label+'%spatch.asc'%str(p_num).zfill(2))
+		ascii.write(patch, patchName, names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
+		return patchDir
+
+	def wcorr_patches(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc):
+
+		patches = [patch for patch in listdir(patchDir) if 'patch' in patch]
+		density = [d for d in listdir(patchDir) if 'Z.asc' in d][0]
+		dCount = len(np.loadtxt(join(patchDir,d)))
+		print('density count: %d',dCount)
+		for p in patches:
+			pCount = len(np.loadtxt(join(patchDir,p)))
+			os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(patchDir,density,dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-9],nproc))
+			del pCount
+			gc.collect()
 			#break
 
 class RandomCatalogue(RealCatalogue):
