@@ -171,8 +171,7 @@ class RealCatalogue:
 		Z = table['Z_1_1']
 		e1 = table['e1c']/table['pgm']
 		e2 = table['e2c']/table['pgm']
-		e1 = e1[np.invert(np.isnan(e1))]
-		e2 = e2[np.invert(np.isnan(e2))]
+		enans = (np.invert(np.isnan(e1)))&(np.invert(np.isnan(e2)))
 
 		# random re-shuffle test - density-shape corr should now ~ 0
 		# e12 = list(zip(e1,e2))
@@ -190,7 +189,8 @@ class RealCatalogue:
 		comov *= h
 
 		new_table = np.column_stack((RA, DEC, comov, e1, e2, e_weight))
-		return new_table
+		new_table1 = new_table[enans]
+		return new_table1
 
 	def save_tables(self, new_table, outfile_root_, label, z_cut, c_cut, notes):
 		"""""
