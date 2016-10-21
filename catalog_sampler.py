@@ -402,70 +402,70 @@ class RealCatalogue:
 				# continue
 
 
-		else:
-			dataPoints = [[wgplus, wgcross, wgerr], [rand_wgplus, rand_wgcross, rand_wgerr]]
-			prefix = ['','rand_']
-			for j, set_ in enumerate(dataPoints): 
-				# plot/save random-subtracted-reals, AND randoms
-				f, axarr = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(15,10))
-				f.subplots_adjust(hspace=0, wspace=0)
-				axarr[0,0].errorbar(r_p, set_[0][0], yerr=set_[2][0],
-				elinewidth=2, color='r', capsize=0,
-				label='w(g+)')
-				axarr[0,0].errorbar(r_p, set_[1][0], yerr=set_[2][0],
-				elinewidth=2, color='g', capsize=0,
-				label='w(gx)', alpha=0.5)
-				axarr[0,1].errorbar(r_p, set_[0][1], yerr=set_[2][1],
-				elinewidth=2, color='b', capsize=0,
-				label='w(g+)')
-				axarr[0,1].errorbar(r_p, set_[1][1], yerr=set_[2][1],
-				elinewidth=2, color='g', capsize=0,
-				label='w(gx)', alpha=0.5)
-				axarr[1,0].errorbar(r_p, set_[0][2], yerr=set_[2][2],
-				elinewidth=2, color='r', capsize=0,
-				label='w(g+)')
-				axarr[1,0].errorbar(r_p, set_[1][2], yerr=set_[2][2],
-				elinewidth=2, color='g', capsize=0,
-				label='w(gx)', alpha=0.5)
-				axarr[1,1].errorbar(r_p, set_[0][3], yerr=set_[2][3],
-				elinewidth=2, color='b', capsize=0,
-				label='w(g+)')
-				axarr[1,1].errorbar(r_p, set_[1][3], yerr=set_[2][3],
-				elinewidth=2, color='g', capsize=0,
-				label='w(gx)', alpha=0.5)
-			arr_ind = [(0,0), (0,1), (1,0), (1,1)]
-			for i, ind in enumerate(arr_ind):
-				a = axarr[ind]
-				a.set_xscale('log')
-				a.set_xlim(0.25,70)
-				a.set_ylim(-0.5,0.4)
-				a.plot(x, [0]*len(x), lw=2, ls='--', color='c')
-				# a.set_xlabel('Comoving transverse separation (Mpc/h)')
-				# a.set_ylabel('Correlations')
-				a.set_title('%s'%wcorrIDs[i], fontsize=12)
-				a.legend(loc='upper right')
-				a.grid()
-			plt.setp([a.get_xticklabels() for a in axarr[0, :]], visible=False)
-			plt.setp([a.get_yticklabels() for a in axarr[:, 1]], visible=False)
-			# plt.setp([a.get_xlabels() for a in axarr[:, 1]], visible=False)
-			axarr[1,0].set_xlabel('Comoving transverse separation (Mpc/h)')
-			axarr[1,0].set_ylabel('Correlations')
-			ZC = np.loadtxt(join(files_path, 'ZC_cuts'), delimiter=',')
-			axarr[1,1].set_xlabel('Cuts: z%s, c%s'%(ZC[0],ZC[1]))
+		# else:
+		# 	dataPoints = [[wgplus, wgcross, wgerr], [rand_wgplus, rand_wgcross, rand_wgerr]]
+		# 	prefix = ['','rand_']
+		# 	for j, set_ in enumerate(dataPoints): 
+		# 		# plot/save random-subtracted-reals, AND randoms
+		# 		f, axarr = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(15,10))
+		# 		f.subplots_adjust(hspace=0, wspace=0)
+		# 		axarr[0,0].errorbar(r_p, set_[0][0], yerr=set_[2][0],
+		# 		elinewidth=2, color='r', capsize=0,
+		# 		label='w(g+)')
+		# 		axarr[0,0].errorbar(r_p, set_[1][0], yerr=set_[2][0],
+		# 		elinewidth=2, color='g', capsize=0,
+		# 		label='w(gx)', alpha=0.5)
+		# 		axarr[0,1].errorbar(r_p, set_[0][1], yerr=set_[2][1],
+		# 		elinewidth=2, color='b', capsize=0,
+		# 		label='w(g+)')
+		# 		axarr[0,1].errorbar(r_p, set_[1][1], yerr=set_[2][1],
+		# 		elinewidth=2, color='g', capsize=0,
+		# 		label='w(gx)', alpha=0.5)
+		# 		axarr[1,0].errorbar(r_p, set_[0][2], yerr=set_[2][2],
+		# 		elinewidth=2, color='r', capsize=0,
+		# 		label='w(g+)')
+		# 		axarr[1,0].errorbar(r_p, set_[1][2], yerr=set_[2][2],
+		# 		elinewidth=2, color='g', capsize=0,
+		# 		label='w(gx)', alpha=0.5)
+		# 		axarr[1,1].errorbar(r_p, set_[0][3], yerr=set_[2][3],
+		# 		elinewidth=2, color='b', capsize=0,
+		# 		label='w(g+)')
+		# 		axarr[1,1].errorbar(r_p, set_[1][3], yerr=set_[2][3],
+		# 		elinewidth=2, color='g', capsize=0,
+		# 		label='w(gx)', alpha=0.5)
+		# 	arr_ind = [(0,0), (0,1), (1,0), (1,1)]
+		# 	for i, ind in enumerate(arr_ind):
+		# 		a = axarr[ind]
+		# 		a.set_xscale('log')
+		# 		a.set_xlim(0.25,70)
+		# 		a.set_ylim(-0.5,0.4)
+		# 		a.plot(x, [0]*len(x), lw=2, ls='--', color='c')
+		# 		# a.set_xlabel('Comoving transverse separation (Mpc/h)')
+		# 		# a.set_ylabel('Correlations')
+		# 		a.set_title('%s'%wcorrIDs[i], fontsize=12)
+		# 		a.legend(loc='upper right')
+		# 		a.grid()
+		# 	plt.setp([a.get_xticklabels() for a in axarr[0, :]], visible=False)
+		# 	plt.setp([a.get_yticklabels() for a in axarr[:, 1]], visible=False)
+		# 	# plt.setp([a.get_xlabels() for a in axarr[:, 1]], visible=False)
+		# 	axarr[1,0].set_xlabel('Comoving transverse separation (Mpc/h)')
+		# 	axarr[1,0].set_ylabel('Correlations')
+		# 	ZC = np.loadtxt(join(files_path, 'ZC_cuts'), delimiter=',')
+		# 	axarr[1,1].set_xlabel('Cuts: z%s, c%s'%(ZC[0],ZC[1]))
 
-			plotsDir = join(files_path, 'Plots')
-			if not isdir(plotsDir):
-				mkdir(plotsDir)
+		# 	plotsDir = join(files_path, 'Plots')
+		# 	if not isdir(plotsDir):
+		# 		mkdir(plotsDir)
 
-			if 'largePi' in wcorrOutputs[0]:
-				outimg = join(plotsDir, '%swcorr_z%s_c%s_largePi.pdf'%(prefix[j],ZC[0],ZC[1]))
-			else:
-				outimg = join(plotsDir, '%swcorr_z%s_c%s.pdf'%(prefix[j],ZC[0],ZC[1]))
-			f.savefig(outimg)
-			try:
-				plt.show()
-			except RuntimeError:
-				continue
+		# 	if 'largePi' in wcorrOutputs[0]:
+		# 		outimg = join(plotsDir, '%swcorr_z%s_c%s_largePi.pdf'%(prefix[j],ZC[0],ZC[1]))
+		# 	else:
+		# 		outimg = join(plotsDir, '%swcorr_z%s_c%s.pdf'%(prefix[j],ZC[0],ZC[1]))
+		# 	f.savefig(outimg)
+		# 	try:
+		# 		plt.show()
+		# 	except RuntimeError:
+		# 		continue
 
 		return wcorrOutputs
 
