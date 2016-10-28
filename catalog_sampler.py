@@ -523,7 +523,7 @@ class RealCatalogue:
 		print('Survey area: %.2f deg^2'%GKskyFrac)
 
 		# find masked pixel IDs
-		kidsBitmap = hp.read_map('/share/splinter/hj/PhD/KiDS_counts_N2048.fits')
+		kidsBitmap = hp.read_map('/share/splinter/hj/PhD/KiDS_counts_N2048.fits', dtype=int)
 		bitmask_cut = [True]*len(kidsBitmap)
 		if bitmask_[0] != None:
 			bitmask_ = bitmask_[0]
