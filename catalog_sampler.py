@@ -534,6 +534,8 @@ class RealCatalogue:
 		print('Lost npix, fraction of area: %s, %s'%(len(lostpixIDs),len(lostpixIDs)/nonzeropix))
 		thetaPhis = hp.pix2ang(nside,lostpixIDs)
 		lostpixra,lostpixdec = np.rad2deg(thetaPhis[1]),(90.-np.rad2deg(thetaPhis[0]))
+		del kidsBitmap
+		gc.collect()
 
 		# divide catalog.data into patches of 2-3 sqdeg
 		raHist = np.histogram(ra, bins=100)
@@ -589,7 +591,7 @@ class RealCatalogue:
 		[print('Patch areas (sqdeg): %.2f'%i) for i in patchAr] 
 		print('rSides (#,deg): ',rLen,rPatchside)
 		print('dSides (#,deg): ',dLen,dPatchside)
-		patch_Ars = np.array([[i]*(dLen-1)*(rLen-1) for i in patchAr]).flatten()
+		patch_Ars = np.array([[i]*(dLen[j]-1)*(rLen[j]-1) for j,i in enumerate(patchAr)]).flatten()
 
 		# contsruct patch edges = 'ra/decPatches'
 		raLims = np.column_stack((raLs,raUs))
@@ -625,7 +627,7 @@ class RealCatalogue:
 			[pixpatchCuts.append(i&j) for i in pixraCuts]
 		patchCuts = np.array(patchCuts)
 		pixpatchCuts = np.array(pixpatchCuts)
-		print('pixpatchCuts shape: %s'%pixpatchCuts.shape)
+		print('pixpatchCuts shape: (%s, %s)'%pixpatchCuts.shape)
 		assert patchCuts.shape[0] == raCuts.shape[0]*decCuts.shape[0], 'patch-cuts broken'
 
 		# combine patch & z/colour cuts
@@ -645,7 +647,7 @@ class RealCatalogue:
 		self.patchedData = np.array([hizR_patches,hizB_patches,lozR_patches,lozB_patches])
 
 		# count lost pixels within each patch for weighting
-		npixLost = [np.bincount(i)[1] for i in pixpatchCuts]
+		npixLost = [np.count_nonzero(i) for i in pixpatchCuts]
 		pArLost = npixLost*pixar
 		self.patchWeights = 1-(pArLost/patch_Ars)
 
@@ -937,6 +939,7 @@ if __name__ == "__main__":
 			catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc)
 			catalog.bootstrap_signals(pDir, patchWeights)
 
+	sys.exit()
 	catalog.make_combos()
 	catalog.prep_wcorr(catalog.new_root,catalog.wcorr_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
 
