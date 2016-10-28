@@ -223,6 +223,7 @@ class RealCatalogue:
 		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[2]+'.asc', self.samplecounts[2], 'loZ_vs_loZ_R'],
 		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[3]+'.asc', self.samplecounts[3], 'loZ_vs_loZ_B']
 		]
+		self.samplecounts = self.samplecounts[0:6]
 		[print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
 		print('total shapes: \t%s'%np.sum(self.samplecounts[:4]))
 		print('total density: \t%s'%np.sum(self.samplecounts[4:]))
@@ -503,11 +504,12 @@ class RealCatalogue:
 
 		return None
 
-	def patch_data(self, patchSize):
+	def patch_data(self, patchSize, *bitmask_):
 		# find survey area
 		nside = 2048
 		fullSky = 41252.96 # square degrees
 		npix = hp.nside2npix(nside)
+		pixar = fullSky/npix
 		ra = self.data['RA_1']
 		dec = self.data['DEC_1']
 		theta = np.deg2rad(90.-dec)
@@ -515,9 +517,23 @@ class RealCatalogue:
 		pixIDs = hp.ang2pix(nside,theta,phi,nest=False)
 		GKmap = np.bincount(pixIDs,minlength=npix)
 		GKskyFrac = len(GKmap[GKmap!=0])
+		nonzeropix = GKskyFrac
 		GKskyFrac /= npix
 		GKskyFrac *= fullSky
 		print('Survey area: %.2f deg^2'%GKskyFrac)
+
+		# find masked pixel IDs
+		kidsBitmap = hp.read_map('/share/splinter/hj/PhD/KiDS_counts_N2048.fits')
+		bitmask_cut = [True]*len(kidsBitmap)
+		if bitmask_[0] != None:
+			bitmask_ = bitmask_[0]
+			for i in np.arange(0,len(bitmask_)):
+				# construct bitmask cut
+				bitmask_cut &= np.where(bitmask_[i] & kidsBitmap == bitmask_[i], False, True)
+		lostpixIDs = [j for j,b in enumerate(bitmask_cut) if b==False]
+		print('Lost npix, fraction of area: %s, %s'%(len(lostpixIDs),len(lostpixIDs)/nonzeropix))
+		thetaPhis = hp.pix2ang(nside,lostpixIDs)
+		lostpixra,lostpixdec = np.rad2deg(thetaPhis[1]),(90.-np.rad2deg(thetaPhis[0]))
 
 		# divide catalog.data into patches of 2-3 sqdeg
 		raHist = np.histogram(ra, bins=100)
@@ -573,6 +589,7 @@ class RealCatalogue:
 		[print('Patch areas (sqdeg): %.2f'%i) for i in patchAr] 
 		print('rSides (#,deg): ',rLen,rPatchside)
 		print('dSides (#,deg): ',dLen,dPatchside)
+		patch_Ars = np.array([[i]*(dLen-1)*(rLen-1) for i in patchAr]).flatten()
 
 		# contsruct patch edges = 'ra/decPatches'
 		raLims = np.column_stack((raLs,raUs))
@@ -585,19 +602,30 @@ class RealCatalogue:
 		# create column/row cuts from patch edges
 		raCuts = []
 		decCuts = []
+		pixraCuts = []
+		pixdecCuts = []
 		for j in np.arange(0,len(raPatches)):
 			raCuts.append(np.array([np.where((ra>=raPatches[j][i])&(ra<=raPatches[j][i+1]),True,False) for i in np.arange(0,len(raPatches[j])-1)]))
+			# AND DEFINE FROM lostpixra
+			pixraCuts.append(np.array([np.where((lostpixra>=raPatches[j][i])&(lostpixra<=raPatches[j][i+1]),True,False) for i in np.arange(0,len(raPatches[j])-1)]))
 		for j in np.arange(0,len(decPatches)):
 			decCuts.append(np.array([np.where((dec>=decPatches[j][i])&(dec<=decPatches[j][i+1]),True,False) for i in np.arange(0,len(decPatches[j])-1)]))
+			# AND DEFINE FROM lostpixdec
+			pixdecCuts.append(np.array([np.where((lostpixdec>=decPatches[j][i])&(lostpixdec<=decPatches[j][i+1]),True,False) for i in np.arange(0,len(decPatches[j])-1)]))
 
-		raCuts, decCuts = map(lambda x: np.array(x), [raCuts, decCuts])
-		raCuts, decCuts = map(lambda x: x.reshape(-1,x.shape[-1]),[raCuts,decCuts]) # flatten 3 cut-arrays (from 3 survey regions) into 1
+		raCuts,decCuts,pixraCuts,pixdecCuts = map(lambda x: np.array(x), [raCuts, decCuts,pixraCuts,pixdecCuts])
+		raCuts,decCuts,pixraCuts,pixdecCuts = map(lambda x: x.reshape(-1,x.shape[-1]),[raCuts,decCuts,pixraCuts,pixdecCuts]) # flatten 3 cut-arrays (from 3 survey regions) into 1
 
 		# combine into patch-cuts
 		patchCuts = []
+		pixpatchCuts = []
 		for j in decCuts:
 			[patchCuts.append(i&j) for i in raCuts]
+		for j in pixdecCuts:
+			[pixpatchCuts.append(i&j) for i in pixraCuts]
 		patchCuts = np.array(patchCuts)
+		pixpatchCuts = np.array(pixpatchCuts)
+		print('pixpatchCuts shape: %s'%pixpatchCuts.shape)
 		assert patchCuts.shape[0] == raCuts.shape[0]*decCuts.shape[0], 'patch-cuts broken'
 
 		# combine patch & z/colour cuts
@@ -615,7 +643,13 @@ class RealCatalogue:
 		gc.collect()
 
 		self.patchedData = np.array([hizR_patches,hizB_patches,lozR_patches,lozB_patches])
-		return self.patchedData
+
+		# count lost pixels within each patch for weighting
+		npixLost = [np.bincount(i)[1] for i in pixpatchCuts]
+		pArLost = npixLost*pixar
+		self.patchWeights = 1-(pArLost/patch_Ars)
+
+		return self.patchedData, self.patchWeights
 
 	def save_patches(self, patch, outfile_root, label, p_num):
 		patchDir = join(outfile_root,label)
@@ -638,7 +672,7 @@ class RealCatalogue:
 			gc.collect()
 			#break
 
-	def bootstrap_signals(self, patchDir):
+	def bootstrap_signals(self, patchDir, patchWeights):
 		pwcorrs = [x for x in listdir(patchDir) if '.dat' in x]
 		psigs = []
 		for x in pwcorrs:
@@ -650,8 +684,8 @@ class RealCatalogue:
 		# construct errors for each bin in r_p, for + & x corrs
 		wgplus = BTsignals[:,:,0,:]
 		wgcross = BTsignals[:,:,1,:]
-		Pmeans = np.mean(wgplus,axis=1)
-		Xmeans = np.mean(wgcross,axis=1) # INCLUDE WEIGHTS FOR EFFECTIVE AREAS AFTER BITMASK CONSIDERATION
+		Pmeans = np.average(wgplus,axis=1, weights=patchWeights)
+		Xmeans = np.average(wgcross,axis=1, weights=patchWeights)
 		Pstds = np.std(Pmeans,axis=0)
 		Xstds = np.std(Xmeans,axis=0)
 
@@ -892,7 +926,7 @@ if __name__ == "__main__":
 
 	if args.bootstrap:
 		# patchData.shape = (4 subsamples, N patches)
-		patchData = catalog.patch_data(args.patchSize)
+		patchData, patchWeights = catalog.patch_data(args.patchSize, args.bitmaskCut)
 		for i,sam in enumerate(patchData):
 			for j,p in enumerate(sam):
 				new_p = catalog.cut_columns(p, args.H)
@@ -901,12 +935,9 @@ if __name__ == "__main__":
 				[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[4]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[4]+'.asc'))) for d in [0,1]]
 				[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[5]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[5]+'.asc'))) for d in [2,3]]
 			catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc)
-			catalog.bootstrap_signals(pDir)
+			catalog.bootstrap_signals(pDir, patchWeights)
 
-		catalog.make_combos()
-		sys.exit()
-
-	# catalog.make_combos()
+	catalog.make_combos()
 	catalog.prep_wcorr(catalog.new_root,catalog.wcorr_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
 
 	if args.wcorr:
