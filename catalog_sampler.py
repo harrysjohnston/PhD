@@ -652,7 +652,8 @@ class RealCatalogue:
 		BTstds = np.column_stack((Pstds,Xstds))
 		label = basename(normpath(patchDir))
 		BTerrs_out = join(patchDir,'..','BTerrs_%s'%label)
-		ascii.write(BTstds, BTerrs_out, delimiter='\t')
+		ascii.write(BTstds, BTerrs_out, delimiter='\t', names=['#w(g+)err','#w(gx)err'])
+		return None
 
 class RandomCatalogue(RealCatalogue):
 
@@ -886,14 +887,15 @@ if __name__ == "__main__":
 	if args.bootstrap:
 		# patchData.shape = (4 subsamples, N patches)
 		patchData = catalog.patch_data(args.patchSize)
-		for i,s in enumerate(patchData):
-			for j,p in enumerate(s):
+		for i,sam in enumerate(patchData):
+			for j,p in enumerate(sam):
 				new_p = catalog.cut_columns(p, args.H)
 				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j) # save_patches returns str(patchDir)
 				# copy density samples into patchDirs for wcorr
 				[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[4]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[4]+'.asc'))) for d in [0,1]]
 				[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[5]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[5]+'.asc'))) for d in [2,3]]
 				catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc)
+			catalog.bootstrap_signals(catalog.labels[i])
 
 		sys.exit()
 
