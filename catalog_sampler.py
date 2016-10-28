@@ -80,7 +80,7 @@ class RealCatalogue:
 		# define colour, redshift & bitmask cuts
 		if colour_ != None:
 			red_cut = np.array((colour > colour_)) # larger (B-V) <-> 'redder' colour
-			blue_cut = np.invert(red_cut)
+			blue_cut = ~red_cut
 		else:
 			red_cut = np.array([True]*len(self.data))
 			blue_cut = red_cut
@@ -88,7 +88,7 @@ class RealCatalogue:
 		print('c cut: \t', colour_, np.unique(red_cut))
 		if z_ != None:
 			z_cut = np.array((z > z_)) # HIGH-Z
-			z_cut_r = np.invert(z_cut) # LOW-Z
+			z_cut_r = ~z_cut # LOW-Z
 		else:
 			z_cut = np.array([True]*len(self.data))
 			z_cut_r = z_cut
@@ -117,12 +117,12 @@ class RealCatalogue:
 			print('bitmask cut: \t', np.unique(bitmask_cut))
 
 		# apply cuts
-		self.highz_R = self.data[(z_cut&red_cut&bitmask_cut&pgm_cut)]
-		self.highz_B = self.data[(z_cut&blue_cut&bitmask_cut&pgm_cut)]
-		self.lowz_R = self.data[(z_cut_r&red_cut&bitmask_cut&pgm_cut)]
-		self.lowz_B = self.data[(z_cut_r&blue_cut&bitmask_cut&pgm_cut)]
-		self.highz = self.data[(z_cut&zeroPgm_cut)]
-		self.lowz = self.data[(z_cut_r&zeroPgm_cut)]
+		self.highz_R = self.data[(z_cut&red_cut&bitmask_cut)]
+		self.highz_B = self.data[(z_cut&blue_cut&bitmask_cut)]
+		self.lowz_R = self.data[(z_cut_r&red_cut&bitmask_cut)]
+		self.lowz_B = self.data[(z_cut_r&blue_cut&bitmask_cut)]
+		self.highz = self.data[z_cut]
+		self.lowz = self.data[z_cut_r]
 
 		self.samplecounts = []
 
@@ -164,11 +164,12 @@ class RealCatalogue:
 		RA = np.deg2rad(table['RA_1'])
 		DEC = np.deg2rad(table['DEC_1'])
 		Z = table['Z_1_1']
-		e1 = table['e1c']/table['pgm']
-		e2 = table['e2c']/table['pgm']
+		pgm = table['pgm']
+		e1 = table['e1c']/pgm
+		e2 = table['e2c']/pgm
+		e1,e2 = map(lambda x: np.nan_to_num(x), [e1,e2])
 		e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
-		enans = (np.invert(np.isnan(e1)))&(np.invert(np.isnan(e2)))
-		e_weight = np.array([1]*len(table))
+		e_weight = np.where(pgm<0.1,0,pgm)
 
 		# random re-shuffle test - density-shape corr should now ~ 0
 		# e12 = list(zip(e1,e2))
@@ -181,11 +182,11 @@ class RealCatalogue:
 		comov = Planck13.comoving_distance(Z)
 		comov *= h
 		new_table = np.column_stack((RA, DEC, comov, e1, e2, e_weight))
-		new_table1 = new_table[enans]
+		# new_table1 = new_table[enans]
 
-		self.samplecounts.append(len(new_table1))
+		self.samplecounts.append(len(new_table))
 
-		return new_table1
+		return new_table
 
 	def save_tables(self, new_table, outfile_root_, label, z_cut, c_cut, notes):
 		"""""
@@ -452,7 +453,7 @@ class RealCatalogue:
 		dataArr = [np.loadtxt(join(path2data, i)) for i in dataList]
 		dataArr = np.array([[i[:,3], i[:,4], i[:,6]] for i in dataArr])
 		randCut = np.array([i.startswith('wcorr_rand') for i in dataList])
-		realCut = np.invert(randCut)
+		realCut = ~randCut
 		randData = dataArr[randCut]
 		dataArr = dataArr[realCut]
 		pVals = []
@@ -694,7 +695,7 @@ class RandomCatalogue(RealCatalogue):
 
 		if z_ != None:
 			z_cut = np.array((z > z_))
-			z_cut_r = np.invert(z_cut)
+			z_cut_r = ~z_cut
 		else:
 			z_cut = np.array([True]*len(self.data))
 			z_cut_r = z_cut
@@ -895,7 +896,7 @@ if __name__ == "__main__":
 				[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[4]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[4]+'.asc'))) for d in [0,1]]
 				[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[5]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[5]+'.asc'))) for d in [2,3]]
 				catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc)
-			catalog.bootstrap_signals(catalog.labels[i])
+			catalog.bootstrap_signals(pDir)
 
 		catalog.make_combos()
 		sys.exit()
