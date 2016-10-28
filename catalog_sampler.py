@@ -167,9 +167,9 @@ class RealCatalogue:
 		pgm = table['pgm']
 		e1 = table['e1c']/pgm
 		e2 = table['e2c']/pgm
-		e1,e2 = map(lambda x: np.nan_to_num(x), [e1,e2])
 		e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
 		e_weight = np.where(pgm<0.1,0,pgm)
+		e1,e2,e_weight = map(lambda x: np.nan_to_num(x), [e1,e2,e_weight])
 
 		# random re-shuffle test - density-shape corr should now ~ 0
 		# e12 = list(zip(e1,e2))
@@ -323,8 +323,12 @@ class RealCatalogue:
 			rand_wgcross.append(randData[i][:,4])
 			rand_wgerr.append(randData[i][:,6])
 			# save reduced data to csv for easy plotting
-			reducedData = zip(realData[0][:,0], realData[i][:,3], realData[i][:,4], propgErrs) # = [r_p, wgplus, wgcross, wgerr]
-			ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wgplus', 'wgcross', 'wgerr'], formats={'r_p':np.float32, 'wgplus':np.float32, 'wgcross':np.float32, 'wgerr':np.float32})
+			if BT:
+				reducedData = zip(realData[0][:,0], realData[i][:,3], Pproperr, realData[i][:,4], Xproperr) # = [r_p, wgplus, Perr, wgcross, Xerr]
+				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', '+err', 'wgx', 'xerr'], formats={'r_p':np.float32, 'wg+':np.float32,'+err':np.float32, 'wgx':np.float32, 'xerr':np.float32})
+			else:
+				reducedData = zip(realData[0][:,0], realData[i][:,3], realData[i][:,4], propgErrs) # = [r_p, wgplus, wgcross, wgerr]
+				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wgplus', 'wgcross', 'wgerr'], formats={'r_p':np.float32, 'wgplus':np.float32, 'wgcross':np.float32, 'wgerr':np.float32})
 
 		r_p = realData[0][:,0]
 		x = np.linspace(0, r_p.max()*1.8)
@@ -597,10 +601,10 @@ class RealCatalogue:
 		assert patchCuts.shape[0] == raCuts.shape[0]*decCuts.shape[0], 'patch-cuts broken'
 
 		# combine patch & z/colour cuts
-		highzR_pcuts = [(self.zcut&self.redcut&self.bitmaskcut&self.pgmcut&pc) for pc in patchCuts]
-		highzB_pcuts = [(self.zcut&self.bluecut&self.bitmaskcut&self.pgmcut&pc) for pc in patchCuts]
-		lowzR_pcuts = [(self.zcut_r&self.redcut&self.bitmaskcut&self.pgmcut&pc) for pc in patchCuts]
-		lowzB_pcuts = [(self.zcut_r&self.bluecut&self.bitmaskcut&self.pgmcut&pc) for pc in patchCuts]
+		highzR_pcuts = [(self.zcut&self.redcut&self.bitmaskcut&pc) for pc in patchCuts]
+		highzB_pcuts = [(self.zcut&self.bluecut&self.bitmaskcut&pc) for pc in patchCuts]
+		lowzR_pcuts = [(self.zcut_r&self.redcut&self.bitmaskcut&pc) for pc in patchCuts]
+		lowzB_pcuts = [(self.zcut_r&self.bluecut&self.bitmaskcut&pc) for pc in patchCuts]
 
 		highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts = map(lambda x: np.array(x),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts])
 
@@ -626,7 +630,8 @@ class RealCatalogue:
 		density = [d for d in listdir(patchDir) if d.endswith('Z.asc')][0]
 		dCount = len(np.loadtxt(join(patchDir,density)))
 		print('density count: %d'%dCount)
-		for p in patches:
+		for i,p in enumerate(patches):
+			print("patch %s"%i)
 			pCount = len(np.loadtxt(join(patchDir,p)))
 			os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(patchDir,density,dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-9],nproc))
 			del pCount
