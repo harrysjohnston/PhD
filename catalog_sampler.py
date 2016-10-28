@@ -623,7 +623,7 @@ class RealCatalogue:
 	def wcorr_patches(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc):
 		patches = [patch for patch in listdir(patchDir) if 'patch' in patch]
 		density = [d for d in listdir(patchDir) if d.endswith('Z.asc')][0]
-		dCount = len(np.loadtxt(join(patchDir,d)))
+		dCount = len(np.loadtxt(join(patchDir,density)))
 		print('density count: %d'%dCount)
 		for p in patches:
 			pCount = len(np.loadtxt(join(patchDir,p)))
