@@ -126,9 +126,9 @@ class RealCatalogue:
 
 		self.samplecounts = []
 
-		[print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
-		print('total shapes: \t%s'%np.sum(self.samplecounts[:4]))
-		print('total density: \t%s'%np.sum(self.samplecounts[4:]))
+		# [print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
+		# print('total shapes: \t%s'%np.sum(self.samplecounts[:4]))
+		# print('total density: \t%s'%np.sum(self.samplecounts[4:]))
 
 		# # construct sets of filenames, counts, & IDs for wcorr-calls
 		# self.wcorr_combos = [
@@ -211,10 +211,10 @@ class RealCatalogue:
 
 		ascii.write(new_table, join(outfile_root, label + ".asc"), names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
 
-		sample_no = str(label) + " # objects: " + str(len(new_table))
+		sample_no = "%s # objects:\t%s"%(label,len(new_table))
 		return sample_no
 
-	def make_combos():
+	def make_combos(self):
 		# construct sets of filenames, counts, & IDs for wcorr-calls
 		self.wcorr_combos = [
 		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[0]+'.asc', self.samplecounts[0], 'hiZ_vs_hiZ_R'],
@@ -897,9 +897,10 @@ if __name__ == "__main__":
 				catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc)
 			catalog.bootstrap_signals(catalog.labels[i])
 
+		catalog.make_combos()
 		sys.exit()
 
-	catalog.make_combos()
+	# catalog.make_combos()
 	catalog.prep_wcorr(catalog.new_root,catalog.wcorr_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
 
 	if args.wcorr:
