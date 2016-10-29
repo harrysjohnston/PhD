@@ -697,6 +697,21 @@ class RealCatalogue:
 		ascii.write(BTstds, BTerrs_out, delimiter='\t', names=['#w(g+)err','#w(gx)err'])
 		return None
 
+	def map_test(self, catalogs):
+		npix = hp.nside2npix(128)
+		hmap = [0]*npix
+		for cat in catalogs:
+			ra = cat[:,0]
+			dec = cat[:,1]
+			theta = (np.pi/2)-dec
+			phi = ra
+			pix = hp.ang2pix(128,theta,phi)
+			hmap += np.bincount(pix, minlength=npix)
+		hp.mollview(hmap,rot=(180,0,0))
+		plt.savefig('/share/splinter/hj/PhD/patchTest.pdf')
+		return None
+
+
 class RandomCatalogue(RealCatalogue):
 
 	def __init__(self, path):
@@ -929,13 +944,17 @@ if __name__ == "__main__":
 	if args.bootstrap:
 		# patchData.shape = (4 subsamples, N patches)
 		patchData, patchWeights = catalog.patch_data(args.patchSize, args.bitmaskCut)
+		print('MAPPING')
+		catalog.map_test(patchData[0])
+		print('MAPPED')
+		sys.exit()
 		for i,sam in enumerate(patchData):
 			for j,p in enumerate(sam):
 				new_p = catalog.cut_columns(p, args.H)
 				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j) # save_patches returns str(patchDir)
-				# copy density samples into patchDirs for wcorr
-				[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[4]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[4]+'.asc'))) for d in [0,1]]
-				[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[5]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[5]+'.asc'))) for d in [2,3]]
+			# copy density samples into patchDirs for wcorr
+			[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[4]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[4]+'.asc'))) for d in [0,1]]
+			[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[5]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[5]+'.asc'))) for d in [2,3]]
 			catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc)
 			catalog.bootstrap_signals(pDir, patchWeights)
 
