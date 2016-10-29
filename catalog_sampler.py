@@ -329,6 +329,7 @@ class RealCatalogue:
 			# save reduced data to csv for easy plotting
 			if BT:
 				reducedData = np.column_stack((realData[0][:,0], realData[i][:,3], Pproperr, realData[i][:,4], Xproperr)) # = [r_p, wgplus, Perr, wgcross, Xerr]
+				print(reducedData.shape)
 				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', '+err', 'wgx', 'xerr'], formats={'r_p':np.float32, 'wg+':np.float32,'+err':np.float32, 'wgx':np.float32, 'xerr':np.float32})
 			else:
 				reducedData = zip(realData[0][:,0], realData[i][:,3], realData[i][:,4], propgErrs) # = [r_p, wgplus, wgcross, wgerr]
