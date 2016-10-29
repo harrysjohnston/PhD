@@ -446,7 +446,7 @@ class RealCatalogue:
 			except RuntimeError:
 				print("can't show plot :(")
 
-		return wcorrOuptuts
+		return wcorrOutputs
 
 	def chiFunc(self, y):
 		return chi2.pdf(y, 10)
@@ -873,6 +873,7 @@ if __name__ == "__main__":
 	'-plot',
 	help='plot data & save figure after correlations completed (1), or not (0), defaults to 1',
 	choices=[0,1],
+	type=int,
 	default=1)
 	parser.add_argument(
 	'-plotNow',
@@ -884,6 +885,7 @@ if __name__ == "__main__":
 	'-chiSqu',
 	help='calc chi^2 stats for ALREADY EXISTING correlation data (1), having given arg="Path" as the path to the .dat files (Catalog arg must still be path of readable .fits catalog). Bypasses all other sampling functions. Defaults to 0',
 	choices=[0,1],
+	type=int,
 	default=0)
 	parser.add_argument(
 	'-expec',
@@ -891,6 +893,7 @@ if __name__ == "__main__":
 	default=0)
 	parser.add_argument(
 	'-bootstrap',
+	type=int,
 	choices=[0,1],
 	help='perform bootstrap error determination (1) or not (0), defaults to 1',
 	type=int,
