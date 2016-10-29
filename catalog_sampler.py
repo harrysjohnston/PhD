@@ -896,7 +896,6 @@ if __name__ == "__main__":
 	type=int,
 	choices=[0,1],
 	help='perform bootstrap error determination (1) or not (0), defaults to 1',
-	type=int,
 	default=1)
 	parser.add_argument(
 	'-patchSize',
