@@ -710,8 +710,8 @@ class RealCatalogue:
 			phi = np.deg2rad(ra)
 			pix = hp.ang2pix(128,theta,phi)
 			hmap += np.bincount(pix, minlength=npix)
-		hp.mollview(hmap,rot=(180,0,0))
-		plt.savefig('/share/splinter/hj/PhD/patchTest.pdf')
+		hp.write_map('patchTest_map.fits',hmap)
+		# plt.savefig('/share/splinter/hj/PhD/patchTest.pdf')
 		return None
 
 
