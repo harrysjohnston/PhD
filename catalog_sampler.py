@@ -647,7 +647,7 @@ class RealCatalogue:
 		self.patchedData = np.array([hizR_patches,hizB_patches,lozR_patches,lozB_patches])
 
 		# count lost pixels within each patch for weighting
-		npixLost = [np.count_nonzero(i) for i in pixpatchCuts]
+		npixLost = np.array([np.count_nonzero(i) for i in pixpatchCuts])
 		pArLost = npixLost*pixar
 		self.patchWeights = 1-(pArLost/patch_Ars)
 
