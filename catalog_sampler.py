@@ -471,7 +471,6 @@ class RealCatalogue:
 		pVals = []
 		chi2s = []
 		xSigma = []
-		xSigs = []
 
 		for j, data in enumerate(dataArr):
 			plus,perr,cross,xerr = data[0],data[1],data[2],data[3]
@@ -487,15 +486,13 @@ class RealCatalogue:
 			chi2 = ['%.5f'%chi2_pl, '%.5f'%chi2_cr]
 			chi2s.append(chi2)
 			pVals.append(pVal)
+			pvals = [pVal_pl,pVal_cr]
+			x_s = abs(stat.norm.interval(pvals, loc=0, scale=1)[0])
+			xSigma.append(x_s)
+			print("p's (pl,cr): %.5f, %.5f"%(pvals[0],pvals[1]))
+			print("xsigma's (pl,cr): %.5f, %.5f"%(x_s[0],x_s[1]))
 
-			print('p-val(chi^2), x-sigma')
-			pl_cr = ['plus', 'cross']
-			for k, p in enumerate([pVal_pl, pVal_cr]):
-				x = abs(stat.norm.interval(p, loc=0, scale=1)[0])
-				xSigs.append(['%.5f'%p, '%.5f'%x])
-				print('%s :'%pl_cr[k], '%.5f'%p, '%.5f'%x)
-			xSigma.append(xSigs)
-
+		print(xSigma, np.array(xSigma).shape)
 		pVals, chi2s, xSigma, filesList = map(lambda x: np.array(x),[pVals, chi2s, xSigma, filesList])
 		chi2Stats = np.column_stack((filesList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1]))
 		fl = open(join(path2data,'..','chi2.csv'), 'w')
