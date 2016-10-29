@@ -499,6 +499,7 @@ class RealCatalogue:
 		xSigma.append(xSigs)
 
 		pVals, chi2s, xSigma, dataList = map(lambda x: np.array(x),[pVals, chi2s, xSigma, dataList])
+		[print(x.shape) for x in [dataList[realCut],chi2s[:,0],pVals[:,0],xSigma[:,0,1],chi2s[:,1],pVals[:,1],xSigma[:,1,1]]]
 		chi2Stats = np.column_stack((dataList[realCut],chi2s[:,0],pVals[:,0],xSigma[:,0,1],chi2s[:,1],pVals[:,1],xSigma[:,1,1]))
 		fl = open(join(path2data, 'chi2.csv'), 'w')
 		writer = csv.writer(fl)
@@ -934,6 +935,7 @@ if __name__ == "__main__":
 			# calculate chi^2 statistics & save to csv
 			catalog.chi2(args.Path, args.expec)
 			sys.exit()
+		sys.exit()
 
 	if args.chiSqu:
 		print('CALC CHI^2')
