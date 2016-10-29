@@ -460,25 +460,23 @@ class RealCatalogue:
 
 	def chi2(self, path2data, expec):
 		filesList = np.array(listdir(path2data))
-		datCut = np.array([i.endswith('.dat') for i in filesList])
-		dataList = filesList[datCut]
-		dataArr = [np.loadtxt(join(path2data, i)) for i in dataList]
-		dataArr = np.array([[i[:,3], i[:,4], i[:,6]] for i in dataArr])
-		randCut = np.array([i.startswith('wcorr_rand') for i in dataList])
-		realCut = ~randCut
-		randData = dataArr[randCut]
-		dataArr = dataArr[realCut]
+		# datCut = np.array([i.endswith('.dat') for i in filesList])
+		# dataList = filesList[datCut]
+		dataArr = [np.loadtxt(join(path2data, i),skiprows=1) for i in filesList]
+		dataArr = np.array([[i[:,1], i[:,2], i[:,3], i[:,4]] for i in dataArr])
+		# randCut = np.array([i.startswith('wcorr_rand') for i in dataList])
+		# realCut = ~randCut
+		# randData = dataArr[randCut]
+		# dataArr = dataArr[realCut]
 		pVals = []
 		chi2s = []
 		xSigma = []
 		xSigs = []
 
 		for j, data in enumerate(dataArr):
-			plus = data[0]-randData[j][0]
-			cross = data[1]-randData[j][1]
-			err = np.sqrt(data[2]**2+randData[j][2]**2)
-			plusChi_i = [((v-expec)/err[i])**2 for i, v in enumerate(plus)]
-			crossChi_i = [((v-expec)/err[i])**2 for i, v in enumerate(cross)]
+			plus,perr,cross,xerr = data[0],data[1],data[2],data[3]
+			plusChi_i = ((plus-expec)/perr)**2
+			crossChi_i = ((cross-expec)/xerr)**2
 			chi2_pl = np.sum(plusChi_i)
 			chi2_cr = np.sum(crossChi_i)
 			intgrl_pl = scint.quad(self.chiFunc, chi2_pl, np.inf)
@@ -499,7 +497,7 @@ class RealCatalogue:
 			xSigma.append(xSigs)
 
 		pVals, chi2s, xSigma, dataList = map(lambda x: np.array(x),[pVals, chi2s, xSigma, dataList])
-		chi2Stats = np.column_stack((dataList[realCut],chi2s[:,0],pVals[:,0],xSigma[:,0,1],chi2s[:,1],pVals[:,1],xSigma[:,1,1]))
+		chi2Stats = np.column_stack((filesList,chi2s[:,0],pVals[:,0],xSigma[:,0,1],chi2s[:,1],pVals[:,1],xSigma[:,1,1]))
 		fl = open(join(path2data, 'chi2.csv'), 'w')
 		writer = csv.writer(fl)
 		writer.writerow(['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'])
@@ -932,14 +930,14 @@ if __name__ == "__main__":
 		if args.chiSqu:
 			print('CALC CHI^2')
 			# calculate chi^2 statistics & save to csv
-			catalog.chi2(args.Path, args.expec)
+			catalog.chi2(join(args.Path,'to_plot'), args.expec)
 			sys.exit()
 		sys.exit()
 
 	if args.chiSqu:
 		print('CALC CHI^2')
 		# calculate chi^2 statistics & save to csv
-		catalog.chi2(args.Path, args.expec)
+		catalog.chi2(join(args.Path,'to_plot'), args.expec)
 		sys.exit()
 
 	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.bitmaskCut)
