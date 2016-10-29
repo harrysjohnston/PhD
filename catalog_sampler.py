@@ -657,6 +657,7 @@ class RealCatalogue:
 		npixLost = np.array([np.count_nonzero(i) for i in pixpatchCuts])
 		pArLost = npixLost*pixar
 		self.patchWeights = 1-(pArLost/patch_Ars)
+		print(self.patchWeights)
 
 		return self.patchedData, self.patchWeights
 
@@ -674,8 +675,8 @@ class RealCatalogue:
 		dCount = len(np.loadtxt(join(patchDir,density)))
 		print('density count: %d'%dCount)
 		for i,p in enumerate(patches):
-			print("patch %s"%i)
 			pCount = len(np.loadtxt(join(patchDir,p)))
+			print("patch %s, popn %s"%(i,pCount))
 			os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(patchDir,density,dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-9],nproc))
 			if largePi:
 				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s_largePi %s 1 0'%(patchDir,density,dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-9],nproc))
@@ -919,14 +920,14 @@ if __name__ == "__main__":
 	if args.plotNow:
 		# plot .dat files, returning filename-list
 		print('PLOTTING')
-		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels, args.bootstrap)
+		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels, args.bootstrap, 0)
 		largePi_outs = [basename(normpath(out[:-4] + '_largePi.dat')) for out in wcorrOuts]
 		# check for largePi .dat files
 		isIn = [i in listdir(args.Path) for i in largePi_outs]
 		uniq = np.unique(isIn)
 		if uniq.all() == True:
 			IDs = [outs[6:-4] for outs in largePi_outs]
-			a = catalog.plot_wcorr(args.Path, IDs, args.bootstrap)
+			a = catalog.plot_wcorr(args.Path, IDs, args.bootstrap, 1)
 
 		if args.chiSqu:
 			print('CALC CHI^2')
