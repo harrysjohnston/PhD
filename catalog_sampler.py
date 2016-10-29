@@ -878,6 +878,7 @@ if __name__ == "__main__":
 	'-plotNow',
 	help='plot ALREADY EXISTING correlation data (1), having given arg="Path" as the path to the .dat files (Catalog arg must still be path of readable .fits catalog). Bypasses all other sampling functions. Defaults to 0',
 	choices=[0,1],
+	type=int,
 	default=0)
 	parser.add_argument(
 	'-chiSqu',
@@ -947,10 +948,9 @@ if __name__ == "__main__":
 	if args.bootstrap:
 		# patchData.shape = (4 subsamples, N patches)
 		patchData, patchWeights = catalog.patch_data(args.patchSize, args.bitmaskCut)
-		print('MAPPING')
-		catalog.map_test(patchData[0])
-		print('MAPPED')
-		sys.exit()
+		# print('MAPPING')
+		# catalog.map_test(patchData[0])
+		# print('MAPPED')
 		for i,sam in enumerate(patchData):
 			for j,p in enumerate(sam):
 				new_p = catalog.cut_columns(p, args.H)
@@ -961,7 +961,6 @@ if __name__ == "__main__":
 			catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc)
 			catalog.bootstrap_signals(pDir, patchWeights)
 
-	sys.exit()
 	catalog.make_combos()
 	catalog.prep_wcorr(catalog.new_root,catalog.wcorr_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
 
