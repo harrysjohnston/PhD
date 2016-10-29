@@ -497,10 +497,8 @@ class RealCatalogue:
 				xSigs.append(['%.5f'%p, '%.5f'%x])
 				print('%s :'%pl_cr[k], '%.5f'%p, '%.5f'%x)
 			xSigma.append(xSigs)
-			print('xSigma shape = ',np.array(xSigma).shape)
 
 		pVals, chi2s, xSigma, dataList = map(lambda x: np.array(x),[pVals, chi2s, xSigma, dataList])
-		[print(x.shape) for x in [dataList[realCut],chi2s[:,0],pVals[:,0],xSigma[:,0,1],chi2s[:,1],pVals[:,1],xSigma[:,1,1]]]
 		chi2Stats = np.column_stack((dataList[realCut],chi2s[:,0],pVals[:,0],xSigma[:,0,1],chi2s[:,1],pVals[:,1],xSigma[:,1,1]))
 		fl = open(join(path2data, 'chi2.csv'), 'w')
 		writer = csv.writer(fl)
@@ -509,7 +507,7 @@ class RealCatalogue:
 			writer.writerow(vals)
 		fl.close()
 
-		ascii.write(chi2Stats, join(path2data, 'chi2'), delimiter='\t', names=['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'], formats={'dataset':str,'chi^2(plus)':np.float32,'p-val':np.float32,'x-sigma':np.float32,'chi^2(cross)':np.float32,'p-val':np.float32,'x-sigma':np.float32})
+		ascii.write(chi2Stats, join(path2data, 'chi2'), delimiter='\t', names=['dataset','chi^2(plus)','p-val(plus)','x-sigma(plus)','chi^2(cross)','p-val(cross)','x-sigma(cross)'], formats={'dataset':str,'chi^2(plus)':np.float32,'p-val(plus)':np.float32,'x-sigma(plus)':np.float32,'chi^2(cross)':np.float32,'p-val(cross)':np.float32,'x-sigma(cross)':np.float32})
 
 		return None
 
