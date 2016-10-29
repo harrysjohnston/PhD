@@ -11,7 +11,7 @@ import csv
 from astropy import cosmology
 from astropy.cosmology import Planck13
 import matplotlib
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import sys
 import scipy.integrate as scint
@@ -471,11 +471,12 @@ class RealCatalogue:
 		pVals = []
 		chi2s = []
 		xSigma = []
+		xSigs = []
 
 		for j, data in enumerate(dataArr):
 			plus = data[0]-randData[j][0]
 			cross = data[1]-randData[j][1]
-			err = np.sqrt(data[2]**2+randData[j][2]**2)#[1]*df
+			err = np.sqrt(data[2]**2+randData[j][2]**2)
 			plusChi_i = [((v-expec)/err[i])**2 for i, v in enumerate(plus)]
 			crossChi_i = [((v-expec)/err[i])**2 for i, v in enumerate(cross)]
 			chi2_pl = np.sum(plusChi_i)
@@ -489,14 +490,14 @@ class RealCatalogue:
 			chi2s.append(chi2)
 			pVals.append(pVal)
 
-		xSigs = []
-		print('p-val(chi^2), x-sigma')
-		pl_cr = ['plus', 'cross']
-		for k, p in enumerate([pVal_pl, pVal_cr]):
-			x = abs(stat.norm.interval(p, loc=0, scale=1)[0])
-			xSigs.append(['%.5f'%p, '%.5f'%x])
-			print('%s :'%pl_cr[k], '%.5f'%p, '%.5f'%x)
-		xSigma.append(xSigs)
+			print('p-val(chi^2), x-sigma')
+			pl_cr = ['plus', 'cross']
+			for k, p in enumerate([pVal_pl, pVal_cr]):
+				x = abs(stat.norm.interval(p, loc=0, scale=1)[0])
+				xSigs.append(['%.5f'%p, '%.5f'%x])
+				print('%s :'%pl_cr[k], '%.5f'%p, '%.5f'%x)
+			xSigma.append(xSigs)
+			print('xSigma shape = ',np.array(xSigma).shape)
 
 		pVals, chi2s, xSigma, dataList = map(lambda x: np.array(x),[pVals, chi2s, xSigma, dataList])
 		[print(x.shape) for x in [dataList[realCut],chi2s[:,0],pVals[:,0],xSigma[:,0,1],chi2s[:,1],pVals[:,1],xSigma[:,1,1]]]
