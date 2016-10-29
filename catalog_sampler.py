@@ -17,7 +17,10 @@ import sys
 import scipy.integrate as scint
 import scipy.stats as stat
 from scipy.stats import chi2
-#import healpy as hp
+try:
+	import healpy as hp
+except ImportError:
+	print('healpy import error')
 import gc
 import astropy.stats as astat
 
@@ -703,8 +706,8 @@ class RealCatalogue:
 		for cat in catalogs:
 			ra = cat['RA_1']
 			dec = cat['DEC_1']
-			theta = (np.pi/2)-dec
-			phi = ra
+			theta = np.deg2rad(90.-dec)
+			phi = np.deg2rad(ra)
 			pix = hp.ang2pix(128,theta,phi)
 			hmap += np.bincount(pix, minlength=npix)
 		hp.mollview(hmap,rot=(180,0,0))
