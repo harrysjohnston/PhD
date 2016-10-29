@@ -701,8 +701,8 @@ class RealCatalogue:
 		npix = hp.nside2npix(128)
 		hmap = [0]*npix
 		for cat in catalogs:
-			ra = cat[:,0]
-			dec = cat[:,1]
+			ra = cat['RA_1']
+			dec = cat['DEC_1']
 			theta = (np.pi/2)-dec
 			phi = ra
 			pix = hp.ang2pix(128,theta,phi)
