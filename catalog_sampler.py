@@ -492,7 +492,6 @@ class RealCatalogue:
 			print("p's (pl,cr): %.5f, %.5f"%(pvals[0],pvals[1]))
 			print("xsigma's (pl,cr): %.5f, %.5f"%(x_s[0],x_s[1]))
 
-		print(xSigma, np.array(xSigma).shape)
 		pVals, chi2s, xSigma, filesList = map(lambda x: np.array(x),[pVals, chi2s, xSigma, filesList])
 		chi2Stats = np.column_stack((filesList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1]))
 		fl = open(join(path2data,'..','chi2.csv'), 'w')
@@ -689,7 +688,7 @@ class RealCatalogue:
 			data = np.array(np.loadtxt(path))
 			psigs.append([data[:,3],data[:,4]]) # [+, x]
 		psigs = np.array(psigs)
-		BTsignals = astat.bootstrap(psigs, bootnum=100)
+		BTsignals = astat.bootstrap(psigs, bootnum=100000)
 		# construct errors for each bin in r_p, for + & x corrs
 		wgplus = BTsignals[:,:,0,:]
 		wgcross = BTsignals[:,:,1,:]
