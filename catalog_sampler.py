@@ -487,7 +487,7 @@ class RealCatalogue:
 			chi2s.append(chi2)
 			pVals.append(pVal)
 			pvals = [pVal_pl,pVal_cr]
-			x_s = abs(stat.norm.interval(pvals, loc=0, scale=1)[0])
+			x_s = abs(stat.norm.interval((1-pvals), loc=0, scale=1)[0])
 			xSigma.append(x_s)
 			print("p's (pl,cr): %.5f, %.5f"%(pvals[0],pvals[1]))
 			print("xsigma's (pl,cr): %.5f, %.5f"%(x_s[0],x_s[1]))
