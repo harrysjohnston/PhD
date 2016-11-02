@@ -486,7 +486,7 @@ class RealCatalogue:
 			chi2 = ['%.5f'%chi2_pl, '%.5f'%chi2_cr]
 			chi2s.append(chi2)
 			pVals.append(pVal)
-			pvals = [pVal_pl,pVal_cr]
+			pvals = np.array([pVal_pl,pVal_cr])
 			x_s = abs(stat.norm.interval((1-pvals), loc=0, scale=1)[0])
 			xSigma.append(x_s)
 			print("p's (pl,cr): %.5f, %.5f"%(pvals[0],pvals[1]))
@@ -692,10 +692,21 @@ class RealCatalogue:
 		# construct errors for each bin in r_p, for + & x corrs
 		wgplus = BTsignals[:,:,0,:]
 		wgcross = BTsignals[:,:,1,:]
+		# shape = (BTs, patch-signal, rp bins)
+
+		# calculate mean over patches (weighted)
 		Pmeans = np.average(wgplus,axis=1, weights=patchWeights)
 		Xmeans = np.average(wgcross,axis=1, weights=patchWeights)
+		# shape = (BTs, mean-signal-in-rp-bin)
+
+		# calculate covariance matrix & corr-coeffs (for +)
+		covP = np.cov(Pmeans,rowvar=0)
+		corrcoeffP = np.corrcoeff(Pmeans,rowvar=0)
+
+		# calculate stdev over BT-realis'ns
 		Pstds = np.std(Pmeans,axis=0)
 		Xstds = np.std(Xmeans,axis=0)
+		# shape = (stdev-on-means, rp bins)
 
 		BTstds = np.column_stack((Pstds,Xstds))
 		label = basename(normpath(patchDir))
@@ -703,6 +714,12 @@ class RealCatalogue:
 		if largePi:
 			BTerrs_out = join(patchDir,'..','BTerrs_%s_largePi'%label)
 		ascii.write(BTstds, BTerrs_out, delimiter='\t', names=['#w(g+)err','#w(gx)err'])
+
+		if not largePi:
+			covName = join(patchDir,'..','covar_%s'%label)
+			corrName = join(patchDir,'..','corrcoeff_%s'%label)
+			ascii.write(covP, covName, delimiter='\t')
+			ascii.write(corrcoeffP, corrName, delimiter='\t')
 		return None
 
 	def map_test(self, catalogs):
