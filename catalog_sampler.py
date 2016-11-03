@@ -460,11 +460,11 @@ class RealCatalogue:
 
 	def chi2(self, path2data, expec):
 		filesList = np.array(listdir(path2data))
-		wcorrData = np.array([('co' not in x) for x in filesList])
-		covarData = np.array([('covar' in x) for x in filesList])
+		wcorrData = np.array(['co' not in x for x in filesList])
+		covarData = np.array(['covar' in x for x in filesList])
 		# datCut = np.array([i.endswith('.dat') for i in filesList])
 		# dataList = filesList[datCut]
-		dataArr1 = [np.loadtxt(join(path2data, i),skiprows=1) for i in filesList]
+		dataArr1 = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in filesList])
 		dataArr = dataArr1[wcorrData]
 		dataArr = np.array([[i[:,1], i[:,2], i[:,3], i[:,4]] for i in dataArr])
 		# randCut = np.array([i.startswith('wcorr_rand') for i in dataList])
