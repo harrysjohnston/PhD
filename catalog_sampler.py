@@ -462,10 +462,11 @@ class RealCatalogue:
 		filesList = np.array(listdir(path2data))
 		wcorrData = np.array(['co' not in x for x in filesList])
 		covarData = np.array(['covar' in x for x in filesList])
+		wcorrList = filesList[wcorrData]
+		covarList = filesList[covarData]
 		# datCut = np.array([i.endswith('.dat') for i in filesList])
 		# dataList = filesList[datCut]
-		dataArr1 = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in filesList])
-		dataArr = dataArr1[wcorrData]
+		dataArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in wcorrList])
 		dataArr = np.array([[i[:,1], i[:,2], i[:,3], i[:,4]] for i in dataArr])
 		# randCut = np.array([i.startswith('wcorr_rand') for i in dataList])
 		# realCut = ~randCut
@@ -496,7 +497,7 @@ class RealCatalogue:
 			# print("xsigma's (pl,cr): %.5f, %.5f"%(x_s[0],x_s[1]))
 
 		# CALC & SAVE CHI^2 FROM COVARIANCE MATRIX
-		covarArr = dataArr1[covarData]
+		covarArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in covarList])
 		covarSigma = []
 		for i,cov in enumerate(covarArr):
 			cov = np.mat(cov)
@@ -508,8 +509,8 @@ class RealCatalogue:
 			xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
 			covarSigma.append(xs)
 
-		pVals, chi2s, xSigma, filesList, covarSigma = map(lambda x: np.array(x),[pVals, chi2s, xSigma, filesList, covarSigma])
-		chi2Stats = np.column_stack((filesList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1],covarSigma))
+		pVals, chi2s, xSigma, wcorrList, covarSigma = map(lambda x: np.array(x),[pVals, chi2s, xSigma, wcorrList, covarSigma])
+		chi2Stats = np.column_stack((wcorrList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1],covarSigma))
 		# fl = open(join(path2data,'..','chi2.csv'), 'w')
 		# writer = csv.writer(fl)
 		# writer.writerow(['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'])
