@@ -510,7 +510,7 @@ class RealCatalogue:
 			covarSigma.append(xs)
 
 		pVals, chi2s, xSigma, wcorrList, covarSigma = map(lambda x: np.array(x),[pVals, chi2s, xSigma, wcorrList, covarSigma])
-		chi2Stats = np.column_stack((wcorrList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1],covarSigma))
+		chi2Stats = np.column_stack((wcorrList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1],covarSigma[:9],covarSigma[9:]))
 		# fl = open(join(path2data,'..','chi2.csv'), 'w')
 		# writer = csv.writer(fl)
 		# writer.writerow(['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'])
@@ -518,7 +518,7 @@ class RealCatalogue:
 		# 	writer.writerow(vals)
 		# fl.close()
 
-		ascii.write(chi2Stats, join(path2data,'..','chi2'), delimiter='\t', names=['dataset','chi^2(plus)','p-val(plus)','x-sigma(plus)','chi^2(cross)','p-val(cross)','x-sigma(cross)','fullcovarSigma(plus)'])#, formats={'dataset':str,'chi^2(plus)':np.float32,'p-val(plus)':np.float32,'x-sigma(plus)':np.float32,'chi^2(cross)':np.float32,'p-val(cross)':np.float32,'x-sigma(cross)':np.float32})
+		ascii.write(chi2Stats, join(path2data,'..','chi2'), delimiter='\t', names=['dataset','chi^2(plus)','p-val(plus)','x-sigma(plus)','chi^2(cross)','p-val(cross)','x-sigma(cross)','fullcovarSigma(plus)','fullcovarSigma(cross)'])#, formats={'dataset':str,'chi^2(plus)':np.float32,'p-val(plus)':np.float32,'x-sigma(plus)':np.float32,'chi^2(cross)':np.float32,'p-val(cross)':np.float32,'x-sigma(cross)':np.float32})
 
 		return None
 
@@ -721,6 +721,8 @@ class RealCatalogue:
 		# calculate covariance matrix & corr-coeffs (for +)
 		covP = np.cov(Pmeans,rowvar=0)
 		corrcoeffP = np.corrcoef(Pmeans,rowvar=0)
+		covX = np.cov(Xmeans,rowvar=0)
+		corrcoeffX = np.corrcoef(Xmeans,rowvar=0)
 
 		# calculate stdev over BT-realis'ns
 		Pstds = np.std(Pmeans,axis=0)
@@ -733,17 +735,18 @@ class RealCatalogue:
 		if largePi:
 			BTerrs_out = join(patchDir,'..','BTerrs_%s_largePi'%label)
 		ascii.write(BTstds, BTerrs_out, delimiter='\t', names=['#w(g+)err','#w(gx)err'])
-
+		cov_combos = [[covP,'P'],[covX,'X']]
 		if not largePi:
-			covName = join(patchDir,'../to_plot','covar_%s'%label)
 			corrName = join(patchDir,'../to_plot','corrcoeff_%s'%label)
-			ascii.write(covP, covName, delimiter='\t')
 			ascii.write(corrcoeffP, corrName, delimiter='\t')
+
+			for covs in cov_combos:
+				covName = join(patchDir,'../to_plot','covar%s_%s'%(covs[1],label))
+				ascii.write(covs[0], covName, delimiter='\t')
 		else:
-			covName = join(patchDir,'../to_plot','covar_%s_largePi'%label)
-			corrName = join(patchDir,'../to_plot','corrcoeff_%s_largePi'%label)
-			ascii.write(covP, covName, delimiter='\t')
-			ascii.write(corrcoeffP, corrName, delimiter='\t')
+			for covs in cov_combos:
+				covName = join(patchDir,'../to_plot','covar%s_%s_largePi'%(covs[1],label))
+				ascii.write(covs[0], covName, delimiter='\t')
 		return None
 
 	def map_test(self, catalogs):
