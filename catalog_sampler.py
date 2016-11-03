@@ -497,9 +497,11 @@ class RealCatalogue:
 			# print("xsigma's (pl,cr): %.5f, %.5f"%(x_s[0],x_s[1]))
 
 		# CALC & SAVE CHI^2 FROM COVARIANCE MATRIX
+		y = [0,4,8,12,2,6,10,14,1,5,9,13,3,7,11,15] # re-order covariance matrices
+		covarList = covarList[y]
 		covarArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in covarList])
 		covarSigma = []
-		for i,cov in enumerate(covarArr):
+		for i,cov in enumerate(covarArr[:8]):
 			cov = np.mat(cov)
 			invCov = np.linalg.inv(cov)
 			wgp = np.array(dataArr[i][[0]]).T[:,0]
@@ -508,9 +510,18 @@ class RealCatalogue:
 			p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
 			xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
 			covarSigma.append(xs)
+		for i,cov in enumerate(covarArr[:8]):
+			cov = np.mat(cov)
+			invCov = np.linalg.inv(cov)
+			wgx = np.array(dataArr[i][[2]]).T[:,0]
+			chi = np.matmul((np.matmul(wgx.T,invCov)), wgx)
+			fchi = float(chi)
+			p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
+			xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
+			covarSigma.append(xs)
 
 		pVals, chi2s, xSigma, wcorrList, covarSigma = map(lambda x: np.array(x),[pVals, chi2s, xSigma, wcorrList, covarSigma])
-		chi2Stats = np.column_stack((wcorrList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1],covarSigma[:9],covarSigma[9:]))
+		chi2Stats = np.column_stack((wcorrList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1],covarSigma[:8],covarSigma[8:]))
 		# fl = open(join(path2data,'..','chi2.csv'), 'w')
 		# writer = csv.writer(fl)
 		# writer.writerow(['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'])
