@@ -460,6 +460,7 @@ class RealCatalogue:
 
 	def chi2(self, path2data, expec):
 		filesList = np.array(listdir(path2data))
+		corrData = [x for x in filesList if 'co' not in x]
 		# datCut = np.array([i.endswith('.dat') for i in filesList])
 		# dataList = filesList[datCut]
 		dataArr = [np.loadtxt(join(path2data, i),skiprows=1) for i in filesList]
