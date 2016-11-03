@@ -460,10 +460,12 @@ class RealCatalogue:
 
 	def chi2(self, path2data, expec):
 		filesList = np.array(listdir(path2data))
-		corrData = [x for x in filesList if 'co' not in x]
+		wcorrData = [x for x in filesList if 'co' not in x]
+		covarData = [x for x in filesList if 'covar' in x]
 		# datCut = np.array([i.endswith('.dat') for i in filesList])
 		# dataList = filesList[datCut]
-		dataArr = [np.loadtxt(join(path2data, i),skiprows=1) for i in filesList]
+		dataArr1 = [np.loadtxt(join(path2data, i),skiprows=1) for i in filesList]
+		dataArr = dataArr1[wcorrData]
 		dataArr = np.array([[i[:,1], i[:,2], i[:,3], i[:,4]] for i in dataArr])
 		# randCut = np.array([i.startswith('wcorr_rand') for i in dataList])
 		# realCut = ~randCut
@@ -490,23 +492,32 @@ class RealCatalogue:
 			pvals = np.array([pVal_pl,pVal_cr])
 			x_s = abs(stat.norm.interval((1-pvals), loc=0, scale=1)[0])
 			xSigma.append(x_s)
-			print("p's (pl,cr): %.5f, %.5f"%(pvals[0],pvals[1]))
-			print("xsigma's (pl,cr): %.5f, %.5f"%(x_s[0],x_s[1]))
+			# print("p's (pl,cr): %.5f, %.5f"%(pvals[0],pvals[1]))
+			# print("xsigma's (pl,cr): %.5f, %.5f"%(x_s[0],x_s[1]))
 
 		# CALC & SAVE CHI^2 FROM COVARIANCE MATRIX
-		# for k, data1 in enumerate(dataArr):
+		covarArr = dataArr1[covarData]
+		covarSigma = []
+		for i,cov in enumerate(covarArr):
+			cov = np.mat(cov)
+			invCov = np.linalg.inv(cov)
+			wgp = np.array(dataArr[i][[0]])
+			chi = np.matmul((np.matmul(wgp,invCov)), wgp)
+			fchi = float(chi)
+			p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
+			xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
+			covarSigma.append(xs)
 
+		pVals, chi2s, xSigma, filesList, covarSigma = map(lambda x: np.array(x),[pVals, chi2s, xSigma, filesList, covarSigma])
+		chi2Stats = np.column_stack((filesList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1],covarSigma))
+		# fl = open(join(path2data,'..','chi2.csv'), 'w')
+		# writer = csv.writer(fl)
+		# writer.writerow(['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'])
+		# for vals in chi2Stats:
+		# 	writer.writerow(vals)
+		# fl.close()
 
-		pVals, chi2s, xSigma, filesList = map(lambda x: np.array(x),[pVals, chi2s, xSigma, filesList])
-		chi2Stats = np.column_stack((filesList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1]))
-		fl = open(join(path2data,'..','chi2.csv'), 'w')
-		writer = csv.writer(fl)
-		writer.writerow(['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'])
-		for vals in chi2Stats:
-			writer.writerow(vals)
-		fl.close()
-
-		ascii.write(chi2Stats, join(path2data,'..','chi2'), delimiter='\t', names=['dataset','chi^2(plus)','p-val(plus)','x-sigma(plus)','chi^2(cross)','p-val(cross)','x-sigma(cross)'])#, formats={'dataset':str,'chi^2(plus)':np.float32,'p-val(plus)':np.float32,'x-sigma(plus)':np.float32,'chi^2(cross)':np.float32,'p-val(cross)':np.float32,'x-sigma(cross)':np.float32})
+		ascii.write(chi2Stats, join(path2data,'..','chi2'), delimiter='\t', names=['dataset','chi^2(plus)','p-val(plus)','x-sigma(plus)','chi^2(cross)','p-val(cross)','x-sigma(cross)','fullcovarSigma(plus)'])#, formats={'dataset':str,'chi^2(plus)':np.float32,'p-val(plus)':np.float32,'x-sigma(plus)':np.float32,'chi^2(cross)':np.float32,'p-val(cross)':np.float32,'x-sigma(cross)':np.float32})
 
 		return None
 
@@ -725,6 +736,11 @@ class RealCatalogue:
 		if not largePi:
 			covName = join(patchDir,'..','covar_%s'%label)
 			corrName = join(patchDir,'..','corrcoeff_%s'%label)
+			ascii.write(covP, covName, delimiter='\t')
+			ascii.write(corrcoeffP, corrName, delimiter='\t')
+		else:
+			covName = join(patchDir,'..','covar_%s_largePi'%label)
+			corrName = join(patchDir,'..','corrcoeff_%s_largePi'%label)
 			ascii.write(covP, covName, delimiter='\t')
 			ascii.write(corrcoeffP, corrName, delimiter='\t')
 		return None
