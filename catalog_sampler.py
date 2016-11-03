@@ -502,8 +502,8 @@ class RealCatalogue:
 		for i,cov in enumerate(covarArr):
 			cov = np.mat(cov)
 			invCov = np.linalg.inv(cov)
-			wgp = np.array(dataArr[i][[0]])
-			chi = np.matmul((np.matmul(wgp,invCov)), wgp)
+			wgp = np.array(dataArr[i][[0]]).T[:,0]
+			chi = np.matmul((np.matmul(wgp.T,invCov)), wgp)
 			fchi = float(chi)
 			p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
 			xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
@@ -735,13 +735,13 @@ class RealCatalogue:
 		ascii.write(BTstds, BTerrs_out, delimiter='\t', names=['#w(g+)err','#w(gx)err'])
 
 		if not largePi:
-			covName = join(patchDir,'..','covar_%s'%label)
-			corrName = join(patchDir,'..','corrcoeff_%s'%label)
+			covName = join(patchDir,'../to_plot','covar_%s'%label)
+			corrName = join(patchDir,'../to_plot','corrcoeff_%s'%label)
 			ascii.write(covP, covName, delimiter='\t')
 			ascii.write(corrcoeffP, corrName, delimiter='\t')
 		else:
-			covName = join(patchDir,'..','covar_%s_largePi'%label)
-			corrName = join(patchDir,'..','corrcoeff_%s_largePi'%label)
+			covName = join(patchDir,'../to_plot','covar_%s_largePi'%label)
+			corrName = join(patchDir,'../to_plot','corrcoeff_%s_largePi'%label)
 			ascii.write(covP, covName, delimiter='\t')
 			ascii.write(corrcoeffP, corrName, delimiter='\t')
 		return None
