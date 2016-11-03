@@ -492,6 +492,10 @@ class RealCatalogue:
 			print("p's (pl,cr): %.5f, %.5f"%(pvals[0],pvals[1]))
 			print("xsigma's (pl,cr): %.5f, %.5f"%(x_s[0],x_s[1]))
 
+		# CALC & SAVE CHI^2 FROM COVARIANCE MATRIX
+		# for k, data1 in enumerate(dataArr):
+
+
 		pVals, chi2s, xSigma, filesList = map(lambda x: np.array(x),[pVals, chi2s, xSigma, filesList])
 		chi2Stats = np.column_stack((filesList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1]))
 		fl = open(join(path2data,'..','chi2.csv'), 'w')
@@ -534,6 +538,7 @@ class RealCatalogue:
 		lostpixIDs = [j for j,b in enumerate(bitmask_cut) if b==False]
 		print('Lost npix, fraction of area: %s, %s'%(len(lostpixIDs),len(lostpixIDs)/nonzeropix))
 		thetaPhis = hp.pix2ang(nside,lostpixIDs)
+		# lost pixel coords;
 		lostpixra,lostpixdec = np.rad2deg(thetaPhis[1]),(90.-np.rad2deg(thetaPhis[0]))
 		del kidsBitmap
 		gc.collect()
@@ -650,7 +655,8 @@ class RealCatalogue:
 		# count lost pixels within each patch for weighting
 		npixLost = np.array([np.count_nonzero(i) for i in pixpatchCuts])
 		pArLost = npixLost*pixar
-		self.patchWeights = 1-(pArLost/patch_Ars)
+		weights = 1-(pArLost/patch_Ars)
+		self.patchWeights = np.where(weights>0,weights,0)
 		print(self.patchWeights)
 
 		return self.patchedData, self.patchWeights
@@ -701,7 +707,7 @@ class RealCatalogue:
 
 		# calculate covariance matrix & corr-coeffs (for +)
 		covP = np.cov(Pmeans,rowvar=0)
-		corrcoeffP = np.corrcoeff(Pmeans,rowvar=0)
+		corrcoeffP = np.corrcoef(Pmeans,rowvar=0)
 
 		# calculate stdev over BT-realis'ns
 		Pstds = np.std(Pmeans,axis=0)
