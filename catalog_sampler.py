@@ -460,8 +460,8 @@ class RealCatalogue:
 
 	def chi2(self, path2data, expec):
 		filesList = np.array(listdir(path2data))
-		wcorrData = [x for x in filesList if 'co' not in x]
-		covarData = [x for x in filesList if 'covar' in x]
+		wcorrData = np.array([('co' not in x) for x in filesList])
+		covarData = np.array([('covar' in x) for x in filesList])
 		# datCut = np.array([i.endswith('.dat') for i in filesList])
 		# dataList = filesList[datCut]
 		dataArr1 = [np.loadtxt(join(path2data, i),skiprows=1) for i in filesList]
@@ -965,7 +965,7 @@ if __name__ == "__main__":
 
 		if args.chiSqu:
 			print('CALC CHI^2')
-			# calculate chi^2 statistics & save to csv
+			# calculate chi^2 statistics & save to ascii
 			catalog.chi2(join(args.Path,'to_plot'), args.expec)
 			sys.exit()
 		sys.exit()
