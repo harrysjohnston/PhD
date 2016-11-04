@@ -38,7 +38,7 @@ class RealCatalogue:
 		# ascii (.asc) file IDs
 		self.labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
 		# bodies of wcorr output file IDs
-		self.wcorrLabels = ['hiZ_vs_hiZ_R', 'hiZ_vs_hiZ_B', 'loZ_vs_loZ_R', 'loZ_vs_loZ_B']
+		self.wcorrLabels = ['highZ_vs_highZ_Red', 'highZ_vs_highZ_Blue', 'lowZ_vs_lowZ_Red', 'lowZ_vs_lowZ_Blue']
 
 	def cut_data(self, pgm_, z_, colour_, *bitmask_): 
 		"""""
@@ -129,18 +129,6 @@ class RealCatalogue:
 
 		self.samplecounts = []
 
-		# [print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
-		# print('total shapes: \t%s'%np.sum(self.samplecounts[:4]))
-		# print('total density: \t%s'%np.sum(self.samplecounts[4:]))
-
-		# # construct sets of filenames, counts, & IDs for wcorr-calls
-		# self.wcorr_combos = [
-		# [self.labels[4]+'.asc', self.samplecounts[4], self.labels[0]+'.asc', self.samplecounts[0], 'hiZ_vs_hiZ_R'],
-		# [self.labels[4]+'.asc', self.samplecounts[4], self.labels[1]+'.asc', self.samplecounts[1], 'hiZ_vs_hiZ_B'],
-		# [self.labels[5]+'.asc', self.samplecounts[5], self.labels[2]+'.asc', self.samplecounts[2], 'loZ_vs_loZ_R'],
-		# [self.labels[5]+'.asc', self.samplecounts[5], self.labels[3]+'.asc', self.samplecounts[3], 'loZ_vs_loZ_B']
-		# ]
-
 		# save cuts for later use
 		self.zcut = z_cut
 		self.zcut_r = z_cut_r
@@ -221,12 +209,12 @@ class RealCatalogue:
 	def make_combos(self):
 		# construct sets of filenames, counts, & IDs for wcorr-calls
 		self.wcorr_combos = [
-		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[0]+'.asc', self.samplecounts[0], 'hiZ_vs_hiZ_R'],
-		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[1]+'.asc', self.samplecounts[1], 'hiZ_vs_hiZ_B'],
-		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[2]+'.asc', self.samplecounts[2], 'loZ_vs_loZ_R'],
-		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[3]+'.asc', self.samplecounts[3], 'loZ_vs_loZ_B']
+		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[0]+'.asc', self.samplecounts[0], catalog.wcorrLabels[0]],
+		[self.labels[4]+'.asc', self.samplecounts[4], self.labels[1]+'.asc', self.samplecounts[1], catalog.wcorrLabels[1]],
+		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[2]+'.asc', self.samplecounts[2], catalog.wcorrLabels[2]],
+		[self.labels[5]+'.asc', self.samplecounts[5], self.labels[3]+'.asc', self.samplecounts[3], catalog.wcorrLabels[3]]
 		]
-		self.samplecounts = self.samplecounts[0:6]
+		self.samplecounts = self.samplecounts[:6]
 		[print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
 		print('total shapes: \t%s'%np.sum(self.samplecounts[:4]))
 		print('total density: \t%s'%np.sum(self.samplecounts[4:]))
@@ -464,14 +452,9 @@ class RealCatalogue:
 		covarData = np.array(['covar' in x for x in filesList])
 		wcorrList = filesList[wcorrData]
 		covarList = filesList[covarData]
-		# datCut = np.array([i.endswith('.dat') for i in filesList])
-		# dataList = filesList[datCut]
+
 		dataArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in wcorrList])
 		dataArr = np.array([[i[:,1], i[:,2], i[:,3], i[:,4]] for i in dataArr])
-		# randCut = np.array([i.startswith('wcorr_rand') for i in dataList])
-		# realCut = ~randCut
-		# randData = dataArr[randCut]
-		# dataArr = dataArr[realCut]
 		pVals = []
 		chi2s = []
 		xSigma = []
@@ -499,6 +482,10 @@ class RealCatalogue:
 		# CALC & SAVE CHI^2 FROM COVARIANCE MATRIX
 		y = [0,4,8,12,2,6,10,14,1,5,9,13,3,7,11,15] # re-order covariance matrices
 		covarList = covarList[y]
+		for j,covar in enumerate(covarList): # assert ordering matches wcorr files
+			assert covar[7:] in wcorrList[j], 'mismatched signals & covariance matrices'
+			if 'Pi' in wcorrList[j]:
+				assert 'Pi' in covar[7:], 'mismatched signals & covariance matrices'
 		covarArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in covarList])
 		covarSigma = []
 		for i,cov in enumerate(covarArr[:8]):
@@ -521,15 +508,10 @@ class RealCatalogue:
 			covarSigma.append([fchi,p_val,xs])
 
 		pVals, chi2s, xSigma, wcorrList, covarSigma = map(lambda x: np.array(x),[pVals, chi2s, xSigma, wcorrList, covarSigma])
-		chi2Stats = np.column_stack((wcorrList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1],covarSigma[:8][:,0],covarSigma[:8][:,1],covarSigma[:8][:,2],covarSigma[8:][:,0],covarSigma[8:][:,1],covarSigma[8:][:,2]))
-		# fl = open(join(path2data,'..','chi2.csv'), 'w')
-		# writer = csv.writer(fl)
-		# writer.writerow(['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'])
-		# for vals in chi2Stats:
-		# 	writer.writerow(vals)
-		# fl.close()
 
-		ascii.write(chi2Stats, join(path2data,'..','chi2'), delimiter='\t', names=['dataset','chi^2(plus)','p-val(plus)','x-sigma(plus)','chi^2(cross)','p-val(cross)','x-sigma(cross)','fullcovarChi2(plus)','fcPval(plus)','fcSigma(plus)','fcChi2(cross)','fcPval(cross)','fcSigma(cross)'])#, formats={'dataset':str,'chi^2(plus)':np.float32,'p-val(plus)':np.float32,'x-sigma(plus)':np.float32,'chi^2(cross)':np.float32,'p-val(cross)':np.float32,'x-sigma(cross)':np.float32})
+		chi2Stats = np.column_stack((wcorrList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1],covarSigma[:8][:,0],covarSigma[:8][:,1],covarSigma[:8][:,2],covarSigma[8:][:,0],covarSigma[8:][:,1],covarSigma[8:][:,2]))
+
+		ascii.write(chi2Stats, join(path2data,'..','chi2'), delimiter='\t', names=['dataset','chi^2(plus)','p-val(plus)','x-sigma(plus)','chi^2(cross)','p-val(cross)','x-sigma(cross)','fullcovarChi2(plus)','fcPval(plus)','fcSigma(plus)','fcChi2(cross)','fcPval(cross)','fcSigma(cross)'])
 
 		return None
 
@@ -1055,10 +1037,10 @@ if __name__ == "__main__":
 		Write.close()
 
 		rand_combos = [
-		[catalog2.labels[0]+'.asc', catalog2.samplecounts[0], catalog.labels[0]+'.asc', catalog.samplecounts[0], 'rand_hiZ_vs_hiZ_R'],
-		[catalog2.labels[0]+'.asc', catalog2.samplecounts[0], catalog.labels[1]+'.asc', catalog.samplecounts[1], 'rand_hiZ_vs_hiZ_B'],
-		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[2]+'.asc', catalog.samplecounts[2], 'rand_loZ_vs_loZ_R'],
-		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[3]+'.asc', catalog.samplecounts[3], 'rand_loZ_vs_loZ_B']
+		[catalog2.labels[0]+'.asc', catalog2.samplecounts[0], catalog.labels[0]+'.asc', catalog.samplecounts[0], 'rand_'+catalog.wcorrLabels[0]],
+		[catalog2.labels[0]+'.asc', catalog2.samplecounts[0], catalog.labels[1]+'.asc', catalog.samplecounts[1], 'rand_'+catalog.wcorrLabels[1]],
+		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[2]+'.asc', catalog.samplecounts[2], 'rand_'+catalog.wcorrLabels[2]],
+		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[3]+'.asc', catalog.samplecounts[3], 'rand_'+catalog.wcorrLabels[3]]
 		]
 
 		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'rand_wcorr')
