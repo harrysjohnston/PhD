@@ -729,16 +729,20 @@ class RealCatalogue:
 			BTerrs_out = join(patchDir,'..','BTerrs_%s_largePi'%label)
 		ascii.write(BTstds, BTerrs_out, delimiter='\t', names=['#w(g+)err','#w(gx)err'])
 		cov_combos = [[covP,'P'],[covX,'X']]
+
+		toplotDir = join(patchDir,'../to_plot')
+		if not isdir(toplotDir):
+			mkdir(toplotDir)
 		if not largePi:
-			corrName = join(patchDir,'../to_plot','corrcoeff_%s'%label)
+			corrName = join(toplotDir,'corrcoeff_%s'%label)
 			ascii.write(corrcoeffP, corrName, delimiter='\t')
 
 			for covs in cov_combos:
-				covName = join(patchDir,'../to_plot','covar%s_%s'%(covs[1],label))
+				covName = join(toplotDir,'covar%s_%s'%(covs[1],label))
 				ascii.write(covs[0], covName, delimiter='\t')
 		else:
 			for covs in cov_combos:
-				covName = join(patchDir,'../to_plot','covar%s_%s_largePi'%(covs[1],label))
+				covName = join(toplotDir,'covar%s_%s_largePi'%(covs[1],label))
 				ascii.write(covs[0], covName, delimiter='\t')
 		return None
 
