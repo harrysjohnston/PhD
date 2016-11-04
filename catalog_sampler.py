@@ -509,7 +509,7 @@ class RealCatalogue:
 			fchi = float(chi)
 			p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
 			xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
-			covarSigma.append(xs)
+			covarSigma.append([fchi,p_val,xs])
 		for i,cov in enumerate(covarArr[:8]):
 			cov = np.mat(cov)
 			invCov = np.linalg.inv(cov)
@@ -518,10 +518,10 @@ class RealCatalogue:
 			fchi = float(chi)
 			p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
 			xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
-			covarSigma.append(xs)
+			covarSigma.append([fchi,p_val,xs])
 
 		pVals, chi2s, xSigma, wcorrList, covarSigma = map(lambda x: np.array(x),[pVals, chi2s, xSigma, wcorrList, covarSigma])
-		chi2Stats = np.column_stack((wcorrList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1],covarSigma[:8],covarSigma[8:]))
+		chi2Stats = np.column_stack((wcorrList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1],covarSigma[:8][:,0],covarSigma[:8][:,1],covarSigma[:8][:,2],covarSigma[8:][:,0],covarSigma[8:][:,1],covarSigma[8:][:,2]))
 		# fl = open(join(path2data,'..','chi2.csv'), 'w')
 		# writer = csv.writer(fl)
 		# writer.writerow(['dataset','chi^2(plus)','p-val','x-sigma','chi^2(cross)','p-val','x-sigma'])
@@ -529,7 +529,7 @@ class RealCatalogue:
 		# 	writer.writerow(vals)
 		# fl.close()
 
-		ascii.write(chi2Stats, join(path2data,'..','chi2'), delimiter='\t', names=['dataset','chi^2(plus)','p-val(plus)','x-sigma(plus)','chi^2(cross)','p-val(cross)','x-sigma(cross)','fullcovarSigma(plus)','fullcovarSigma(cross)'])#, formats={'dataset':str,'chi^2(plus)':np.float32,'p-val(plus)':np.float32,'x-sigma(plus)':np.float32,'chi^2(cross)':np.float32,'p-val(cross)':np.float32,'x-sigma(cross)':np.float32})
+		ascii.write(chi2Stats, join(path2data,'..','chi2'), delimiter='\t', names=['dataset','chi^2(plus)','p-val(plus)','x-sigma(plus)','chi^2(cross)','p-val(cross)','x-sigma(cross)','fullcovarChi2(plus)','fcPval(plus)','fcSigma(plus)','fcChi2(cross)','fcPval(cross)','fcSigma(cross)'])#, formats={'dataset':str,'chi^2(plus)':np.float32,'p-val(plus)':np.float32,'x-sigma(plus)':np.float32,'chi^2(cross)':np.float32,'p-val(cross)':np.float32,'x-sigma(cross)':np.float32})
 
 		return None
 
