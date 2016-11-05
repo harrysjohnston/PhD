@@ -482,10 +482,12 @@ class RealCatalogue:
 		# CALC & SAVE CHI^2 FROM COVARIANCE MATRIX
 		y = [0,4,8,12,2,6,10,14,1,5,9,13,3,7,11,15] # re-order covariance matrices
 		covarList = covarList[y]
-		for j,covar in enumerate(covarList): # assert ordering matches wcorr files
-			assert covar[7:] in wcorrList[j], 'mismatched signals & covariance matrices'
-			if 'Pi' in wcorrList[j]:
-				assert 'Pi' in covar[7:], 'mismatched signals & covariance matrices'
+		covLists = [covarList[:8],covarList[8:]]
+		for halfList in covLists:
+			for j,covar in enumerate(halfList): # assert ordering matches wcorr files
+				assert covar[7:] in wcorrList[j], 'mismatched signals & covariance matrices'
+				if 'Pi' in wcorrList[j]:
+					assert 'Pi' in covar[7:], 'mismatched signals & covariance matrices'
 		covarArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in covarList])
 		covarSigma = []
 		for i,cov in enumerate(covarArr[:8]):
