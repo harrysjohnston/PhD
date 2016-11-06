@@ -452,7 +452,7 @@ class RealCatalogue:
 		covarData = np.array(['covar' in x for x in filesList])
 		wcorrList = filesList[wcorrData]
 		covarList = filesList[covarData]
-		[print(i,covarList[j]) for j,i in enumerate(wcorrList)]
+		[print(i,wcorrList[j]) for j,i in enumerate(covarList)]
 		# [print(i) for i in covarList]
 
 		dataArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in wcorrList])
