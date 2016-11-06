@@ -497,8 +497,8 @@ class RealCatalogue:
 			for i,cov in enumerate(ARR):
 				cov = np.mat(cov)
 				invCov = np.linalg.inv(cov)
-				sig = np.array(dataArr[i][[j]])
-				chi = np.dot((np.dot(sig,invCov)), sig)
+				sig = np.mat(dataArr[i][[j]])
+				chi = (sig*invCov)*sig.T
 				fchi = float(chi)
 				p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
 				xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
@@ -517,7 +517,7 @@ class RealCatalogue:
 
 		covarSigma = np.array(covarSigma)
 
-		chi2Stats = np.column_stack((covarList,covarSigma[:,:,0],covarSigma[:,:,1],covarSigma[:,:,2]))
+		chi2Stats = np.column_stack((covarList,covarSigma[:,0],covarSigma[:,1],covarSigma[:,2]))
 
 		ascii.write(chi2Stats, join(path2data,'..','chi2'), delimiter='\t', names=['dataset','chi^2','p-val','x-sigma'])
 
