@@ -452,70 +452,74 @@ class RealCatalogue:
 		covarData = np.array(['covar' in x for x in filesList])
 		wcorrList = filesList[wcorrData]
 		covarList = filesList[covarData]
-		[print(i,wcorrList[j]) for j,i in enumerate(covarList)]
-		# [print(i) for i in covarList]
+		wcorrList.sort() # hzB, hzBlPi, hzR, hzRlPi, lzB, lzBlPi....
+		covarList.sort() # all Plus, then all Xross
 
 		dataArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in wcorrList])
-		dataArr = np.array([[i[:,1], i[:,2], i[:,3], i[:,4]] for i in dataArr])
-		pVals = []
-		chi2s = []
-		xSigma = []
+		# dataArr = np.array([[i[:,1], i[:,2], i[:,3], i[:,4]] for i in dataArr])
+		dataArr = np.array([[i[:,1],i[:,3]] for i in dataArr]) # +, x signals
+		# pVals = []
+		# chi2s = []
+		# xSigma = []
 
-		for j, data in enumerate(dataArr):
-			plus,perr,cross,xerr = data[0],data[1],data[2],data[3]
-			plusChi_i = ((plus-expec)/perr)**2
-			crossChi_i = ((cross-expec)/xerr)**2
-			chi2_pl = np.sum(plusChi_i)
-			chi2_cr = np.sum(crossChi_i)
-			intgrl_pl = scint.quad(self.chiFunc, chi2_pl, np.inf)
-			intgrl_cr = scint.quad(self.chiFunc, chi2_cr, np.inf)
-			pVal_pl = intgrl_pl[0]
-			pVal_cr = intgrl_cr[0]
-			pVal = ['%.5f'%pVal_pl, '%.5f'%pVal_cr]
-			chi2 = ['%.5f'%chi2_pl, '%.5f'%chi2_cr]
-			chi2s.append(chi2)
-			pVals.append(pVal)
-			pvals = np.array([pVal_pl,pVal_cr])
-			x_s = abs(stat.norm.interval((1-pvals), loc=0, scale=1)[0])
-			xSigma.append(x_s)
+		# for j, data in enumerate(dataArr):
+		# 	plus,perr,cross,xerr = data[0],data[1],data[2],data[3]
+		# 	plusChi_i = ((plus-expec)/perr)**2
+		# 	crossChi_i = ((cross-expec)/xerr)**2
+		# 	chi2_pl = np.sum(plusChi_i)
+		# 	chi2_cr = np.sum(crossChi_i)
+		# 	intgrl_pl = scint.quad(self.chiFunc, chi2_pl, np.inf)
+		# 	intgrl_cr = scint.quad(self.chiFunc, chi2_cr, np.inf)
+		# 	pVal_pl = intgrl_pl[0]
+		# 	pVal_cr = intgrl_cr[0]
+		# 	pVal = ['%.5f'%pVal_pl, '%.5f'%pVal_cr]
+		# 	chi2 = ['%.5f'%chi2_pl, '%.5f'%chi2_cr]
+		# 	chi2s.append(chi2)
+		# 	pVals.append(pVal)
+		# 	pvals = np.array([pVal_pl,pVal_cr])
+		# 	x_s = abs(stat.norm.interval((1-pvals), loc=0, scale=1)[0])
+		# 	xSigma.append(x_s)
 			# print("p's (pl,cr): %.5f, %.5f"%(pvals[0],pvals[1]))
 			# print("xsigma's (pl,cr): %.5f, %.5f"%(x_s[0],x_s[1]))
 
 		# CALC & SAVE CHI^2 FROM COVARIANCE MATRIX
-		y = [0,4,8,12,2,6,10,14,1,5,9,13,3,7,11,15] # re-order covariance matrices
-		covarList = covarList[y]
-		covLists = [covarList[:8],covarList[8:]]
-		for halfList in covLists:
-			for j,covar in enumerate(halfList): # assert ordering matches wcorr files
-				assert covar[7:] in wcorrList[j], 'mismatched signals & covariance matrices'
-				if 'Pi' in wcorrList[j]:
-					assert 'Pi' in covar[7:], 'mismatched signals & covariance matrices'
+		# y = [0,4,8,12,2,6,10,14,1,5,9,13,3,7,11,15] # re-order covariance matrices
+		# covarList = covarList[y]
+		# covLists = [covarList[:8],covarList[8:]]
+		# for halfList in covLists:
+		# 	for j,covar in enumerate(halfList): # assert ordering matches wcorr files
+		# 		assert covar[7:] in wcorrList[j], 'mismatched signals & covariance matrices'
+		# 		if 'Pi' in wcorrList[j]:
+		# 			assert 'Pi' in covar[7:], 'mismatched signals & covariance matrices'
 		covarArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in covarList])
 		covarSigma = []
-		for i,cov in enumerate(covarArr[:8]):
-			cov = np.mat(cov)
-			invCov = np.linalg.inv(cov)
-			wgp = np.array(dataArr[i][[0]]).T[:,0]
-			chi = np.matmul((np.matmul(wgp.T,invCov)), wgp)
-			fchi = float(chi)
-			p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
-			xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
-			covarSigma.append([fchi,p_val,xs])
-		for i,cov in enumerate(covarArr[:8]):
-			cov = np.mat(cov)
-			invCov = np.linalg.inv(cov)
-			wgx = np.array(dataArr[i][[2]]).T[:,0]
-			chi = np.matmul((np.matmul(wgx.T,invCov)), wgx)
-			fchi = float(chi)
-			p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
-			xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
-			covarSigma.append([fchi,p_val,xs])
+		for j,ARR in enumerate([covarArr[:8],covarArr[8:]]):
+			for i,cov in enumerate(ARR):
+				cov = np.mat(cov)
+				invCov = np.linalg.inv(cov)
+				sig = np.array(dataArr[i][[j]])
+				chi = np.dot((np.dot(sig,invCov)), sig)
+				fchi = float(chi)
+				p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
+				xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
+				covarSigma.append([fchi,p_val,xs])
+		# for i,cov in enumerate(covarArr[:8]):
+		# 	cov = np.mat(cov)
+		# 	invCov = np.linalg.inv(cov)
+		# 	wgx = np.array(dataArr[i][[2]]).T[:,0]
+		# 	chi = np.matmul((np.matmul(wgx.T,invCov)), wgx)
+		# 	fchi = float(chi)
+		# 	p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
+		# 	xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
+		# 	covarSigma.append([fchi,p_val,xs])
 
-		pVals, chi2s, xSigma, wcorrList, covarSigma = map(lambda x: np.array(x),[pVals, chi2s, xSigma, wcorrList, covarSigma])
+		# pVals, chi2s, xSigma, wcorrList, covarSigma = map(lambda x: np.array(x),[pVals, chi2s, xSigma, wcorrList, covarSigma])
 
-		chi2Stats = np.column_stack((wcorrList,chi2s[:,0],pVals[:,0],xSigma[:,0],chi2s[:,1],pVals[:,1],xSigma[:,1],covarSigma[:8][:,0],covarSigma[:8][:,1],covarSigma[:8][:,2],covarSigma[8:][:,0],covarSigma[8:][:,1],covarSigma[8:][:,2]))
+		covarSigma = np.array(covarSigma)
 
-		ascii.write(chi2Stats, join(path2data,'..','chi2'), delimiter='\t', names=['dataset','chi^2(plus)','p-val(plus)','x-sigma(plus)','chi^2(cross)','p-val(cross)','x-sigma(cross)','fullcovarChi2(plus)','fcPval(plus)','fcSigma(plus)','fcChi2(cross)','fcPval(cross)','fcSigma(cross)'])
+		chi2Stats = np.column_stack((covarList,covarSigma[:,:,0],covarSigma[:,:,1],covarSigma[:,:,2]))
+
+		ascii.write(chi2Stats, join(path2data,'..','chi2'), delimiter='\t', names=['dataset','chi^2','p-val','x-sigma'])
 
 		return None
 
