@@ -448,10 +448,12 @@ class RealCatalogue:
 
 	def chi2(self, path2data, expec):
 		filesList = np.array(listdir(path2data))
-		wcorrData = np.array(['co' not in x for x in filesList])
+		wcorrData = np.array(['_vs_' in x for x in filesList])
 		covarData = np.array(['covar' in x for x in filesList])
 		wcorrList = filesList[wcorrData]
 		covarList = filesList[covarData]
+		[print(i,j) for i,j in [wcorrList,covarList]]
+		# [print(i) for i in covarList]
 
 		dataArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in wcorrList])
 		dataArr = np.array([[i[:,1], i[:,2], i[:,3], i[:,4]] for i in dataArr])
@@ -722,7 +724,7 @@ class RealCatalogue:
 		# calculate stdev over BT-realis'ns
 		Pstds = np.std(Pmeans,axis=0)
 		Xstds = np.std(Xmeans,axis=0)
-		# shape = (stdev-on-means, rp bins)
+		# shape = (stdev-on-means-in-rp-bins)
 
 		BTstds = np.column_stack((Pstds,Xstds))
 		label = basename(normpath(patchDir))
