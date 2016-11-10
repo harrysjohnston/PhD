@@ -440,13 +440,13 @@ class RealCatalogue:
 
 		return wcorrOutputs
 
-	def chiFunc(self, y):
-		return chi2.pdf(y, 10)
+	def chiFunc(self, y, dof):
+		return chi2.pdf(y, dof)
 
 	def normFunc(self, y):
 		return stat.norm(0,1).pdf(y)
 
-	def chi2(self, path2data, expec):
+	def chi2(self, path2data, expec, dof):
 		filesList = np.array(listdir(path2data))
 		wcorrData = np.array(['_vs_' in x for x in filesList])
 		covarData = np.array(['covar' in x for x in filesList])
@@ -493,6 +493,7 @@ class RealCatalogue:
 		# 			assert 'Pi' in covar[7:], 'mismatched signals & covariance matrices'
 		covarArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in covarList])
 		covarSigma = []
+		chiFunc = lambda x: chi2.pdf(x, dof)
 		for j,ARR in enumerate([covarArr[:8],covarArr[8:]]):
 			for i,cov in enumerate(ARR):
 				cov = np.mat(cov)
@@ -500,7 +501,7 @@ class RealCatalogue:
 				sig = np.mat(dataArr[i][[j]])
 				chi = (sig*invCov)*sig.T
 				fchi = float(chi)
-				p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
+				p_val = scint.quad(chiFunc, fchi, np.inf)[0]
 				xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
 				covarSigma.append([fchi,p_val,xs])
 		# for i,cov in enumerate(covarArr[:8]):
@@ -550,14 +551,16 @@ class RealCatalogue:
 				# construct bitmask cut
 				bitmask_cut &= np.where(bitmask_[i] & kidsBitmap == bitmask_[i], False, True)
 		lostpixIDs = [j for j,b in enumerate(bitmask_cut) if b==False]
+		lostmap = np.bincount(lostpixIDs,minlength=npix)
+		hp.write_map(join(self.new_root,'lostpixmap.fits'),lostmap)
 		print('Lost npix, fraction of area: %s, %s'%(len(lostpixIDs),len(lostpixIDs)/nonzeropix))
 		thetaPhis = hp.pix2ang(nside,lostpixIDs)
 		# lost pixel coords;
 		lostpixra,lostpixdec = np.rad2deg(thetaPhis[1]),(90.-np.rad2deg(thetaPhis[0]))
-		del kidsBitmap
+		del kidsBitmap,lostmap
 		gc.collect()
 
-		# divide catalog.data into patches of 2-3 sqdeg
+		# divide catalog.data into patches
 		raHist = np.histogram(ra, bins=100)
 		decHist = np.histogram(dec, bins=100)
 		raCounts, raEdges = raHist
@@ -975,14 +978,14 @@ if __name__ == "__main__":
 		if args.chiSqu:
 			print('CALC CHI^2')
 			# calculate chi^2 statistics & save to ascii
-			catalog.chi2(join(args.Path,'to_plot'), args.expec)
+			catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins)
 			sys.exit()
 		sys.exit()
 
 	if args.chiSqu:
 		print('CALC CHI^2')
 		# calculate chi^2 statistics & save to csv
-		catalog.chi2(join(args.Path,'to_plot'), args.expec)
+		catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins)
 		sys.exit()
 
 	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.bitmaskCut)
