@@ -663,7 +663,7 @@ class RealCatalogue:
 		return patchDir
 
 	def wcorr_patches(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi):
-		patches = [patch for patch in listdir(patchDir) if '_' in patch]
+		patches = [patch for patch in listdir(patchDir) if ('wcorr' not in patch)&('_' in patch)]
 		patches.sort()
 		label = basename(normpath(patchDir))
 		if 'highZ' in label:
