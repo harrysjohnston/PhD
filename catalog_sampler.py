@@ -122,10 +122,13 @@ class RealCatalogue:
 		BCGcut = np.where(self.data['RankBCG_1']==1,True,False)
 		BCG_dc = [True]*len(self.data)
 		BCG_sc = BCG_dc
+		BCGargs = [0,0]
 		if BCGdens:
 			BCG_dc &= BCGcut
+			BCGargs[1] = 1
 		if BCGshap:
 			BCG_sc &= BCGcut
+			BCGargs[0] = 1
 
 		# apply cuts
 		self.highz_R = self.data[(z_cut&red_cut&bitmask_cut&BCG_sc)]
@@ -146,6 +149,7 @@ class RealCatalogue:
 		self.pgmcut = pgm_cut
 		self.BCG_dc = BCG_dc
 		self.BCG_sc = BCG_sc
+		self.BCGargs = BCGargs
 
 		return None
 
@@ -633,7 +637,7 @@ class RealCatalogue:
 
 		highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts = map(lambda x: np.array(x),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts])
 
-		# cut data into 4xpatch-arrays, each element of which is a fits-table
+		# cut data into 6xpatch-arrays, each element of which is a fits-table
 		hizR_patches,hizB_patches,lozR_patches,lozB_patches,hiz_patches,loz_patches = map(lambda x: np.array([self.data[pc] for pc in x]),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts])
 
 		del highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts
@@ -659,7 +663,7 @@ class RealCatalogue:
 		return patchDir
 
 	def wcorr_patches(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi):
-		patches = [patch for patch in listdir(patchDir) if ('R' in patch)or('B' in patch)]
+		patches = [patch for patch in listdir(patchDir) if '_' in patch]
 		patches.sort()
 		label = basename(normpath(patchDir))
 		if 'highZ' in label:
@@ -669,6 +673,7 @@ class RealCatalogue:
 		dpatches = listdir(dDir)
 		dpatches.sort()
 		os.system('cp %s/* %s'%(dDir,patchDir))
+		print('BCGcuts: shape=%s, dens=%s'%(self.BCGargs[0],self.BCGargs[1]))
 		for i,p in enumerate(patches):
 			pCount = len(np.loadtxt(join(patchDir,p)))
 			dCount = len(np.loadtxt(join(patchDir,dpatches[i])))
