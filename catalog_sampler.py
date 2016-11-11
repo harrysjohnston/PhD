@@ -597,9 +597,9 @@ class RealCatalogue:
 		rPatchside = deltaR/rLen
 		dPatchside = deltaD/dLen
 		patchAr = rPatchside*dPatchside
-		initDiff = abs(patchAr-patchSize)
 
 		while any(abs(patchAr-patchSize)>0.5):
+			initDiff = abs(patchAr-patchSize)
 			dLen += 1
 			rLen = dLen*np.round(RDratio)
 			rPatchside = deltaR/rLen
