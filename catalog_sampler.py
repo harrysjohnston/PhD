@@ -40,7 +40,7 @@ class RealCatalogue:
 		# bodies of wcorr output file IDs
 		self.wcorrLabels = ['highZ_vs_highZ_Red', 'highZ_vs_highZ_Blue', 'lowZ_vs_lowZ_Red', 'lowZ_vs_lowZ_Blue']
 
-	def cut_data(self, pgm_, z_, colour_, BCG, *bitmask_):
+	def cut_data(self, pgm_, z_, colour_, BCGdens, BCGshap, *bitmask_):
 		"""""
 		cut catalogue according to bitmasks, 
 		PGM, & into subsamples
@@ -120,20 +120,20 @@ class RealCatalogue:
 			print('bitmask cut: \t', np.unique(bitmask_cut))
 
 		BCGcut = np.where(self.data['RankBCG_1']==1,True,False)
+		BCG_dc = [True]*len(self.data)
+		BCG_sc = BCG_dc
+		if BCGdens:
+			BCG_dc &= BCGcut
+		if BCGshap:
+			BCG_sc &= BCGcut
 
 		# apply cuts
-		self.highz_R = self.data[(z_cut&red_cut&bitmask_cut)]
-		self.highz_B = self.data[(z_cut&blue_cut&bitmask_cut)]
-		self.lowz_R = self.data[(z_cut_r&red_cut&bitmask_cut)]
-		self.lowz_B = self.data[(z_cut_r&blue_cut&bitmask_cut)]
-		if BCG:
-			z_BCG = z_cut&BCGcut
-			rz_BCG = z_cut_r&BCGcut
-			self.highz = self.data[z_BCG]
-			self.lowz = self.data[rz_BCG]
-		else:
-			self.highz = self.data[z_cut]
-			self.lowz = self.data[z_cut_r]
+		self.highz_R = self.data[(z_cut&red_cut&bitmask_cut&BCG_sc)]
+		self.highz_B = self.data[(z_cut&blue_cut&bitmask_cut&BCG_sc)]
+		self.lowz_R = self.data[(z_cut_r&red_cut&bitmask_cut&BCG_sc)]
+		self.lowz_B = self.data[(z_cut_r&blue_cut&bitmask_cut&BCG_sc)]
+		self.highz = self.data[(z_cut&BCG_dc)]
+		self.lowz = self.data[(z_cut_r&BCG_dc)]
 
 		self.samplecounts = []
 
@@ -144,7 +144,8 @@ class RealCatalogue:
 		self.bluecut = blue_cut
 		self.bitmaskcut = bitmask_cut
 		self.pgmcut = pgm_cut
-		self.BCGcut = BCGcut
+		self.BCG_dc = BCG_dc
+		self.BCG_sc = BCG_sc
 
 		return None
 
@@ -496,6 +497,7 @@ class RealCatalogue:
 		phi = np.deg2rad(ra)
 		pixIDs = hp.ang2pix(nside,theta,phi,nest=False)
 		GKmap = np.bincount(pixIDs,minlength=npix)
+		GKpix = np.where(GKmap!=0,1,0)
 		GKskyFrac = len(GKmap[GKmap!=0])
 		nonzeropix = GKskyFrac
 		GKskyFrac /= npix
@@ -511,9 +513,10 @@ class RealCatalogue:
 				# construct bitmask cut
 				bitmask_cut &= np.where(bitmask_[i] & kidsBitmap == bitmask_[i], False, True)
 		lostpixIDs = [j for j,b in enumerate(bitmask_cut) if b==False]
+		lostfromGK = np.where(GKpix[lostpixIDs]!=0,1,0) #1=pixel-lost,0=not-lost
 		lostmap = np.bincount(lostpixIDs,minlength=npix)
 		hp.write_map(join(self.new_root,'lostpixmap.fits'),lostmap)
-		print('Lost npix, fraction of area: %s, %s'%(len(lostpixIDs),len(lostpixIDs)/nonzeropix))
+		print('Lost npix, fraction of area: %s, %s'%(sum(lostfromGK),sum(lostfromGK)/sum(GKpix)))
 		thetaPhis = hp.pix2ang(nside,lostpixIDs)
 		# lost pixel coords;
 		lostpixra,lostpixdec = np.rad2deg(thetaPhis[1]),(90.-np.rad2deg(thetaPhis[0]))
@@ -621,20 +624,22 @@ class RealCatalogue:
 		assert patchCuts.shape[0] == raCuts.shape[0]*decCuts.shape[0], 'patch-cuts broken'
 
 		# combine patch & z/colour cuts
-		highzR_pcuts = [(self.zcut&self.redcut&self.bitmaskcut&pc) for pc in patchCuts]
-		highzB_pcuts = [(self.zcut&self.bluecut&self.bitmaskcut&pc) for pc in patchCuts]
-		lowzR_pcuts = [(self.zcut_r&self.redcut&self.bitmaskcut&pc) for pc in patchCuts]
-		lowzB_pcuts = [(self.zcut_r&self.bluecut&self.bitmaskcut&pc) for pc in patchCuts]
+		highzR_pcuts = [(self.zcut&self.redcut&self.bitmaskcut&self.BCG_sc&pc) for pc in patchCuts]
+		highzB_pcuts = [(self.zcut&self.bluecut&self.bitmaskcut&self.BCG_sc&pc) for pc in patchCuts]
+		lowzR_pcuts = [(self.zcut_r&self.redcut&self.bitmaskcut&self.BCG_sc&pc) for pc in patchCuts]
+		lowzB_pcuts = [(self.zcut_r&self.bluecut&self.bitmaskcut&self.BCG_sc&pc) for pc in patchCuts]
+		highz_pcuts = [(self.zcut&self.BCG_dc&pc) for pc in patchCuts]
+		lowz_pcuts = [(self.zcut_r&self.BCG_dc&pc) for pc in patchCuts]
 
-		highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts = map(lambda x: np.array(x),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts])
+		highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts = map(lambda x: np.array(x),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts])
 
 		# cut data into 4xpatch-arrays, each element of which is a fits-table
-		hizR_patches,hizB_patches,lozR_patches,lozB_patches = map(lambda x: np.array([self.data[pc] for pc in x]),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts])
+		hizR_patches,hizB_patches,lozR_patches,lozB_patches,hiz_patches,loz_patches = map(lambda x: np.array([self.data[pc] for pc in x]),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts])
 
-		del highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts
+		del highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts
 		gc.collect()
 
-		self.patchedData = np.array([hizR_patches,hizB_patches,lozR_patches,lozB_patches])
+		self.patchedData = np.array([hizR_patches,hizB_patches,lozR_patches,lozB_patches,hiz_patches,loz_patches])
 
 		# count lost pixels within each patch for weighting
 		npixLost = np.array([np.count_nonzero(i) for i in pixpatchCuts])
@@ -654,17 +659,24 @@ class RealCatalogue:
 		return patchDir
 
 	def wcorr_patches(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi):
-		patches = [patch for patch in listdir(patchDir) if 'patch' in patch]
-		density = [d for d in listdir(patchDir) if d.endswith('Z.asc')][0]
-		dCount = len(np.loadtxt(join(patchDir,density)))
-		print('density count: %d'%dCount)
+		patches = [patch for patch in listdir(patchDir) if ('R' in patch)or('B' in patch)]
+		patches.sort()
+		label = basename(normpath(patchDir))
+		if 'highZ' in label:
+			dDir = join(patchDir,'..','highZ')
+		if 'lowZ' in label:
+			dDir = join(patchDir,'..','lowZ')
+		dpatches = listdir(dDir)
+		dpatches.sort()
+		os.system('cp %s/* %s'%(dDir,patchDir))
 		for i,p in enumerate(patches):
 			pCount = len(np.loadtxt(join(patchDir,p)))
-			print("patch %s, popn %s"%(i,pCount))
-			os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(patchDir,density,dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-9],nproc))
+			dCount = len(np.loadtxt(join(patchDir,dpatches[i])))
+			print("patch %s, density popn %s, shapes popn %s"%(i,dCount,pCount))
+			os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(patchDir,dpatches[i],dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-9],nproc))
 			if largePi:
 				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s_largePi %s 1 0'%(patchDir,density,dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-9],nproc))
-			del pCount
+			del pCount,dCount
 			gc.collect()
 			#break
 
@@ -851,8 +863,8 @@ if __name__ == "__main__":
 	parser.add_argument(
 	'-rpBins',
 	type=int,
-	help='specify no. of (log-spaced) bins in comoving transverse separation r_p (Mpc/h), for measurement of density-shape correlations. Defaults to 10',
-	default=10)
+	help='specify no. of (log-spaced) bins in comoving transverse separation r_p (Mpc/h), for measurement of density-shape correlations. Defaults to 6',
+	default=6)
 	parser.add_argument(
 	'-rpLims',
 	nargs=2,
@@ -920,12 +932,17 @@ if __name__ == "__main__":
 	default=1)
 	parser.add_argument(
 	'-patchSize',
-	help='preferred mean patch size (deg^2) for bootstrap error determination, defaults to 2.5',
+	help='preferred mean patch size (deg^2) for bootstrap error determination, defaults to 9sqdeg',
 	type=np.float32,
-	default=2.5)
+	default=9)
 	parser.add_argument(
-	'-BCGs',
+	'-BCGdens',
 	help='select only BCGs for real density samples (1) or not (0), defaults to 0',
+	type=int,
+	default=0)
+	parser.add_argument(
+	'-BCGshap',
+	help='select only BCGs for shapes samples (1) or not (0), defaults to 0',
 	type=int,
 	default=0)
 	args = parser.parse_args()
@@ -957,7 +974,7 @@ if __name__ == "__main__":
 		catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins)
 		sys.exit()
 
-	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.BCGs, args.bitmaskCut)
+	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.BCGdens, args.BCGshap, args.bitmaskCut)
 	samples = [catalog.highz_R,catalog.highz_B,catalog.lowz_R,catalog.lowz_B,catalog.highz,catalog.lowz]
 	cuts = 'z-cut: %s\t colour-cut (g-i): %s'%(args.zCut,args.cCut)
 	sample_numbers = [cuts]
@@ -982,7 +999,7 @@ if __name__ == "__main__":
 	Write.close()
 
 	if args.bootstrap:
-		# patchData.shape = (4 subsamples, N patches)
+		# patchData.shape = (6 subsamples, N patches)
 		patchData, patchWeights = catalog.patch_data(args.patchSize, args.bitmaskCut)
 		# print('MAPPING')
 		# catalog.map_test(patchData[0])
@@ -991,9 +1008,8 @@ if __name__ == "__main__":
 			for j,p in enumerate(sam):
 				new_p = catalog.cut_columns(p, args.H)
 				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j) # save_patches returns str(patchDir)
-			# copy density samples into patchDirs for wcorr
-			[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[4]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[4]+'.asc'))) for d in [0,1]]
-			[os.system('cp %s %s'%(join(catalog.new_root,catalog.labels[5]+'.asc'),join(catalog.new_root,catalog.labels[d],catalog.labels[5]+'.asc'))) for d in [2,3]]
+		for lab in catalog.labels[:4]:
+			pDir = join(catalog.new_root,lab)
 			catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi)
 			catalog.bootstrap_signals(pDir, patchWeights, 0)
 			if args.largePi:
