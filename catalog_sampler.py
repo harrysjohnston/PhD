@@ -126,12 +126,14 @@ class RealCatalogue:
 		self.highz_B = self.data[(z_cut&blue_cut&bitmask_cut)]
 		self.lowz_R = self.data[(z_cut_r&red_cut&bitmask_cut)]
 		self.lowz_B = self.data[(z_cut_r&blue_cut&bitmask_cut)]
-		self.highz = self.data[z_cut]
-		self.lowz = self.data[z_cut_r]
-
 		if BCG:
-			self.highz = self.highz[BCGs]
-			self.lowz = self.lowz[BCGs]
+			z_BCG = z_cut&BCG
+			rz_BCG = z_cut_r&BCG
+			self.highz = self.data[z_BCG]
+			self.lowz = self.data[rz_BCG]
+		else:
+			self.highz = self.data[z_cut]
+			self.lowz = self.data[z_cut_r]
 
 		self.samplecounts = []
 
