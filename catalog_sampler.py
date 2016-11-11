@@ -119,7 +119,7 @@ class RealCatalogue:
 			bitmask_cut = np.array(bitmask_cut)
 			print('bitmask cut: \t', np.unique(bitmask_cut))
 
-		BCGs = np.where(self.data['RankBCG_1']==1,True,False)
+		BCGcut = np.where(self.data['RankBCG_1']==1,True,False)
 
 		# apply cuts
 		self.highz_R = self.data[(z_cut&red_cut&bitmask_cut)]
@@ -127,8 +127,8 @@ class RealCatalogue:
 		self.lowz_R = self.data[(z_cut_r&red_cut&bitmask_cut)]
 		self.lowz_B = self.data[(z_cut_r&blue_cut&bitmask_cut)]
 		if BCG:
-			z_BCG = z_cut&BCG
-			rz_BCG = z_cut_r&BCG
+			z_BCG = z_cut&BCGcut
+			rz_BCG = z_cut_r&BCGcut
 			self.highz = self.data[z_BCG]
 			self.lowz = self.data[rz_BCG]
 		else:
@@ -144,7 +144,7 @@ class RealCatalogue:
 		self.bluecut = blue_cut
 		self.bitmaskcut = bitmask_cut
 		self.pgmcut = pgm_cut
-		self.BCGcut = BCGs
+		self.BCGcut = BCGcut
 
 		return None
 
