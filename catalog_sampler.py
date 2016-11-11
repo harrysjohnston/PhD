@@ -580,14 +580,15 @@ class RealCatalogue:
 		[print('Patch areas (sqdeg): %.2f'%i) for i in patchAr] 
 		print('rSides (#,deg): ',rLen,rPatchside)
 		print('dSides (#,deg): ',dLen,dPatchside)
-		patch_Ars = np.array([[i]*(dLen[j]-1)*(rLen[j]-1) for j,i in enumerate(patchAr)]).flatten()
+		patch_Ars = np.array([[i]*(dLen[j])*(rLen[j]) for j,i in enumerate(patchAr)]).flatten() # -1s removed!
 
 		# contsruct patch edges = 'ra/decPatches'
 		raLims = np.column_stack((raLs,raUs))
 		decLims = np.column_stack((decLs,decUs))
 
-		raPatches = [np.linspace(raLims[i][0],raLims[i][1],num=rLen[i]) for i in np.arange(0,len(raLims))]
-		decPatches = [np.linspace(decLims[i][0],decLims[i][1],num=dLen[i]) for i in np.arange(0,len(decLims))]
+		# PROBLEM HERE ??? +1s added (see above also)
+		raPatches = [np.linspace(raLims[i][0],raLims[i][1],num=rLen[i]+1) for i in np.arange(0,len(raLims))]
+		decPatches = [np.linspace(decLims[i][0],decLims[i][1],num=dLen[i]+1) for i in np.arange(0,len(decLims))]
 		raPatches,decPatches = map(lambda x: np.array(x),[raPatches,decPatches])
 
 		# create column/row cuts from patch edges
@@ -962,6 +963,7 @@ if __name__ == "__main__":
 	sample_numbers = [cuts]
 	outfile_root = join(args.Path,'Wcorr')
 
+	Notes = args.notes
 	if args.BCGs:
 		if args.notes != None:
 			Notes = args.notes+'BCGs'
