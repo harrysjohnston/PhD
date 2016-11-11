@@ -40,7 +40,7 @@ class RealCatalogue:
 		# bodies of wcorr output file IDs
 		self.wcorrLabels = ['highZ_vs_highZ_Red', 'highZ_vs_highZ_Blue', 'lowZ_vs_lowZ_Red', 'lowZ_vs_lowZ_Blue']
 
-	def cut_data(self, pgm_, z_, colour_, *bitmask_, BCG):
+	def cut_data(self, pgm_, z_, colour_, BCG, *bitmask_):
 		"""""
 		cut catalogue according to bitmasks, 
 		PGM, & into subsamples
@@ -962,7 +962,7 @@ if __name__ == "__main__":
 		catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins)
 		sys.exit()
 
-	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.bitmaskCut, args.BCGs)
+	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.BCGs, args.bitmaskCut)
 	samples = [catalog.highz_R,catalog.highz_B,catalog.lowz_R,catalog.lowz_B,catalog.highz,catalog.lowz]
 	cuts = 'z-cut: %s\t colour-cut (g-i): %s'%(args.zCut,args.cCut)
 	sample_numbers = [cuts]
