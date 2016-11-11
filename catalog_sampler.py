@@ -40,7 +40,7 @@ class RealCatalogue:
 		# bodies of wcorr output file IDs
 		self.wcorrLabels = ['highZ_vs_highZ_Red', 'highZ_vs_highZ_Blue', 'lowZ_vs_lowZ_Red', 'lowZ_vs_lowZ_Blue']
 
-	def cut_data(self, pgm_, z_, colour_, *bitmask_): 
+	def cut_data(self, pgm_, z_, colour_, *bitmask_, BCG):
 		"""""
 		cut catalogue according to bitmasks, 
 		PGM, & into subsamples
@@ -80,7 +80,7 @@ class RealCatalogue:
 		colour = self.data['absmag_g_1'] - self.data['absmag_i_1']
 		total_bitmasks = self.data['col3']
 
-		# define colour, redshift & bitmask cuts
+		# define colour, redshift, bitmask & BCG cuts
 		if colour_ != None:
 			red_cut = np.array((colour > colour_)) # larger (B-V) <-> 'redder' colour
 			blue_cut = ~red_cut
@@ -119,6 +119,8 @@ class RealCatalogue:
 			bitmask_cut = np.array(bitmask_cut)
 			print('bitmask cut: \t', np.unique(bitmask_cut))
 
+		BCGs = np.where(self.data['RankBCG_1']==1,True,False)
+
 		# apply cuts
 		self.highz_R = self.data[(z_cut&red_cut&bitmask_cut)]
 		self.highz_B = self.data[(z_cut&blue_cut&bitmask_cut)]
@@ -126,6 +128,10 @@ class RealCatalogue:
 		self.lowz_B = self.data[(z_cut_r&blue_cut&bitmask_cut)]
 		self.highz = self.data[z_cut]
 		self.lowz = self.data[z_cut_r]
+
+		if BCG:
+			self.highz = self.highz[BCGs]
+			self.lowz = self.lowz[BCGs]
 
 		self.samplecounts = []
 
@@ -136,6 +142,7 @@ class RealCatalogue:
 		self.bluecut = blue_cut
 		self.bitmaskcut = bitmask_cut
 		self.pgmcut = pgm_cut
+		self.BCGcut = BCGs
 
 		return None
 
@@ -456,41 +463,8 @@ class RealCatalogue:
 		covarList.sort() # all Plus, then all Xross
 
 		dataArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in wcorrList])
-		# dataArr = np.array([[i[:,1], i[:,2], i[:,3], i[:,4]] for i in dataArr])
 		dataArr = np.array([[i[:,1],i[:,3]] for i in dataArr]) # +, x signals
-		# pVals = []
-		# chi2s = []
-		# xSigma = []
 
-		# for j, data in enumerate(dataArr):
-		# 	plus,perr,cross,xerr = data[0],data[1],data[2],data[3]
-		# 	plusChi_i = ((plus-expec)/perr)**2
-		# 	crossChi_i = ((cross-expec)/xerr)**2
-		# 	chi2_pl = np.sum(plusChi_i)
-		# 	chi2_cr = np.sum(crossChi_i)
-		# 	intgrl_pl = scint.quad(self.chiFunc, chi2_pl, np.inf)
-		# 	intgrl_cr = scint.quad(self.chiFunc, chi2_cr, np.inf)
-		# 	pVal_pl = intgrl_pl[0]
-		# 	pVal_cr = intgrl_cr[0]
-		# 	pVal = ['%.5f'%pVal_pl, '%.5f'%pVal_cr]
-		# 	chi2 = ['%.5f'%chi2_pl, '%.5f'%chi2_cr]
-		# 	chi2s.append(chi2)
-		# 	pVals.append(pVal)
-		# 	pvals = np.array([pVal_pl,pVal_cr])
-		# 	x_s = abs(stat.norm.interval((1-pvals), loc=0, scale=1)[0])
-		# 	xSigma.append(x_s)
-			# print("p's (pl,cr): %.5f, %.5f"%(pvals[0],pvals[1]))
-			# print("xsigma's (pl,cr): %.5f, %.5f"%(x_s[0],x_s[1]))
-
-		# CALC & SAVE CHI^2 FROM COVARIANCE MATRIX
-		# y = [0,4,8,12,2,6,10,14,1,5,9,13,3,7,11,15] # re-order covariance matrices
-		# covarList = covarList[y]
-		# covLists = [covarList[:8],covarList[8:]]
-		# for halfList in covLists:
-		# 	for j,covar in enumerate(halfList): # assert ordering matches wcorr files
-		# 		assert covar[7:] in wcorrList[j], 'mismatched signals & covariance matrices'
-		# 		if 'Pi' in wcorrList[j]:
-		# 			assert 'Pi' in covar[7:], 'mismatched signals & covariance matrices'
 		covarArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in covarList])
 		covarSigma = []
 		chiFunc = lambda x: chi2.pdf(x, dof)
@@ -504,23 +478,12 @@ class RealCatalogue:
 				p_val = scint.quad(chiFunc, fchi, np.inf)[0]
 				xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
 				covarSigma.append([fchi,p_val,xs])
-		# for i,cov in enumerate(covarArr[:8]):
-		# 	cov = np.mat(cov)
-		# 	invCov = np.linalg.inv(cov)
-		# 	wgx = np.array(dataArr[i][[2]]).T[:,0]
-		# 	chi = np.matmul((np.matmul(wgx.T,invCov)), wgx)
-		# 	fchi = float(chi)
-		# 	p_val = scint.quad(self.chiFunc, fchi, np.inf)[0]
-		# 	xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
-		# 	covarSigma.append([fchi,p_val,xs])
-
-		# pVals, chi2s, xSigma, wcorrList, covarSigma = map(lambda x: np.array(x),[pVals, chi2s, xSigma, wcorrList, covarSigma])
 
 		covarSigma = np.array(covarSigma)
 
 		chi2Stats = np.column_stack((covarList,covarSigma[:,0],covarSigma[:,1],covarSigma[:,2]))
 
-		ascii.write(chi2Stats, join(path2data,'..','chi2'), delimiter='\t', names=['dataset','chi^2','p-val','x-sigma'])
+		ascii.write(chi2Stats, join(path2data,'chi2'), delimiter='\t', names=['dataset','chi^2','p-val','x-sigma'])
 
 		return None
 
@@ -608,7 +571,13 @@ class RealCatalogue:
 			print('patchArs :',patchAr)
 			newDiff = abs(patchAr-patchSize)
 			if newDiff[0]>initDiff[0]:
-				print('MISSED PATCH-AREA TARGET')
+				print('MISSED PATCH-AREA TARGET, reverting to closest..')
+				dLen -= 1
+				rLen = dLen*np.round(RDratio)
+				rPatchside = deltaR/rLen
+				dPatchside = deltaD/dLen
+				patchAr = rPatchside*dPatchside
+				print('patchArs :',patchAr)
 				break
 				# sys.exit()
 		[print('Patch areas (sqdeg): %.2f'%i) for i in patchAr] 
@@ -959,6 +928,11 @@ if __name__ == "__main__":
 	help='preferred mean patch size (deg^2) for bootstrap error determination, defaults to 2.5',
 	type=np.float32,
 	default=2.5)
+	parser.add_argument(
+	'-BCGs',
+	help='select only BCGs for real density samples (1) or not (0), defaults to 0',
+	type=int,
+	default=0)
 	args = parser.parse_args()
 
 	catalog = RealCatalogue(args.Catalog)
@@ -988,15 +962,21 @@ if __name__ == "__main__":
 		catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins)
 		sys.exit()
 
-	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.bitmaskCut)
+	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.bitmaskCut, args.BCGs)
 	samples = [catalog.highz_R,catalog.highz_B,catalog.lowz_R,catalog.lowz_B,catalog.highz,catalog.lowz]
 	cuts = 'z-cut: %s\t colour-cut (g-i): %s'%(args.zCut,args.cCut)
 	sample_numbers = [cuts]
 	outfile_root = join(args.Path,'Wcorr')
 
+	if args.BCGs:
+		if args.notes != None:
+			Notes = args.notes+'BCGs'
+		else:
+			Notes = 'BCGs'
+
 	for i, sample in enumerate(samples):
 		new_table = catalog.cut_columns(sample, args.H)
-		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
+		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, Notes)
 		sample_numbers.append(sample_num)
 
 	File = join(catalog.new_root, 'Sample_popns')
@@ -1042,7 +1022,7 @@ if __name__ == "__main__":
 
 		for i, sample in enumerate(samples):
 			new_table = catalog2.cut_columns(sample, args.H)
-			sample_num = catalog2.save_tables(new_table,outfile_root,catalog2.labels[i],args.zCut,args.cCut,args.notes)
+			sample_num = catalog2.save_tables(new_table,outfile_root,catalog2.labels[i],args.zCut,args.cCut,Notes)
 			sample_numbers.append(sample_num)
 
 		File = join(catalog.new_root, 'Sample_rand_popns')
