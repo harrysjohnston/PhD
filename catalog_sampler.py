@@ -981,11 +981,16 @@ if __name__ == "__main__":
 	outfile_root = join(args.Path,'Wcorr')
 
 	Notes = args.notes
-	if args.BCGs:
+	if args.BCGdens:
 		if args.notes != None:
-			Notes = args.notes+'BCGs'
+			Notes = args.notes+'BCGdens'
 		else:
-			Notes = 'BCGs'
+			Notes = 'BCGdens'
+	if args.BCGshap:
+		if args.notes != None:
+			Notes = args.notes+'BCGshap'
+		else:
+			Notes = 'BCGshap'
 
 	for i, sample in enumerate(samples):
 		new_table = catalog.cut_columns(sample, args.H)
