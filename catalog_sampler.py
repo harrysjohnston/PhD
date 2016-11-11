@@ -46,8 +46,8 @@ class RealCatalogue:
 		PGM, & into subsamples
 
 		"""""
-		assert 'RA_1' in self.columns, "'RA_1' not in columns, see column headers: "+ str(self.columns)
-		assert 'DEC_1' in self.columns, "'DEC_1' not in columns, see column headers: "+ str(self.columns)
+		assert 'RA_1_1' in self.columns, "'RA_1_1' not in columns, see column headers: "+ str(self.columns)
+		assert 'DEC_1_1' in self.columns, "'DEC_1_1' not in columns, see column headers: "+ str(self.columns)
 		assert 'pgm' in self.columns, "'pgm' not in columns, see column headers: "+ str(self.columns)
 		assert 'Z_1_1' in self.columns, "'Z_1_1' not in columns, see column headers: "+ str(self.columns)
 		assert 'absmag_g_1' in self.columns, "'absmag_g_1' not in columns, see column headers: "+ str(self.columns)
@@ -58,7 +58,7 @@ class RealCatalogue:
 		self.cstr = '%.f'%colour_
 
 		# Remove duplicates in RA/DEC:
-		# coordStrings = ['RA_1', 'DEC_1']
+		# coordStrings = ['RA_1_1', 'DEC_1_1']
 		# for i, col in enumerate(coordStrings):
 		#   coords = self.data[col]
 		#   uniqCoords = np.unique(coords, return_inverse=True, return_counts=True)
@@ -152,15 +152,10 @@ class RealCatalogue:
 		& isolate columns for wcorr
 
 		"""""
-		assert 'RA_1' in self.columns, "'RA_1' not in columns, see column headers: "+ str(self.columns)
-		assert 'DEC_1' in self.columns, "'DEC_1' not in columns, see column headers: "+ str(self.columns)
-		assert 'Z_1_1' in self.columns, "'Z_1_1' not in columns, see column headers: "+ str(self.columns)
-		assert 'e1c' in self.columns, "'e1c' not in columns, see column headers: "+ str(self.columns)
-		assert 'e2c' in self.columns, "'e2c' not in columns, see column headers: "+ str(self.columns)
 
 		table = subsample
-		RA = np.deg2rad(table['RA_1'])
-		DEC = np.deg2rad(table['DEC_1'])
+		RA = np.deg2rad(table['RA_1_1'])
+		DEC = np.deg2rad(table['DEC_1_1'])
 		Z = table['Z_1_1']
 		pgm = table['pgm']
 		e1 = table['e1c']/pgm
@@ -493,8 +488,8 @@ class RealCatalogue:
 		fullSky = 41252.96 # square degrees
 		npix = hp.nside2npix(nside)
 		pixar = fullSky/npix
-		ra = self.data['RA_1']
-		dec = self.data['DEC_1']
+		ra = self.data['RA_1_1']
+		dec = self.data['DEC_1_1']
 		theta = np.deg2rad(90.-dec)
 		phi = np.deg2rad(ra)
 		pixIDs = hp.ang2pix(nside,theta,phi,nest=False)
@@ -730,8 +725,8 @@ class RealCatalogue:
 		npix = hp.nside2npix(128)
 		hmap = [0]*npix
 		for cat in catalogs:
-			ra = cat['RA_1']
-			dec = cat['DEC_1']
+			ra = cat['RA_1_1']
+			dec = cat['DEC_1_1']
 			theta = np.deg2rad(90.-dec)
 			phi = np.deg2rad(ra)
 			pix = hp.ang2pix(128,theta,phi)
@@ -798,9 +793,6 @@ class RandomCatalogue(RealCatalogue):
 		& isolate columns for wcorr
 
 		"""""
-		assert 'RA' in self.columns, "'RA' not in columns, see column headers: "+ str(self.columns)
-		assert 'DEC' in self.columns, "'DEC' not in columns, see column headers: "+ str(self.columns)
-		assert 'Z' in self.columns, "'Z' not in columns, see column headers: "+ str(self.columns)
 
 		table = subsample
 		RA = np.deg2rad(table['RA'])
