@@ -474,7 +474,7 @@ class RealCatalogue:
 			for i,cov in enumerate(ARR):
 				cov = np.mat(cov)
 				invCov = np.linalg.inv(cov)
-				sig = np.mat(dataArr[i][[j]])
+				sig = np.mat(dataArr[i][j])
 				chi = (sig*invCov)*sig.T
 				fchi = float(chi)
 				p_val = scint.quad(chiFunc, fchi, np.inf)[0]
@@ -987,13 +987,13 @@ if __name__ == "__main__":
 
 	Notes = args.notes
 	if args.BCGdens:
-		if args.notes != None:
-			Notes = args.notes+'BCGdens'
+		if Notes != None:
+			Notes += 'BCGdens'
 		else:
 			Notes = 'BCGdens'
 	if args.BCGshap:
-		if args.notes != None:
-			Notes = args.notes+'BCGshap'
+		if Notes != None:
+			Notes += 'BCGshap'
 		else:
 			Notes = 'BCGshap'
 
