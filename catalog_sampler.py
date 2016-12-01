@@ -455,10 +455,10 @@ class RealCatalogue:
 	def normFunc(self, y):
 		return stat.norm(0,1).pdf(y)
 
-	def chi2(self, path2data, expec, dof):
+	def chi2(self, path2data, expec, dof, covartype):
 		filesList = np.array(listdir(path2data))
 		wcorrData = np.array(['_vs_' in x for x in filesList])
-		covarData = np.array(['covar' in x for x in filesList])
+		covarData = np.array(['%scovar'%covartype in x for x in filesList])
 		wcorrList = filesList[wcorrData]
 		covarList = filesList[covarData]
 		wcorrList.sort() # hzB, hzBlPi, hzR, hzRlPi, lzB, lzBlPi....
@@ -485,7 +485,7 @@ class RealCatalogue:
 
 		chi2Stats = np.column_stack((covarList,covarSigma[:,0],covarSigma[:,1],covarSigma[:,2]))
 
-		ascii.write(chi2Stats, join(path2data,'chi2'), delimiter='\t', names=['dataset','chi^2','p-val','x-sigma'])
+		ascii.write(chi2Stats, join(path2data,'%schi2'%covartype), delimiter='\t', names=['dataset','chi^2','p-val','x-sigma'])
 
 		return None
 
@@ -703,9 +703,10 @@ class RealCatalogue:
 		# shape = (BTs, patch-signal/weight, rp bins)
 
 		# calculate mean over patches (weighted)
-		# WEIGHTING FIXED? - TESTED, SHOULD WORK!
-		Pmeans = np.average(wgplus,axis=1,weights=pws)
-		Xmeans = np.average(wgcross,axis=1,weights=pws)
+		# Pmeans = np.average(wgplus,axis=1,weights=pws)
+		# Xmeans = np.average(wgcross,axis=1,weights=pws)
+		Pmeans = np.median(wgplus,axis=1)
+		Xmeans = np.median(wgcross,axis=1)
 		# shape = (BTs, mean-signal-in-rp-bin)
 
 		# calculate covariance matrix & corr-coeffs (for +)
@@ -731,15 +732,15 @@ class RealCatalogue:
 		if not isdir(toplotDir):
 			mkdir(toplotDir)
 		if not largePi:
-			corrName = join(toplotDir,'corrcoeff_%s'%label)
+			corrName = join(toplotDir,'BTcorrcoeff_%s'%label)
 			ascii.write(corrcoeffP, corrName, delimiter='\t')
 
 			for covs in cov_combos:
-				covName = join(toplotDir,'covar%s_%s'%(covs[1],label))
+				covName = join(toplotDir,'BTcovar%s_%s'%(covs[1],label))
 				ascii.write(covs[0], covName, delimiter='\t')
 		else:
 			for covs in cov_combos:
-				covName = join(toplotDir,'covar%s_%s_largePi'%(covs[1],label))
+				covName = join(toplotDir,'BTcovar%s_%s_largePi'%(covs[1],label))
 				ascii.write(covs[0], covName, delimiter='\t')
 		return None
 
@@ -785,7 +786,21 @@ class RealCatalogue:
 		ascii.write(JKstds, JKerrs_out, delimiter='\t', names=['#w(g+)err','#w(gx)err'])
 		cov_combos = [[covP,'P'],[covX,'X']]
 
+		toplotDir = join(patchDir,'../to_plot')
+		if not isdir(toplotDir):
+			mkdir(toplotDir)
+		if not largePi:
+			corrName = join(toplotDir,'JKcorrcoeff_%s'%label)
+			ascii.write(corrcoeffP, corrName, delimiter='\t')
 
+			for covs in cov_combos:
+				covName = join(toplotDir,'JKcovar%s_%s'%(covs[1],label))
+				ascii.write(covs[0], covName, delimiter='\t')
+		else:
+			for covs in cov_combos:
+				covName = join(toplotDir,'JKcovar%s_%s_largePi'%(covs[1],label))
+				ascii.write(covs[0], covName, delimiter='\t')
+		return None
 
 
 	def map_test(self, catalogs):
@@ -983,6 +998,12 @@ if __name__ == "__main__":
 	help='perform bootstrap error determination (1) or not (0), defaults to 1',
 	default=1)
 	parser.add_argument(
+	'-jackknife',
+	type=int,
+	choices=[0,1],
+	help='perform jackknife error determination (1) or not (0), defaults to 1',
+	default=1)
+	parser.add_argument(
 	'-patchSize',
 	help='preferred mean patch size (deg^2) for bootstrap error determination, defaults to 9sqdeg',
 	type=np.float32,
@@ -1016,14 +1037,18 @@ if __name__ == "__main__":
 		if args.chiSqu:
 			print('CALC CHI^2')
 			# calculate chi^2 statistics & save to ascii
-			catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins)
+			catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'BT')
+			if args.jackknife:
+				catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'JK')
 			sys.exit()
 		sys.exit()
 
 	if args.chiSqu:
 		print('CALC CHI^2')
 		# calculate chi^2 statistics & save to csv
-		catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins)
+		catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'BT')
+		if args.jackknife:
+			catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'JK')
 		sys.exit()
 
 	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.BCGdens, args.BCGshap, args.bitmaskCut)
@@ -1069,8 +1094,12 @@ if __name__ == "__main__":
 			pDir = join(catalog.new_root,lab)
 			catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi)
 			catalog.bootstrap_signals(pDir, patchWeights, 0)
+			if args.jackknife:
+				catalog.jackknife_signals(pDir, patchWeights, 0)
 			if args.largePi:
 				catalog.bootstrap_signals(pDir, patchWeights, 1)
+				if args.jackknife:
+					catalog.jackknife_signals(pDir, patchWeights, 1)
 
 	catalog.make_combos()
 	catalog.prep_wcorr(catalog.new_root,catalog.wcorr_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
