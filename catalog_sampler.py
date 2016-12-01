@@ -494,7 +494,7 @@ class RealCatalogue:
 		nside = 2048
 		fullSky = 41252.96 # square degrees
 		npix = hp.nside2npix(nside)
-		pixar = hp.nside2pixarea(nside)
+		pixar = hp.nside2pixarea(nside,degrees=True)
 		ra = self.data['RA_1_1']
 		dec = self.data['DEC_1_1']
 		theta = np.deg2rad(90.-dec)
@@ -649,7 +649,7 @@ class RealCatalogue:
 		pArLost = npixLost*pixar
 		weights = 1-(pArLost/patch_Ars)
 		self.patchWeights = np.where(weights>0,weights,0)
-		print(self.patchWeights)
+		print('patch weights: ',self.patchWeights)
 
 		return self.patchedData, self.patchWeights
 
@@ -776,6 +776,14 @@ class RealCatalogue:
 		corrcoeffX = np.corrcoef(Xmeans,rowvar=0)
 		Pstds = np.std(Pmeans,axis=0)
 		Xstds = np.std(Xmeans,axis=0)
+
+		JKstds = np.column_stack((Pstds,Xstds))
+		label = basename(normpath(patchDir))
+		JKerrs_out = join(patchDir,'..','JKerrs_%s'%label)
+		if largePi:
+			JKerrs_out = join(patchDir,'..','JKerrs_%s_largePi'%label)
+		ascii.write(JKstds, JKerrs_out, delimiter='\t', names=['#w(g+)err','#w(gx)err'])
+		cov_combos = [[covP,'P'],[covX,'X']]
 
 
 
