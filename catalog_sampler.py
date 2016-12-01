@@ -782,13 +782,17 @@ class RealCatalogue:
 		for i in range(Nps):
 			JKsignals[i] = np.delete(psigs,i,axis=0)
 			JKpws[i] = np.delete(patchWeights, i)
+		print('JKsignals shape: ',np.array(JKsignals).shape)
+		print('JKpweights shape: ',np.array(JKpws).shape)
 
 		# compute JK errors & covariances, analogous to BT
 		wgplus = JKsignals[:,:,0,:]
 		wgcross = JKsignals[:,:,1,:]
 		pws = JKsignals[:,:,2,:]
 		Pmeans = np.average(wgplus,axis=1,weights=pws)
+		print('plus means: ',Pmeans)
 		Xmeans = np.average(wgcross,axis=1,weights=pws)
+		print('cross means: ',Xmeans)
 		covP = np.cov(Pmeans,rowvar=0)
 		corrcoeffP = np.corrcoef(Pmeans,rowvar=0)
 		covX = np.cov(Xmeans,rowvar=0)
