@@ -494,7 +494,7 @@ class RealCatalogue:
 		nside = 2048
 		fullSky = 41252.96 # square degrees
 		npix = hp.nside2npix(nside)
-		pixar = fullSky/npix
+		pixar = hp.nside2pixarea(nside)
 		ra = self.data['RA_1_1']
 		dec = self.data['DEC_1_1']
 		theta = np.deg2rad(90.-dec)
@@ -587,13 +587,12 @@ class RealCatalogue:
 		[print('Patch areas (sqdeg): %.2f'%i) for i in patchAr] 
 		print('rSides (#,deg): ',rLen,rPatchside)
 		print('dSides (#,deg): ',dLen,dPatchside)
-		patch_Ars = np.array([[i]*(dLen[j])*(rLen[j]) for j,i in enumerate(patchAr)]).flatten() # -1s removed!
+		patch_Ars = np.array([[i]*(dLen[j])*(rLen[j]) for j,i in enumerate(patchAr)]).flatten()
 
 		# contsruct patch edges = 'ra/decPatches'
 		raLims = np.column_stack((raLs,raUs))
 		decLims = np.column_stack((decLs,decUs))
 
-		# PROBLEM HERE ??? +1s added (see above also)
 		raPatches = [np.linspace(raLims[i][0],raLims[i][1],num=rLen[i]+1) for i in np.arange(0,len(raLims))]
 		decPatches = [np.linspace(decLims[i][0],decLims[i][1],num=dLen[i]+1) for i in np.arange(0,len(decLims))]
 		raPatches,decPatches = map(lambda x: np.array(x),[raPatches,decPatches])
@@ -690,20 +689,23 @@ class RealCatalogue:
 		if largePi:
 			pwcorrs = [x for x in listdir(patchDir) if 'Pi' in x]
 		psigs = []
-		for x in pwcorrs:
+		for i,x in enumerate(pwcorrs):
 			path = join(patchDir, x)
 			data = np.array(np.loadtxt(path))
-			psigs.append([data[:,3],data[:,4]]) # [+, x]
+			psigs.append([data[:,3],data[:,4],[patchWeights[i]]*len(data[:,3])])
+			# [+, x, pweight]
 		psigs = np.array(psigs)
-		BTsignals = astat.bootstrap(psigs, bootnum=100000)
+		BTsignals = astat.bootstrap(psigs,bootnum=100000)
 		# construct errors for each bin in r_p, for + & x corrs
 		wgplus = BTsignals[:,:,0,:]
 		wgcross = BTsignals[:,:,1,:]
-		# shape = (BTs, patch-signal, rp bins)
+		pws = BTsignals[:,:,2,:]
+		# shape = (BTs, patch-signal/weight, rp bins)
 
 		# calculate mean over patches (weighted)
-		Pmeans = np.average(wgplus,axis=1, weights=patchWeights)
-		Xmeans = np.average(wgcross,axis=1, weights=patchWeights)
+		# WEIGHTING FIXED? - TESTED, SHOULD WORK!
+		Pmeans = np.average(wgplus,axis=1,weights=pws)
+		Xmeans = np.average(wgcross,axis=1,weights=pws)
 		# shape = (BTs, mean-signal-in-rp-bin)
 
 		# calculate covariance matrix & corr-coeffs (for +)
@@ -740,6 +742,43 @@ class RealCatalogue:
 				covName = join(toplotDir,'covar%s_%s_largePi'%(covs[1],label))
 				ascii.write(covs[0], covName, delimiter='\t')
 		return None
+
+	def jackknife_signals(self, patchDir, patchWeights, largePi):
+		pwcorrs = [x for x in listdir(patchDir) if ('.dat' in x)&('Pi' not in x)]
+		if largePi:
+			pwcorrs = [x for x in listdir(patchDir) if 'Pi' in x]
+		psigs = []
+		for i,x in enumerate(pwcorrs):
+			path = join(patchDir, x)
+			data = np.array(np.loadtxt(path))
+			psigs.append([data[:,3],data[:,4],[patchWeights[i]]*len(data[:,3])]) 
+			# [+, x, pws]
+		psigs = np.array(psigs)
+
+		# construct delete-one jackknife resampling of patches
+		ps_shape = psigs.shape
+		Nps = ps_shape[0]
+		JKsignals = np.empty([Nps,Nps-1,ps_shape[1],ps_shape[2]])
+		JKpws = np.empty([Nps,Nps-1])
+		for i in range(Nps):
+			JKsignals[i] = np.delete(psigs,i,axis=0)
+			JKpws[i] = np.delete(patchWeights, i)
+
+		# compute JK errors & covariances, analogous to BT
+		wgplus = JKsignals[:,:,0,:]
+		wgcross = JKsignals[:,:,1,:]
+		pws = JKsignals[:,:,2,:]
+		Pmeans = np.average(wgplus,axis=1,weights=pws)
+		Xmeans = np.average(wgcross,axis=1,weights=pws)
+		covP = np.cov(Pmeans,rowvar=0)
+		corrcoeffP = np.corrcoef(Pmeans,rowvar=0)
+		covX = np.cov(Xmeans,rowvar=0)
+		corrcoeffX = np.corrcoef(Xmeans,rowvar=0)
+		Pstds = np.std(Pmeans,axis=0)
+		Xstds = np.std(Xmeans,axis=0)
+
+
+
 
 	def map_test(self, catalogs):
 		npix = hp.nside2npix(128)
