@@ -281,7 +281,7 @@ class RealCatalogue:
 		Write.write(str(Text))
 		Write.close()
 
-	def plot_wcorr(self, files_path, wcorrIDs, BT, largePi):
+	def plot_wcorr(self, files_path, wcorrIDs, BT, JK, largePi):
 		wcorrOutputs = []
 		rand_wcorrOutputs = []
 		for item in wcorrIDs:
@@ -295,6 +295,8 @@ class RealCatalogue:
 		wgerr = []
 		Pproperrs = []
 		Xproperrs = []
+		Pproperrs2 = []
+		Xproperrs2 = []
 		rand_wgplus = []
 		rand_wgcross = []
 		rand_wgerr = []
@@ -308,6 +310,7 @@ class RealCatalogue:
 			realData[i][:,4] -= randData[i][:,4] # subtracting randoms from +/x
 			realErr = realData[i][:,6]
 			randErr = randData[i][:,6]
+
 			if BT:
 				BTerrs = np.loadtxt(join(files_path,'BTerrs_%s'%self.labels[i]))
 				if largePi:
@@ -318,6 +321,18 @@ class RealCatalogue:
 				Xproperr = np.sqrt((Xerr**2) + (randErr**2)) # propagate errors
 				Pproperrs.append(Pproperr)
 				Xproperrs.append(Xproperr)
+
+			if JK:
+				JKerrs = np.loadtxt(join(files_path,'JKerrs_%s'%self.labels[i]))
+				if largePi:
+					JKerrs = np.loadtxt(join(files_path,'JKerrs_%s_largePi'%self.labels[i]))
+				Perr2 = JKerrs[:,0]
+				Xerr2 = JKerrs[:,1]
+				Pproperr2 = np.sqrt((Perr2**2) + (randErr**2))
+				Xproperr2 = np.sqrt((Xerr2**2) + (randErr**2)) # propagate errors
+				Pproperrs2.append(Pproperr2)
+				Xproperrs2.append(Xproperr2)
+
 			propgErrs = np.sqrt((realErr**2) + (randErr**2)) # propagate errors
 			wgplus.append(realData[i][:,3])
 			wgcross.append(realData[i][:,4])
@@ -325,10 +340,13 @@ class RealCatalogue:
 			rand_wgplus.append(randData[i][:,3])
 			rand_wgcross.append(randData[i][:,4])
 			rand_wgerr.append(randData[i][:,6])
-			# save reduced data to csv for easy plotting
-			if BT:
+			# save reduced data to ascii for easy plotting
+			if BT&JK:
+				reducedData = np.column_stack((realData[0][:,0], realData[i][:,3], Pproperr, Pproperr2, realData[i][:,4], Xproperr, Xproperr2, propgErrs)) # = [r_p, wgplus, BTPerr, JKPerr, wgcross, BTXerr, JKXerr, analyticErrs]
+				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'BT+err', 'JK+err', 'wgx', 'BTxerr', 'JKxerr', 'analyticerrs'])
+			elif BT:
 				reducedData = np.column_stack((realData[0][:,0], realData[i][:,3], Pproperr, realData[i][:,4], Xproperr, propgErrs)) # = [r_p, wgplus, Perr, wgcross, Xerr, analyticErrs]
-				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', '+err', 'wgx', 'xerr', 'analyticerrs'])#, formats={'r_p':np.float32, 'wg+':np.float32,'+err':np.float32, 'wgx':np.float32, 'xerr':np.float32})
+				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'BT+err', 'wgx', 'BTxerr', 'analyticerrs'])
 			else:
 				reducedData = zip(realData[0][:,0], realData[i][:,3], realData[i][:,4], propgErrs) # = [r_p, wgplus, wgcross, wgerr]
 				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wgplus', 'wgcross', 'wgerr'], formats={'r_p':np.float32, 'wgplus':np.float32, 'wgcross':np.float32, 'wgerr':np.float32})
@@ -703,10 +721,10 @@ class RealCatalogue:
 		# shape = (BTs, patch-signal/weight, rp bins)
 
 		# calculate mean over patches (weighted)
-		# Pmeans = np.average(wgplus,axis=1,weights=pws)
-		# Xmeans = np.average(wgcross,axis=1,weights=pws)
-		Pmeans = np.median(wgplus,axis=1)
-		Xmeans = np.median(wgcross,axis=1)
+		Pmeans = np.average(wgplus,axis=1,weights=pws)
+		Xmeans = np.average(wgcross,axis=1,weights=pws)
+		# Pmeans = np.median(wgplus,axis=1)
+		# Xmeans = np.median(wgcross,axis=1)
 		# shape = (BTs, mean-signal-in-rp-bin)
 
 		# calculate covariance matrix & corr-coeffs (for +)
@@ -802,7 +820,6 @@ class RealCatalogue:
 				ascii.write(covs[0], covName, delimiter='\t')
 		return None
 
-
 	def map_test(self, catalogs):
 		npix = hp.nside2npix(128)
 		hmap = [0]*npix
@@ -890,6 +907,7 @@ class RandomCatalogue(RealCatalogue):
 		return new_table
 
 if __name__ == "__main__":
+	# Command-line args...
 	parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
 	parser.add_argument(
 	'Catalog',
@@ -1025,14 +1043,14 @@ if __name__ == "__main__":
 	if args.plotNow:
 		# plot .dat files, returning filename-list
 		print('PLOTTING')
-		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels, args.bootstrap, 0)
+		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels, args.bootstrap, args.jackknife, 0)
 		largePi_outs = [basename(normpath(out[:-4] + '_largePi.dat')) for out in wcorrOuts]
 		# check for largePi .dat files
 		isIn = [i in listdir(args.Path) for i in largePi_outs]
 		uniq = np.unique(isIn)
 		if uniq.all() == True:
 			IDs = [outs[6:-4] for outs in largePi_outs]
-			a = catalog.plot_wcorr(args.Path, IDs, args.bootstrap, 1)
+			a = catalog.plot_wcorr(args.Path, IDs, args.bootstrap, args.jackknife, 1)
 
 		if args.chiSqu:
 			print('CALC CHI^2')
