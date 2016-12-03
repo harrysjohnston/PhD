@@ -723,9 +723,9 @@ class RealCatalogue:
 		# calculate mean over patches (weighted)
 		Pmeans = np.average(wgplus,axis=1,weights=pws)
 		Xmeans = np.average(wgcross,axis=1,weights=pws)
-		# Pmeans = np.median(wgplus,axis=1)
-		# Xmeans = np.median(wgcross,axis=1)
-		# shape = (BTs, mean-signal-in-rp-bin)
+		Pmeds = np.median(wgplus,axis=1)
+		Xmeds = np.median(wgcross,axis=1)
+		# shape = (BTs, mean/med-signal-in-rp-bin)
 
 		# calculate covariance matrix & corr-coeffs (for +)
 		covP = np.cov(Pmeans,rowvar=0)
@@ -760,6 +760,10 @@ class RealCatalogue:
 			for covs in cov_combos:
 				covName = join(toplotDir,'BTcovar%s_%s_largePi'%(covs[1],label))
 				ascii.write(covs[0], covName, delimiter='\t')
+
+		BTanalysis = np.column_stack((Pmeans,Xmeans,Pmeds,Xmeds))
+		BTanalysis_root = join(toplotDir,'BTanalysis')
+		ascii.write(BTanalysis,BTanalysis_root,delimiter='\t',names=['#w(g+)_patch-means','#w(gx)_means','#w(g+)_meds','#w(gx)_meds'])
 		return None
 
 	def jackknife_signals(self, patchDir, patchWeights, largePi):
@@ -778,21 +782,15 @@ class RealCatalogue:
 		ps_shape = psigs.shape
 		Nps = ps_shape[0]
 		JKsignals = np.empty([Nps,Nps-1,ps_shape[1],ps_shape[2]])
-		JKpws = np.empty([Nps,Nps-1])
 		for i in range(Nps):
 			JKsignals[i] = np.delete(psigs,i,axis=0)
-			JKpws[i] = np.delete(patchWeights, i)
-		print('JKsignals shape: ',np.array(JKsignals).shape)
-		print('JKpweights shape: ',np.array(JKpws).shape)
 
 		# compute JK errors & covariances, analogous to BT
 		wgplus = JKsignals[:,:,0,:]
 		wgcross = JKsignals[:,:,1,:]
 		pws = JKsignals[:,:,2,:]
 		Pmeans = np.average(wgplus,axis=1,weights=pws)
-		print('plus means: ',Pmeans)
 		Xmeans = np.average(wgcross,axis=1,weights=pws)
-		print('cross means: ',Xmeans)
 		covP = np.cov(Pmeans,rowvar=0)
 		corrcoeffP = np.corrcoef(Pmeans,rowvar=0)
 		covX = np.cov(Xmeans,rowvar=0)
@@ -837,7 +835,6 @@ class RealCatalogue:
 		hp.write_map('patchTest_map.fits',hmap)
 		# plt.savefig('/share/splinter/hj/PhD/patchTest.pdf')
 		return None
-
 
 class RandomCatalogue(RealCatalogue):
 
