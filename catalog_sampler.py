@@ -762,7 +762,7 @@ class RealCatalogue:
 				ascii.write(covs[0], covName, delimiter='\t')
 
 		BTanalysis = np.column_stack((Pmeans,Xmeans,Pmeds,Xmeds))
-		BTanalysis_root = join(toplotDir,'BTanalysis')
+		BTanalysis_root = join(toplotDir,'BTanalysis_%s'%label)
 		ascii.write(BTanalysis,BTanalysis_root,delimiter='\t',
 			names=['#wg+_pmean_rp%s'%i for i in range(Pmeans.shape[-1])]+['#wgx_pmean_rp%s'%i for i in range(Xmeans.shape[-1])]+['#wg+_pmed_rp%s'%i for i in range(Pmeds.shape[-1])]+['#wgx_pmed_rp%s'%i for i in range(Xmeds.shape[-1])])
 		return None
