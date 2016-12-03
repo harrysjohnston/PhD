@@ -763,7 +763,8 @@ class RealCatalogue:
 
 		BTanalysis = np.column_stack((Pmeans,Xmeans,Pmeds,Xmeds))
 		BTanalysis_root = join(toplotDir,'BTanalysis')
-		ascii.write(BTanalysis,BTanalysis_root,delimiter='\t',names=['#w(g+)_patch-means','#w(gx)_means','#w(g+)_meds','#w(gx)_meds'])
+		ascii.write(BTanalysis,BTanalysis_root,delimiter='\t',
+			names=['#wg+_pmean_rp%s'%i for i in range(Pmeans.shape[-1])]+['#wgx_pmean_rp%s'%i for i in range(Xmeans.shape[-1])]+['#wg+_pmed_rp%s'%i for i in range(Pmeds.shape[-1])]+['#wgx_pmed_rp%s'%i for i in range(Xmeds.shape[-1])])
 		return None
 
 	def jackknife_signals(self, patchDir, patchWeights, largePi):
