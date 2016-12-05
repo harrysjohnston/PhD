@@ -101,17 +101,7 @@ class RealCatalogue:
 		bitmask_cut = [True]*len(total_bitmasks)
 		if bitmask_[0] != None:
 			bitmask_ = bitmask_[0]
-
-			# bitmask_cut = []
-			# for bit_test in total_bitmasks:
-			#   for mask_ in bitmask_:
-			#       if (mask_ & bit_test == mask_):
-			#           bitmask_cut.append(False)
-			#           break
-			#       if mask_ == bitmask_[-1]:
-			#           bitmask_cut.append(True)
-
-			for i in np.arange(0,len(bitmask_)):
+			for i in range(len(bitmask_)):
 				# construct bitmask cut
 				bitmask_cut &= np.where(bitmask_[i] & total_bitmasks == bitmask_[i], False, True)
 
@@ -159,7 +149,6 @@ class RealCatalogue:
 		& isolate columns for wcorr
 
 		"""""
-
 		table = subsample
 		RA = np.deg2rad(table['RA_1_1'])
 		DEC = np.deg2rad(table['DEC_1_1'])
@@ -182,7 +171,6 @@ class RealCatalogue:
 		comov = Planck13.comoving_distance(Z)
 		comov *= h
 		new_table = np.column_stack((RA, DEC, comov, e1, e2, e_weight))
-		# new_table1 = new_table[enans]
 
 		self.samplecounts.append(len(new_table))
 
@@ -248,7 +236,7 @@ class RealCatalogue:
 		'date']
 
 		for combo in wcorr_combos: 
-			# write 4x wcorr-calls to .sh script, & another 4x if largePi
+			# write 4x wcorr-calls to .sh script, & another 4x if largePi testing
 			shell_script.append('')
 			outfile = combo[4]
 			shell_script.append('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0' %   (files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile, nproc)
@@ -269,7 +257,7 @@ class RealCatalogue:
 		Write.write(str(Text))
 		Write.close()
 
-		wcorr_spec = [] # record parameters used in wcorr
+		wcorr_spec = [] # record wcorr specification
 		wcorr_spec.append('Comoving transverse separation r_p: %s - %s Mpc/h in %s log-spaced bins'%(rp_lims[0], rp_lims[1], rp_bins))
 		wcorr_spec.append('Comoving line-of-sight separation \Pi: %s - %s Mpc/h in %s bins'%(los_lim*(-1), los_lim, los_bins))
 		wcorr_spec.append('No. processors: %s'%nproc)
@@ -351,120 +339,6 @@ class RealCatalogue:
 				reducedData = zip(realData[0][:,0], realData[i][:,3], realData[i][:,4], propgErrs) # = [r_p, wgplus, wgcross, wgerr]
 				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wgplus', 'wgcross', 'wgerr'], formats={'r_p':np.float32, 'wgplus':np.float32, 'wgcross':np.float32, 'wgerr':np.float32})
 
-		r_p = realData[0][:,0]
-		x = np.linspace(0, r_p.max()*1.8)
-		if BT:
-			data = [wgplus,wgcross,Pproperrs,Xproperrs]
-			f, axarr = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(15,10))
-			f.subplots_adjust(hspace=0, wspace=0)
-			axarr[0,0].errorbar(r_p,data[0][0],yerr=data[2][0],elinewidth=2, color='r', capsize=1,label='w(g+)',fmt='o')
-			axarr[0,0].errorbar(r_p,data[1][0],yerr=data[3][0],elinewidth=2, color='g', capsize=1,label='w(gx)',alpha=0.5,fmt='^')
-			axarr[0,1].errorbar(r_p,data[0][1],yerr=data[2][1],elinewidth=2, color='b', capsize=1,label='w(g+)',fmt='o')
-			axarr[0,1].errorbar(r_p,data[1][1],yerr=data[3][1],elinewidth=2, color='g', capsize=1,label='w(gx)',alpha=0.5,fmt='^')
-			axarr[1,0].errorbar(r_p,data[0][2],yerr=data[2][2],elinewidth=2, color='r', capsize=1,label='w(g+)',fmt='o')
-			axarr[1,0].errorbar(r_p,data[1][2],yerr=data[3][2],elinewidth=2, color='g', capsize=1,label='w(gx)',alpha=0.5,fmt='^')
-			axarr[1,1].errorbar(r_p,data[0][3],yerr=data[2][3],elinewidth=2, color='b', capsize=1,label='w(g+)',fmt='o')
-			axarr[1,1].errorbar(r_p,data[1][3],yerr=data[3][3],elinewidth=2, color='g', capsize=1,label='w(gx)',alpha=0.5,fmt='^')
-			arr_ind = [(0,0), (0,1), (1,0), (1,1)]
-			for i, ind in enumerate(arr_ind):
-				a = axarr[ind]
-				a.set_xscale('log')
-				a.set_xlim(0.25,70)
-				a.set_ylim(-0.5,0.4)
-				a.plot(x, [0]*len(x), lw=2, ls='--', color='c')
-				# a.set_xlabel('Comoving transverse separation (Mpc/h)')
-				# a.set_ylabel('Correlations')
-				a.set_title('%s'%wcorrIDs[i], fontsize=12)
-				a.legend(loc='upper right')
-				a.grid()
-			plt.setp([a.get_xticklabels() for a in axarr[0, :]], visible=False)
-			plt.setp([a.get_yticklabels() for a in axarr[:, 1]], visible=False)
-			# plt.setp([a.get_xlabels() for a in axarr[:, 1]], visible=False)
-			axarr[1,0].set_xlabel('Comoving transverse separation (Mpc/h)')
-			axarr[1,0].set_ylabel('Correlations')
-			ZC = np.loadtxt(join(files_path, 'ZC_cuts'), delimiter=',')
-			axarr[1,1].set_xlabel('Cuts: z%s, c%s'%(ZC[0],ZC[1]))
-			if largePi:
-				axarr[1,1].set_xlabel('largePi test, Cuts: z%s, c%s'%(ZC[0],ZC[1]))
-
-			plotsDir = join(files_path, 'Plots')
-			if not isdir(plotsDir):
-				mkdir(plotsDir)
-
-			if 'largePi' in wcorrOutputs[0]:
-				outimg = join(plotsDir, 'wcorr_z%s_c%s_largePi.pdf'%(ZC[0],ZC[1]))
-			else:
-				outimg = join(plotsDir, 'wcorr_z%s_c%s.pdf'%(ZC[0],ZC[1]))
-			f.savefig(outimg)
-			try:
-				plt.show()
-			except RuntimeError:
-				print("can't show plot :(")
-		else:
-			dataPoints = [[wgplus,wgcross,wgerr],[rand_wgplus,rand_wgcross,rand_wgerr]]
-			prefix = ['','rand_']
-			for j, set_ in enumerate(dataPoints): 
-				# plot/save random-subtracted-reals, AND randoms
-				f, axarr = plt.subplots(2, 2, sharex=True, sharey=True, figsize=(15,10))
-				f.subplots_adjust(hspace=0, wspace=0)
-				axarr[0,0].errorbar(r_p, set_[0][0], yerr=set_[2][0],
-				elinewidth=2, color='r', capsize=0,
-				label='w(g+)')
-				axarr[0,0].errorbar(r_p, set_[1][0], yerr=set_[2][0],
-				elinewidth=2, color='g', capsize=0,
-				label='w(gx)', alpha=0.5)
-				axarr[0,1].errorbar(r_p, set_[0][1], yerr=set_[2][1],
-				elinewidth=2, color='b', capsize=0,
-				label='w(g+)')
-				axarr[0,1].errorbar(r_p, set_[1][1], yerr=set_[2][1],
-				elinewidth=2, color='g', capsize=0,
-				label='w(gx)', alpha=0.5)
-				axarr[1,0].errorbar(r_p, set_[0][2], yerr=set_[2][2],
-				elinewidth=2, color='r', capsize=0,
-				label='w(g+)')
-				axarr[1,0].errorbar(r_p, set_[1][2], yerr=set_[2][2],
-				elinewidth=2, color='g', capsize=0,
-				label='w(gx)', alpha=0.5)
-				axarr[1,1].errorbar(r_p, set_[0][3], yerr=set_[2][3],
-				elinewidth=2, color='b', capsize=0,
-				label='w(g+)')
-				axarr[1,1].errorbar(r_p, set_[1][3], yerr=set_[2][3],
-				elinewidth=2, color='g', capsize=0,
-				label='w(gx)', alpha=0.5)
-			arr_ind = [(0,0), (0,1), (1,0), (1,1)]
-			for i, ind in enumerate(arr_ind):
-				a = axarr[ind]
-				a.set_xscale('log')
-				a.set_xlim(0.25,70)
-				a.set_ylim(-0.5,0.4)
-				a.plot(x, [0]*len(x), lw=2, ls='--', color='c')
-				# a.set_xlabel('Comoving transverse separation (Mpc/h)')
-				# a.set_ylabel('Correlations')
-				a.set_title('%s'%wcorrIDs[i], fontsize=12)
-				a.legend(loc='upper right')
-				a.grid()
-			plt.setp([a.get_xticklabels() for a in axarr[0, :]], visible=False)
-			plt.setp([a.get_yticklabels() for a in axarr[:, 1]], visible=False)
-			# plt.setp([a.get_xlabels() for a in axarr[:, 1]], visible=False)
-			axarr[1,0].set_xlabel('Comoving transverse separation (Mpc/h)')
-			axarr[1,0].set_ylabel('Correlations')
-			ZC = np.loadtxt(join(files_path, 'ZC_cuts'), delimiter=',')
-			axarr[1,1].set_xlabel('Cuts: z%s, c%s'%(ZC[0],ZC[1]))
-
-			plotsDir = join(files_path, 'Plots')
-			if not isdir(plotsDir):
-				mkdir(plotsDir)
-
-			if 'largePi' in wcorrOutputs[0]:
-				outimg = join(plotsDir, '%swcorr_z%s_c%s_largePi.pdf'%(prefix[j],ZC[0],ZC[1]))
-			else:
-				outimg = join(plotsDir, '%swcorr_z%s_c%s.pdf'%(prefix[j],ZC[0],ZC[1]))
-			f.savefig(outimg)
-			try:
-				plt.show()
-			except RuntimeError:
-				print("can't show plot :(")
-
 		return wcorrOutputs
 
 	def chiFunc(self, y, dof):
@@ -484,10 +358,10 @@ class RealCatalogue:
 
 		dataArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in wcorrList])
 		dataArr = np.array([[i[:,1],i[:,3]] for i in dataArr]) # +, x signals
-
 		covarArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in covarList])
 		covarSigma = []
 		chiFunc = lambda x: chi2.pdf(x, dof)
+		# compute chi2, p-values, significance for a) plus and b) cross signals
 		for j,ARR in enumerate([covarArr[:8],covarArr[8:]]):
 			for i,cov in enumerate(ARR):
 				cov = np.mat(cov)
@@ -498,11 +372,9 @@ class RealCatalogue:
 				p_val = scint.quad(chiFunc, fchi, np.inf)[0]
 				xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
 				covarSigma.append([fchi,p_val,xs])
-
 		covarSigma = np.array(covarSigma)
-
+		
 		chi2Stats = np.column_stack((covarList,covarSigma[:,0],covarSigma[:,1],covarSigma[:,2]))
-
 		ascii.write(chi2Stats, join(path2data,'%schi2'%covartype), delimiter='\t', names=['dataset','chi^2','p-val','x-sigma'])
 
 		return None
@@ -524,7 +396,6 @@ class RealCatalogue:
 		nonzeropix = GKskyFrac
 		GKskyFrac /= npix
 		GKskyFrac *= fullSky
-		print('Survey area: %.2f deg^2'%GKskyFrac)
 
 		# find masked pixel IDs
 		kidsBitmap = hp.read_map('/share/splinter/hj/PhD/KiDS_counts_N2048.fits', dtype=int)
@@ -538,16 +409,16 @@ class RealCatalogue:
 		lostfromGK = np.where(GKpix[lostpixIDs]!=0,1,0) #1=pixel-lost,0=not-lost
 		lostmap = np.bincount(lostpixIDs,minlength=npix)
 		hp.write_map(join(self.new_root,'lostpixmap.fits'),lostmap)
-		print('Lost npix, fraction of area: %s, %s'%(sum(lostfromGK),sum(lostfromGK)/sum(GKpix)))
+		print('Lost npix, fraction of area: %s, %.3f'%(sum(lostfromGK),sum(lostfromGK)/sum(GKpix)))
 		thetaPhis = hp.pix2ang(nside,lostpixIDs)
 		# lost pixel coords;
 		lostpixra,lostpixdec = np.rad2deg(thetaPhis[1]),(90.-np.rad2deg(thetaPhis[0]))
 		del kidsBitmap,lostmap
 		gc.collect()
 
-		# divide catalog.data into patches
-		raHist = np.histogram(ra, bins=100)
-		decHist = np.histogram(dec, bins=100)
+		# divide catalog.data into patches...
+		raHist = np.histogram(ra,bins=100)
+		decHist = np.histogram(dec,bins=100)
 		raCounts, raEdges = raHist
 		decCounts, decEdges = decHist
 		Counts, Edges = [raCounts, decCounts], [raEdges, decEdges]
@@ -569,9 +440,9 @@ class RealCatalogue:
 					Edges[i] = Edges[i][nonz[0]:]
 				else: # ...until absolute maxs in ra/dec
 					Uppers[i].append(Edges[i][-1])
-					count=[]
+					count=[] # kill while-loop
 
-		raLs,raUs,decLs,decUs = map(lambda x: np.array(x),[Lowers[0], Uppers[0], Lowers[1], Uppers[1]])
+		raLs,raUs,decLs,decUs = map(lambda x: np.array(x),[Lowers[0],Uppers[0],Lowers[1],Uppers[1]])
 		# ranges in ra/dec
 		deltaR = raUs-raLs
 		deltaD = decUs-decLs
@@ -590,7 +461,7 @@ class RealCatalogue:
 			rPatchside = deltaR/rLen
 			dPatchside = deltaD/dLen
 			patchAr = rPatchside*dPatchside
-			print('patchArs :',patchAr)
+			print('try patchArs :',patchAr)
 			newDiff = abs(patchAr-patchSize)
 			if newDiff[0]>initDiff[0]:
 				print('MISSED PATCH-AREA TARGET, reverting to closest..')
@@ -601,18 +472,17 @@ class RealCatalogue:
 				patchAr = rPatchside*dPatchside
 				print('patchArs :',patchAr)
 				break
-				# sys.exit()
-		[print('Patch areas (sqdeg): %.2f'%i) for i in patchAr] 
-		print('rSides (#,deg): ',rLen,rPatchside)
-		print('dSides (#,deg): ',dLen,dPatchside)
+		[print('region %s: %.2f deg^2'%(i,(i+1))) for i in patchAr] 
+		print('ra sides (#,deg): ',rLen,rPatchside)
+		print('dec sides (#,deg): ',dLen,dPatchside)
 		patch_Ars = np.array([[i]*(dLen[j])*(rLen[j]) for j,i in enumerate(patchAr)]).flatten()
 
 		# contsruct patch edges = 'ra/decPatches'
 		raLims = np.column_stack((raLs,raUs))
 		decLims = np.column_stack((decLs,decUs))
 
-		raPatches = [np.linspace(raLims[i][0],raLims[i][1],num=rLen[i]+1) for i in np.arange(0,len(raLims))]
-		decPatches = [np.linspace(decLims[i][0],decLims[i][1],num=dLen[i]+1) for i in np.arange(0,len(decLims))]
+		raPatches = [np.linspace(raLims[i][0],raLims[i][1],num=rLen[i]+1) for i in range(len(raLims))]
+		decPatches = [np.linspace(decLims[i][0],decLims[i][1],num=dLen[i]+1) for i in range(len(decLims))]
 		raPatches,decPatches = map(lambda x: np.array(x),[raPatches,decPatches])
 
 		# create column/row cuts from patch edges
@@ -620,16 +490,28 @@ class RealCatalogue:
 		decCuts = []
 		pixraCuts = []
 		pixdecCuts = []
-		for j in np.arange(0,len(raPatches)):
-			raCuts.append(np.array([np.where((ra>=raPatches[j][i])&(ra<=raPatches[j][i+1]),True,False) for i in np.arange(0,len(raPatches[j])-1)]))
-			# AND DEFINE FROM lostpixra
-			pixraCuts.append(np.array([np.where((lostpixra>=raPatches[j][i])&(lostpixra<=raPatches[j][i+1]),True,False) for i in np.arange(0,len(raPatches[j])-1)]))
-		for j in np.arange(0,len(decPatches)):
-			decCuts.append(np.array([np.where((dec>=decPatches[j][i])&(dec<=decPatches[j][i+1]),True,False) for i in np.arange(0,len(decPatches[j])-1)]))
-			# AND DEFINE FROM lostpixdec
-			pixdecCuts.append(np.array([np.where((lostpixdec>=decPatches[j][i])&(lostpixdec<=decPatches[j][i+1]),True,False) for i in np.arange(0,len(decPatches[j])-1)]))
+		for j in range(len(raPatches)):
+			raCuts.append(np.array(
+				[np.where((ra>=raPatches[j][i])&(ra<=raPatches[j][i+1]),True,False) for i in range(len(raPatches[j])-1)]
+				)
+			)
+			# and define from lostpixra
+			pixraCuts.append(np.array(
+				[np.where((lostpixra>=raPatches[j][i])&(lostpixra<=raPatches[j][i+1]),True,False) for i in range(len(raPatches[j])-1)]
+				)
+			)
+		for j in range(len(decPatches)):
+			decCuts.append(np.array(
+				[np.where((dec>=decPatches[j][i])&(dec<=decPatches[j][i+1]),True,False) for i in range(len(decPatches[j])-1)]
+				)
+			)
+			# and define from lostpixdec
+			pixdecCuts.append(np.array(
+				[np.where((lostpixdec>=decPatches[j][i])&(lostpixdec<=decPatches[j][i+1]),True,False) for i in np.arange(0,len(decPatches[j])-1)]
+				)
+			)
 
-		raCuts,decCuts,pixraCuts,pixdecCuts = map(lambda x: np.array(x), [raCuts, decCuts,pixraCuts,pixdecCuts])
+		raCuts,decCuts,pixraCuts,pixdecCuts = map(lambda x: np.array(x),[raCuts,decCuts,pixraCuts,pixdecCuts])
 		raCuts,decCuts,pixraCuts,pixdecCuts = map(lambda x: x.reshape(-1,x.shape[-1]),[raCuts,decCuts,pixraCuts,pixdecCuts]) # flatten 3 cut-arrays (from 3 survey regions) into 1
 
 		# combine into patch-cuts
@@ -641,20 +523,19 @@ class RealCatalogue:
 			[pixpatchCuts.append(i&j) for i in pixraCuts]
 		patchCuts = np.array(patchCuts)
 		pixpatchCuts = np.array(pixpatchCuts)
-		print('pixpatchCuts shape: (%s, %s)'%pixpatchCuts.shape)
-		assert patchCuts.shape[0] == raCuts.shape[0]*decCuts.shape[0], 'patch-cuts broken'
+		print('pixpatchCuts shape (patches,pixels): (%s, %s)'%pixpatchCuts.shape)
+		assert patchCuts.shape[0] == raCuts.shape[0]*decCuts.shape[0],'patch-cuts broken'
 
-		# combine patch & z/colour cuts
+		# combine patch & z/colour cuts, coerce into ndarrays for slicing
 		highzR_pcuts = [(self.zcut&self.redcut&self.bitmaskcut&self.BCG_sc&pc) for pc in patchCuts]
 		highzB_pcuts = [(self.zcut&self.bluecut&self.bitmaskcut&self.BCG_sc&pc) for pc in patchCuts]
 		lowzR_pcuts = [(self.zcut_r&self.redcut&self.bitmaskcut&self.BCG_sc&pc) for pc in patchCuts]
 		lowzB_pcuts = [(self.zcut_r&self.bluecut&self.bitmaskcut&self.BCG_sc&pc) for pc in patchCuts]
 		highz_pcuts = [(self.zcut&self.BCG_dc&pc) for pc in patchCuts]
 		lowz_pcuts = [(self.zcut_r&self.BCG_dc&pc) for pc in patchCuts]
-
 		highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts = map(lambda x: np.array(x),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts])
 
-		# cut data into 6xpatch-arrays, each element of which is a fits-table
+		# cut data into 6xpatch-arrays, w/ each element is a fits-table
 		hizR_patches,hizB_patches,lozR_patches,lozB_patches,hiz_patches,loz_patches = map(lambda x: np.array([self.data[pc] for pc in x]),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts])
 
 		del highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts
@@ -666,7 +547,8 @@ class RealCatalogue:
 		npixLost = np.array([np.count_nonzero(i) for i in pixpatchCuts])
 		pArLost = npixLost*pixar
 		weights = 1-(pArLost/patch_Ars)
-		self.patchWeights = np.where(weights>0,weights,0)
+		assert all(weights>0),'patch-weighting broken'
+		self.patchWeights = weights
 		print('patch weights: ',self.patchWeights)
 
 		return self.patchedData, self.patchWeights
@@ -690,7 +572,7 @@ class RealCatalogue:
 		dpatches = listdir(dDir)
 		dpatches.sort()
 		os.system('cp %s/* %s'%(dDir,patchDir))
-		print('BCGcuts: shape=%s, dens=%s'%(self.BCGargs[0],self.BCGargs[1]))
+		print('is BCGs: shape=%s, dens=%s'%(self.BCGargs[0],self.BCGargs[1]))
 		for i,p in enumerate(patches):
 			pCount = len(np.loadtxt(join(patchDir,p)))
 			dCount = len(np.loadtxt(join(patchDir,dpatches[i])))
@@ -700,7 +582,6 @@ class RealCatalogue:
 				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s_largePi %s 1 0'%(patchDir,dpatches[i],dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-9],nproc))
 			del pCount,dCount
 			gc.collect()
-			#break
 
 	def bootstrap_signals(self, patchDir, patchWeights, largePi):
 		pwcorrs = [x for x in listdir(patchDir) if ('.dat' in x)&('Pi' not in x)]
@@ -708,7 +589,7 @@ class RealCatalogue:
 			pwcorrs = [x for x in listdir(patchDir) if 'Pi' in x]
 		psigs = []
 		for i,x in enumerate(pwcorrs):
-			path = join(patchDir, x)
+			path = join(patchDir,x)
 			data = np.array(np.loadtxt(path))
 			psigs.append([data[:,3],data[:,4],[patchWeights[i]]*len(data[:,3])])
 			# [+, x, pweight]
@@ -719,6 +600,8 @@ class RealCatalogue:
 		wgcross = BTsignals[:,:,1,:]
 		pws = BTsignals[:,:,2,:]
 		# shape = (BTs, patch-signal/weight, rp bins)
+		del BTsignals,psigs
+		gc.collect()
 
 		# calculate mean over patches (weighted)
 		Pmeans = np.average(wgplus,axis=1,weights=pws)
@@ -726,6 +609,8 @@ class RealCatalogue:
 		Pmeds = np.median(wgplus,axis=1)
 		Xmeds = np.median(wgcross,axis=1)
 		# shape = (BTs, mean/med-signal-in-rp-bin)
+		del wgplus,wgcross
+		gc.collect()
 
 		# calculate covariance matrix & corr-coeffs (for +)
 		covP = np.cov(Pmeans,rowvar=0)
@@ -773,13 +658,13 @@ class RealCatalogue:
 			pwcorrs = [x for x in listdir(patchDir) if 'Pi' in x]
 		psigs = []
 		for i,x in enumerate(pwcorrs):
-			path = join(patchDir, x)
+			path = join(patchDir,x)
 			data = np.array(np.loadtxt(path))
 			psigs.append([data[:,3],data[:,4],[patchWeights[i]]*len(data[:,3])]) 
 			# [+, x, pws]
 		psigs = np.array(psigs)
 
-		# construct delete-one jackknife resampling of patches
+		# construct delete-one jackknife resample of patches
 		ps_shape = psigs.shape
 		Nps = ps_shape[0]
 		JKsignals = np.empty([Nps,Nps-1,ps_shape[1],ps_shape[2]])
@@ -798,6 +683,14 @@ class RealCatalogue:
 		corrcoeffX = np.corrcoef(Xmeans,rowvar=0)
 		Pstds = np.std(Pmeans,axis=0)
 		Xstds = np.std(Xmeans,axis=0)
+		del JKsignals,psigs,wgplus,wgcross
+		gc.collect()
+
+		# Variance across jackknife samples (i.e. N-1 patches) unrealistically small...
+		# and r_p bins highly correlated...
+		# -> significances blowing up
+		# Should I be removing 1 patch and then correlating the ENTIRE remaining sample,
+		# once for each patch, and then performing analysis?
 
 		JKstds = np.column_stack((Pstds,Xstds))
 		label = basename(normpath(patchDir))
@@ -929,13 +822,13 @@ if __name__ == "__main__":
 	parser.add_argument(
 	'-zCut',
 	type=np.float32,
-	help='lowZ vs. highZ redshift threshold, between 0 - 0.5. Omit for no redshift cut',
-	default=None)
+	help='lowZ vs. highZ redshift threshold, between 0 - 0.5. Defaults to 0.22, set to 0 for no redshift cut',
+	default=0.22)
 	parser.add_argument(
 	'-cCut',
 	type=np.float32,
-	help='red vs. blue colour threshold, between 0 - 1.4 (meaningfully, between approx 0.7 - 1.1). Omit for no colour cut',
-	default=None)
+	help='red vs. blue colour threshold, between 0 - 1.4 (meaningfully, between approx 0.7 - 1.1). Defaults to 1.0, set to 0 for no colour cut',
+	default=1.0)
 	parser.add_argument(
 	'-bitmaskCut',
 	nargs='*',
@@ -991,25 +884,25 @@ if __name__ == "__main__":
 	default=None)
 	parser.add_argument(
 	'-plot',
-	help='plot data & save figure after correlations completed (1), or not (0), defaults to 1',
+	help='reduce data & save for easy plotting, after correlations completed (1), or not (0), defaults to 1',
 	choices=[0,1],
 	type=int,
 	default=1)
 	parser.add_argument(
 	'-plotNow',
-	help='plot ALREADY EXISTING correlation data (1), having given arg="Path" as the path to the .dat files (Catalog arg must still be path of readable .fits catalog). Bypasses all other sampling functions. Defaults to 0',
+	help='bypass sampling functions and reduce/save data for plotting (1), or not (0). Sampling and correlations must be ALREADY COMPLETED i.e. "raw" data already existing. Give arg="Path" as the path to the .dat files (Catalog arg must still be path of readable .fits catalog). Defaults to 0',
 	choices=[0,1],
 	type=int,
 	default=0)
 	parser.add_argument(
 	'-chiSqu',
-	help='calc chi^2 stats for ALREADY EXISTING correlation data (1), having given arg="Path" as the path to the .dat files (Catalog arg must still be path of readable .fits catalog). Bypasses all other sampling functions. Defaults to 0',
+	help='bypass sampling functions and calc chi^2 stats from reduced correlation data (1), or not (0). Give arg="Path" as the path to the .dat files (Catalog arg must still be path of readable .fits catalog). Defaults to 0',
 	choices=[0,1],
 	type=int,
 	default=0)
 	parser.add_argument(
 	'-expec',
-	help='expectation values for chi^2 statistics, defaults to zeros at all points',
+	help='model values for chi^2 statistics. Defaults to zeros at all points i.e. chi2 testing for signal detection',
 	default=0)
 	parser.add_argument(
 	'-bootstrap',
@@ -1043,7 +936,7 @@ if __name__ == "__main__":
 	catalog = RealCatalogue(args.Catalog)
 
 	if args.plotNow:
-		# plot .dat files, returning filename-list
+		# reduce & save data files, returning filename-list
 		print('PLOTTING')
 		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels, args.bootstrap, args.jackknife, 0)
 		largePi_outs = [basename(normpath(out[:-4] + '_largePi.dat')) for out in wcorrOuts]
