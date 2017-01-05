@@ -26,12 +26,19 @@ import astropy.stats as astat
 
 class RealCatalogue:
 
-	def __init__(self, path):
+	def __init__(self, path, DEI):
 		"""""
 		read-in catalogue
 
 		"""""
 		self.path = path
+		KSBheads = ['RA_1_1','DEC_1_1','Z_1_1','e1c','e2c','RankBCG_1','pgm','absmag_g_1','absmag_i_1','col3']
+		DEIheads = ['RA_GAMA','DEC_GAMA','Z','e1','e2','RankBCG','pgm','absmag_g_1','absmag_i_1','MASK']
+		if DEI:
+			self.headers = DEIheads
+			self.DEI = 1
+		else:
+			self.headers = KSBheads
 		hdulist = fits.open(path)
 		self.data = hdulist[1].data
 		self.columns = hdulist[1].columns.names
@@ -46,13 +53,8 @@ class RealCatalogue:
 		PGM, & into subsamples
 
 		"""""
-		assert 'RA_1_1' in self.columns, "'RA_1_1' not in columns, see column headers: "+ str(self.columns)
-		assert 'DEC_1_1' in self.columns, "'DEC_1_1' not in columns, see column headers: "+ str(self.columns)
-		assert 'pgm' in self.columns, "'pgm' not in columns, see column headers: "+ str(self.columns)
-		assert 'Z_1_1' in self.columns, "'Z_1_1' not in columns, see column headers: "+ str(self.columns)
-		assert 'absmag_g_1' in self.columns, "'absmag_g_1' not in columns, see column headers: "+ str(self.columns)
-		assert 'absmag_i_1' in self.columns, "'absmag_i_1' not in columns, see column headers: "+ str(self.columns)
-		assert 'col3' in self.columns, "'col3' not in columns, see column headers: "+ str(self.columns)
+		for head in self.headers:
+			assert head in self.columns, "'%s' not in columns, see headers: %s"%(head,self.columns)
 
 		self.zstr = '%.f'%z_
 		self.cstr = '%.f'%colour_
@@ -69,16 +71,18 @@ class RealCatalogue:
 		#   self.data = self.data[duplicateCut]
 		#   print('Removed %s duplicates in %s' % ((len(duplicateCut)-len(self.data)), col[:-2]))
 
+		self.pre_count = len(self.data)
+		z = self.data[self.headers[2]]
+		self.pre_z = z
+		colour = self.data[self.headers[-3]] - self.data[self.headers[-2]]
+		total_bitmasks = self.data[self.headers[-1]]
+
 		pgm = self.data['pgm']
+		if self.DEI:
+			pgm = np.ones_like(pgm)
 		pgm_cut = np.array((pgm > pgm_))
 		zeroPgm_cut = np.array((pgm != 0))
 		print('pgm cut: \t', np.unique(pgm_cut))
-
-		self.pre_count = len(self.data)
-		z = self.data['z_1_1']
-		self.pre_z = z
-		colour = self.data['absmag_g_1'] - self.data['absmag_i_1']
-		total_bitmasks = self.data['col3']
 
 		# define colour, redshift, bitmask & BCG cuts
 		if colour_ != None:
@@ -109,7 +113,7 @@ class RealCatalogue:
 			bitmask_cut = np.array(bitmask_cut)
 			print('bitmask cut: \t', np.unique(bitmask_cut))
 
-		BCGcut = np.where(self.data['RankBCG_1']==1,True,False)
+		BCGcut = np.where(self.data[self.headers[5]]==1,True,False)
 		BCG_dc = [True]*len(self.data)
 		BCG_sc = BCG_dc
 		BCGargs = [0,0]
@@ -150,12 +154,14 @@ class RealCatalogue:
 
 		"""""
 		table = subsample
-		RA = np.deg2rad(table['RA_1_1'])
-		DEC = np.deg2rad(table['DEC_1_1'])
-		Z = table['Z_1_1']
+		RA = np.deg2rad(table[self.headers[0]])
+		DEC = np.deg2rad(table[self.headers[1]])
+		Z = table[self.headers[2]]
 		pgm = table['pgm']
-		e1 = table['e1c']/pgm
-		e2 = table['e2c']/pgm
+		if self.DEI:
+			pgm = np.ones_like(pgm)
+		e1 = table[self.headers[3]]/pgm
+		e2 = table[self.headers[4]]/pgm
 		e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
 		e_weight = np.where(pgm<0.1,0,pgm)
 		e1,e2,e_weight = map(lambda x: np.nan_to_num(x), [e1,e2,e_weight])
@@ -402,7 +408,7 @@ class RealCatalogue:
 		bitmask_cut = [True]*len(kidsBitmap)
 		if bitmask_[0] != None:
 			bitmask_ = bitmask_[0]
-			for i in np.arange(0,len(bitmask_)):
+			for i in range(len(bitmask_)):
 				# construct bitmask cut
 				bitmask_cut &= np.where(bitmask_[i] & kidsBitmap == bitmask_[i], False, True)
 		lostpixIDs = [j for j,b in enumerate(bitmask_cut) if b==False]
@@ -507,7 +513,7 @@ class RealCatalogue:
 			)
 			# and define from lostpixdec
 			pixdecCuts.append(np.array(
-				[np.where((lostpixdec>=decPatches[j][i])&(lostpixdec<=decPatches[j][i+1]),True,False) for i in np.arange(0,len(decPatches[j])-1)]
+				[np.where((lostpixdec>=decPatches[j][i])&(lostpixdec<=decPatches[j][i+1]),True,False) for i in range(len(decPatches[j])-1)]
 				)
 			)
 
@@ -931,9 +937,14 @@ if __name__ == "__main__":
 	help='select only BCGs for shapes samples (1) or not (0), defaults to 0',
 	type=int,
 	default=0)
+	parser.add_argument(
+	'-DEIMOS',
+	help='DEIMOS shapes (1), or KSB shapes (0), defaults to 1',
+	type=int,
+	default=1)
 	args = parser.parse_args()
 
-	catalog = RealCatalogue(args.Catalog)
+	catalog = RealCatalogue(args.Catalog, args.DEIMOS)
 
 	if args.plotNow:
 		# reduce & save data files, returning filename-list
