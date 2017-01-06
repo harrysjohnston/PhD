@@ -164,6 +164,8 @@ class RealCatalogue:
 		e2 = table[self.headers[4]]/pgm
 		e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
 		e_weight = np.where(pgm<0.1,0,pgm)
+		if self.DEI:
+			e_weight = np.where(table['flag_DEIMOS']=='0000',1,0)
 		e1,e2,e_weight = map(lambda x: np.nan_to_num(x), [e1,e2,e_weight])
 
 		# random re-shuffle test - density-shape corr should now ~ 0
@@ -478,7 +480,7 @@ class RealCatalogue:
 				patchAr = rPatchside*dPatchside
 				print('patchArs :',patchAr)
 				break
-		[print('region %s: %.2f deg^2'%(i,(i+1))) for i in patchAr] 
+		[print('region %s: %.2f deg^2'%(j+1,i) for j,i in enumerate(patchAr)] 
 		print('ra sides (#,deg): ',rLen,rPatchside)
 		print('dec sides (#,deg): ',dLen,dPatchside)
 		patch_Ars = np.array([[i]*(dLen[j])*(rLen[j]) for j,i in enumerate(patchAr)]).flatten()
@@ -654,8 +656,10 @@ class RealCatalogue:
 
 		BTanalysis = np.column_stack((Pmeans,Xmeans,Pmeds,Xmeds))
 		BTanalysis_root = join(toplotDir,'BTanalysis_%s'%label)
-		ascii.write(BTanalysis,BTanalysis_root,delimiter='\t',
-			names=['#wg+_pmean_rp%s'%i for i in range(Pmeans.shape[-1])]+['#wgx_pmean_rp%s'%i for i in range(Xmeans.shape[-1])]+['#wg+_pmed_rp%s'%i for i in range(Pmeds.shape[-1])]+['#wgx_pmed_rp%s'%i for i in range(Xmeds.shape[-1])])
+		# ascii.write(BTanalysis,BTanalysis_root,delimiter='\t',
+		# 	names=['#wg+_pmean_rp%s'%i for i in range(Pmeans.shape[-1])]+['#wgx_pmean_rp%s'%i for i in range(Xmeans.shape[-1])]+['#wg+_pmed_rp%s'%i for i in range(Pmeds.shape[-1])]+['#wgx_pmed_rp%s'%i for i in range(Xmeds.shape[-1])])
+		del BTanalysis
+		gc.collect()
 		return None
 
 	def jackknife_signals(self, patchDir, patchWeights, largePi):
