@@ -16,14 +16,21 @@ def setup(options):
     power_section = options[option_section,'power_section'] # options[] must be in .ini
     nbin = options[option_section,'nbin']
     make_nz = options.get_bool(option_section,'make_nz',default=False)
+    nz_section = options.get_string(option_section,'nz_section',default=None)
     cat_path = options.get_string(option_section,'catalog_path',default=None)
     nz = options.get_int(option_section,'nz',default=None)
     outfile = options.get_string(option_section,'outfile',default=None)
 
-    # optionally, generate n(z) ascii file for later use
+    # optionally, generate ascii & save info on n(z) into datablock
     if make_nz:
         gal_z = read_z(cat_path)
-        create_nz(gal_z,nz,nbin,outfile)
+        z_mids,nofz = create_nz(gal_z,nz,nbin,outfile)
+        block.put_double_array_1d(nz_section,'z',z_mids)
+        block.put_grid(nz_section,'nz',nz,'nbin',nbin)
+        for i in range(len(nofz)):
+            bin_nz = np.zeros_like(nofz)
+            bin_nz[i] = nofz[i]
+            block.put_double_array_1d(power_section,'bin_%s'%(i+1),bin_nz)
 
     # return the config for execute fn
     return (power_section,nbin)

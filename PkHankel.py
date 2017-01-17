@@ -15,6 +15,7 @@ def read_z(path):
 
 def create_nz(gal_z,nz,nbin,outfile):
     # NOTE: this is written specifically for zrange=[0,0.5]
+    # AND would need editing for:  nz != nbin 
     z_hist = np.histogram(gal_z,bins=nz,range=(0.,0.5))
     n_of_z = z_hist[0]
     x = z_hist[1]
@@ -27,7 +28,7 @@ def create_nz(gal_z,nz,nbin,outfile):
             (bin_ranges[i]<=z_mids)&(z_mids<bin_ranges[i+1]),n_of_z,0)
     # outfile = outfile+'_nz%snbin%s.asc'%(nz,nbin)
     ascii.write(nz_table,outfile,names=['#z_mid']+['#bin_%s'%(i+1) for i in range(nbin)],delimiter='\t')
-    return n_of_z
+    return z_mids,n_of_z
 
 def cut_krange(k_h,p_k,kmin=10**-2.2,kmax=10**1.2):
     # limit range in k, prior to FFT (Hankel transfm), to avoid ringing
