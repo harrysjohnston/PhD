@@ -25,20 +25,16 @@ def setup(options):
     if make_nz:
         gal_z = read_z(cat_path)
         z_mids,nofz = create_nz(gal_z,nz,nbin,outfile)
-        block.put_double_array_1d(nz_section,'z',z_mids)
-        block.put_grid(nz_section,'nz',nz,'nbin',nbin)
-        for i in range(len(nofz)):
-            bin_nz = np.zeros_like(nofz)
-            bin_nz[i] = nofz[i]
-            block.put_double_array_1d(power_section,'bin_%s'%(i+1),bin_nz)
+    else:
+        z_mids,nofz = (None,None)
 
     # return the config for execute fn
-    return (power_section,nbin)
+    return (power_section,nbin,make_nz,z_mids,nofz,nz_section)
 
 def execute(block, config):
     # this function is called every time you have a new sample of cosmological and other parameters
     # collect config variables
-    power_section,nbin = config
+    power_section,nbin,make_nz,z_mids,nofz,nz_section = config
 
     # load from datablock
     k_h = block[power_section,'k_h']
@@ -52,6 +48,14 @@ def execute(block, config):
     block.put_int(power_section,'nbin',nbin)
     for i in range(len(p_k)):
         block.put_double_array_1d(power_section,'bin_%s_%s'%(i+1,i+1),p_k[i])
+
+    if make_nz:
+        block.put_double_array_1d(nz_section,'z',z_mids)
+        block.put_grid(nz_section,'nz',nz,'nbin',nbin)
+        for i in range(len(nofz)):
+            bin_nz = np.zeros_like(nofz)
+            bin_nz[i] = nofz[i]
+            block.put_double_array_1d(nz_section,'bin_%s'%(i+1),bin_nz)
 
     # return zero == all done, no probs
     return 0
