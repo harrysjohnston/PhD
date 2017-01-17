@@ -480,7 +480,7 @@ class RealCatalogue:
 				patchAr = rPatchside*dPatchside
 				print('patchArs :',patchAr)
 				break
-		[print('region %s: %.2f deg^2'%(j+1,patchAr[j]) for j in range(len(patchAr))] 
+		[print('region %s: %.2f deg^2'%(j+1,patchAr[j])) for j in range(len(patchAr))] 
 		print('ra sides (#,deg): ',rLen,rPatchside)
 		print('dec sides (#,deg): ',dLen,dPatchside)
 		patch_Ars = np.array([[i]*(dLen[j])*(rLen[j]) for j,i in enumerate(patchAr)]).flatten()
