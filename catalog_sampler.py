@@ -419,9 +419,12 @@ class RealCatalogue:
 		lostmap = np.bincount(lostpixIDs,minlength=npix)
 		hp.write_map(join(self.new_root,'lostpixmap.fits'),lostmap)
 		print('Lost npix, fraction of area: %s, %.3f'%(sum(lostfromGK),sum(lostfromGK)/sum(GKpix)))
-		thetaPhis = hp.pix2ang(nside,lostpixIDs)
-		# lost pixel coords;
-		lostpixra,lostpixdec = np.rad2deg(thetaPhis[1]),(90.-np.rad2deg(thetaPhis[0]))
+		if lostpixIDs != []:
+			thetaPhis = hp.pix2ang(nside,lostpixIDs)
+			# lost pixel coords;
+			lostpixra,lostpixdec = np.rad2deg(thetaPhis[1]),(90.-np.rad2deg(thetaPhis[0]))
+		else:
+			lostpixra,lostpixdec = (1e3,1e3)
 		del kidsBitmap,lostmap
 		gc.collect()
 
