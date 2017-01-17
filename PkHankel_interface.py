@@ -43,7 +43,7 @@ def execute(block, config):
     k_h,p_k = cut_krange(k_h,p_k, kmin=10**-2.2, kmax=10**1.2) # k-limits in h/Mpc
     block.put_double_array_1d(power_section,'ell',k_h)
     block.put_int(power_section,'nbin',nbin)
-    for i in xrange(p_k):
+    for i in range(len(p_k)):
         block.put_double_array_1d(power_section,'bin_%s_%s'%(i,i),p_k[i])
 
     # return zero == all done, no probs
