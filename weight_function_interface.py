@@ -36,7 +36,7 @@ def execute(block, config):
 
     # compute W(z), wgp(r)
     Wz = compute_Wz(z,nofz)
-    wgp_r = compute_wgp(Wz,wgp_rz,nbin)
+    wgp_r = compute_wgp(Wz,wgp_rz,nbin,dz)
     block.put_double_array_1d(wgp_section,'wgp(r_p)',wgp_r)
     block.put_double_array_1d(wgp_section,'W(z)',Wz)
 

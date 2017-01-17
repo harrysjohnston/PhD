@@ -30,7 +30,7 @@ def compute_Wz(z,nofz):
     Wz = Wz_nom/Wz_dom
     return Wz # WILL NEED TO EDIT FOR HIGH- & LOW-Z 
 
-def compute_wgp(Wz,wgp_rz,nbin):
+def compute_wgp(Wz,wgp_rz,nbin,dz):
     # Riemann sum over W(z) for wgp(r,z) -> wgp(r)
     for i in range(nbin):
         wgp_rz[i] *= Wz[i]
