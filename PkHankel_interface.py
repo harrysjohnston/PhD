@@ -1,4 +1,5 @@
 from cosmosis.datablock import names, option_section
+import numpy as np
 from PkHankel import read_z
 from PkHankel import create_nz
 from PkHankel import cut_krange

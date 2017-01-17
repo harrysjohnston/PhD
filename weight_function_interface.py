@@ -31,7 +31,7 @@ def execute(block, config):
     z = block[nz_section,'z']
     dz = z[1]-z[0]
     wgp_rz = np.array([block[wgp_section,'bin_%s_%s'%(i+1,i+1)] for i in range(nbin)])
-    bin_popns = tuple([block[nz_section,"bin_%s"%(i+1)] for i in range(nbin)])
+    bin_popns = [block[nz_section,"bin_%s"%(i+1)] for i in range(nbin)]
 
     # compute W(z), wgp(r)
     Wz = compute_Wz(z,bin_popns)
