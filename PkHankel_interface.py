@@ -1,6 +1,7 @@
 from cosmosis.datablock import names, option_section
 from PkHankel import read_z
 from PkHankel import create_nz
+from PkHankel import cut_krange
 
 # We have a collection of commonly used pre-defined block section names.
 # If none of the names here is relevant for your calculation you can use any
@@ -33,12 +34,13 @@ def execute(block, config):
     power_section,nbin = config
 
     # load from datablock
-    k_h = block[power_section,'k_h'] # CUT K-RANGE & P(k)'s here !
+    k_h = block[power_section,'k_h']
     p_k = block[power_section,'p_k']
 
     # execute main function
     # aim for simplicity
-    # here, saving k,P(k) back to db in format for Hankel transfm
+    # here, cutting k,P(k) & saving back to db in format for Hankel transfm
+    k_h,p_k = cut_krange(k_h,p_k, kmin=10**-2.2, kmax=10**1.2) # k-limits in h/Mpc
     block.put_double_array_1d(power_section,'ell',k_h)
     block.put_int(power_section,'nbin',nbin)
     for i in xrange(p_k):
