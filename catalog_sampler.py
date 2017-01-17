@@ -39,6 +39,7 @@ class RealCatalogue:
 			self.DEI = 1
 		else:
 			self.headers = KSBheads
+			self.DEI = 0
 		hdulist = fits.open(path)
 		self.data = hdulist[1].data
 		self.columns = hdulist[1].columns.names
