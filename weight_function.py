@@ -8,12 +8,10 @@ def fivept_stencil(func,x,h):
     # returns f'(x), via 5pt stencil, for grid-spacing h
     return (-func(x+2*h)+8*func(x+h)-8*func(x-h)+func(x-2*h))/(12*h)
 
-def compute_Wz(z,*bin_popns):
+def compute_Wz(z,nofz):
     # Wz = [p^2 / X^2*X'] / int[p^2 / X^2*X' dz]
 
     # compute p(z) = unconditional pdf
-    nofz = sum(bin_popns)
-    print('nofz tuple-sum check: ',nofz.shape,nofz,sum(nofz))
     pz = nofz/sum(nofz)
     assert pz.shape==z.shape, "p(z) vs. z mismatch"
 

@@ -54,6 +54,7 @@ def execute(block, config):
         block.put_double_array_1d(nz_section,'z',z_mids)
         block.put_int(nz_section,'nz',nz)
         block.put_int(nz_section,'nbin',nbin)
+        block.put_double_array_1d(nz_section,'nofz',nofz)
         for i in range(len(nofz)):
             bin_nz = np.zeros_like(nofz)
             bin_nz[i] = nofz[i]

@@ -31,10 +31,11 @@ def execute(block, config):
     z = block[nz_section,'z']
     dz = z[1]-z[0]
     wgp_rz = np.array([block[wgp_section,'bin_%s_%s'%(i+1,i+1)] for i in range(nbin)])
-    bin_popns = [block[nz_section,"bin_%s"%(i+1)] for i in range(nbin)]
+    nofz = block[nz_section,'nofz',nofz]
+    # bin_popns = [block[nz_section,"bin_%s"%(i+1)] for i in range(nbin)]
 
     # compute W(z), wgp(r)
-    Wz = compute_Wz(z,bin_popns)
+    Wz = compute_Wz(z,nofz)
     wgp_r = compute_wgp(Wz, wgp_rz)
     block.put_double_array_1d(wgp_section,'wgp(r_p)',wgp_r)
     block.put_double_array_1d(wgp_section,'W(z)',Wz)
