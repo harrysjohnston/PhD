@@ -424,7 +424,7 @@ class RealCatalogue:
 			# lost pixel coords;
 			lostpixra,lostpixdec = np.rad2deg(thetaPhis[1]),(90.-np.rad2deg(thetaPhis[0]))
 		else:
-			lostpixra,lostpixdec = (1e3,1e3)
+			lostpixra,lostpixdec = (np.array([1e3]),np.array([1e3]))
 		del kidsBitmap,lostmap
 		gc.collect()
 
