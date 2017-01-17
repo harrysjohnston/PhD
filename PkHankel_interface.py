@@ -8,7 +8,7 @@ from PkHankel import create_nz
 cosmo = names.cosmological_parameters
 
 def setup(options):
-    # This function is called ONCE per processor per chain
+    # this function is called ONCE per processor per chain
     # use to load fixed parameters, perform one-off calculations (i.e. not changing
     # with sampling) etc.
 
@@ -28,13 +28,12 @@ def setup(options):
     return (power_section,nbin)
 
 def execute(block, config):
-    # This function is called every time you have a new sample of cosmological and other parameters
-    
-    # redefine config variables
+    # this function is called every time you have a new sample of cosmological and other parameters
+    # collect config variables
     power_section,nbin = config
 
     # load from datablock
-    k_h = block[power_section,'k_h']
+    k_h = block[power_section,'k_h'] # CUT K-RANGE & P(k)'s here !
     p_k = block[power_section,'p_k']
 
     # execute main function

@@ -26,7 +26,7 @@ def create_nz(gal_z,nz,nbin,outfile):
         nz_table[:,i+1] = np.where(
             (bin_ranges[i]<=z_mids)&(z_mids<bin_ranges[i+1]),n_of_z,0)
     # outfile = outfile+'_nz%snbin%s.asc'%(nz,nbin)
-    ascii.write(nz_table,outfile,names=['#z_mid']+['#bin_%s'%i+1 for i in nbin],delimiter='\t')
-    return None
+    ascii.write(nz_table,outfile,names=['#z_mid']+['#bin_%s'%(i+1) for i in range(nbin)],delimiter='\t')
+    return n_of_z
 
 
