@@ -26,15 +26,15 @@ def setup(options):
         gal_z = read_z(cat_path)
         z_mids,nofz = create_nz(gal_z,nz,nbin,outfile)
     else:
-        z_mids,nofz = (None,None)
+        z_mids,nofz,nz = (None,None,None)
 
     # return the config for execute fn
-    return (power_section,nbin,make_nz,z_mids,nofz,nz_section)
+    return (power_section,nbin,make_nz,z_mids,nofz,nz_section,nz)
 
 def execute(block, config):
     # this function is called every time you have a new sample of cosmological and other parameters
     # collect config variables
-    power_section,nbin,make_nz,z_mids,nofz,nz_section = config
+    power_section,nbin,make_nz,z_mids,nofz,nz_section,nz = config
 
     # load from datablock
     k_h = block[power_section,'k_h']
