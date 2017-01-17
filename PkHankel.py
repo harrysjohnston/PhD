@@ -36,8 +36,6 @@ def cut_krange(k_h,p_k,kmin=10**-2.2,kmax=10**1.2):
     newp_k = np.empty([len(p_k),len(newk_h)])
     for i in range(len(p_k)):
         newp_k[i] = p_k[i][kcut]
-    print('k_h range cut to %.2f - %.2f / (h/Mpc)'%(kmin,kmax))
+    print('k_h range cut to %.3f - %.2f / (h/Mpc)'%(kmin,kmax))
     print('approx. equiv. to %.2f - %.2f / (Mpc/h)'%(1/kmax,1/kmin))
-    print('k-shape: ',newk_h.shape,'p_k-shape: ',newp_k.shape)
-    print('k_h: ',newk_h)
     return (newk_h,newp_k)

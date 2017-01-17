@@ -44,7 +44,7 @@ def execute(block, config):
     block.put_double_array_1d(power_section,'ell',k_h)
     block.put_int(power_section,'nbin',nbin)
     for i in range(len(p_k)):
-        block.put_double_array_1d(power_section,'bin_%s_%s'%(i,i),p_k[i])
+        block.put_double_array_1d(power_section,'bin_%s_%s'%(i+1,i+1),p_k[i])
 
     # return zero == all done, no probs
     return 0
