@@ -104,15 +104,18 @@ class RealCatalogue:
 		print('z cut: \t', z_, np.unique(z_cut))
 
 		bitmask_cut = [True]*len(total_bitmasks)
+		if self.DEI:
+			print("DEIMOS: CUTTING MASK!=0")
+			bitmask_cut = np.where(total_bitmasks==0,True,False)
 		if bitmask_[0] != None:
 			bitmask_ = bitmask_[0]
 			for i in range(len(bitmask_)):
 				# construct bitmask cut
 				bitmask_cut &= np.where(bitmask_[i] & total_bitmasks == bitmask_[i], False, True)
 
-			assert len(bitmask_cut) == len(total_bitmasks), "bitmask testing broken"
-			bitmask_cut = np.array(bitmask_cut)
-			print('bitmask cut: \t', np.unique(bitmask_cut))
+		assert len(bitmask_cut) == len(total_bitmasks), "bitmask testing broken"
+		bitmask_cut = np.array(bitmask_cut)
+		print('bitmask cut: \t', np.unique(bitmask_cut))
 
 		BCGcut = np.where(self.data[self.headers[5]]==1,True,False)
 		BCG_dc = [True]*len(self.data)
@@ -409,6 +412,9 @@ class RealCatalogue:
 		# find masked pixel IDs
 		kidsBitmap = hp.read_map('/share/splinter/hj/PhD/KiDS_counts_N2048.fits', dtype=int)
 		bitmask_cut = [True]*len(kidsBitmap)
+		if self.DEI:
+			print("DEIMOS: CUTTING MASK!=0")
+			bitmask_cut = np.where(kidsBitmap==0,True,False)
 		if bitmask_[0] != None:
 			bitmask_ = bitmask_[0]
 			for i in range(len(bitmask_)):
