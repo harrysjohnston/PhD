@@ -166,7 +166,7 @@ class RealCatalogue:
 			pgm = np.ones_like(pgm)
 		e1 = table[self.headers[3]]/pgm
 		e2 = table[self.headers[4]]/pgm
-		e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
+		e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward ???
 		e_weight = np.where(pgm<0.1,0,pgm)
 		if self.DEI:
 			e_weight = np.where(table['flag_DEIMOS']=='0000',1,0)
@@ -182,7 +182,7 @@ class RealCatalogue:
 
 		comov = Planck13.comoving_distance(Z)
 		comov *= h
-		new_table = np.column_stack((RA, DEC, comov, e1, e2, e_weight))
+		new_table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
 
 		self.samplecounts.append(len(new_table))
 
@@ -397,8 +397,8 @@ class RealCatalogue:
 		fullSky = 41252.96 # square degrees
 		npix = hp.nside2npix(nside)
 		pixar = hp.nside2pixarea(nside,degrees=True)
-		ra = self.data['RA_1_1']
-		dec = self.data['DEC_1_1']
+		ra = self.data[self.headers[0]]
+		dec = self.data[self.headers[1]]
 		theta = np.deg2rad(90.-dec)
 		phi = np.deg2rad(ra)
 		pixIDs = hp.ang2pix(nside,theta,phi,nest=False)
@@ -711,6 +711,7 @@ class RealCatalogue:
 		# -> significances blowing up
 		# Should I be removing 1 patch and then correlating the ENTIRE remaining sample,
 		# once for each patch, and then performing analysis?
+		# surely I should; why else remove 1 patch at a time? this would have no effect on the signal from each individual patch...
 
 		JKstds = np.column_stack((Pstds,Xstds))
 		label = basename(normpath(patchDir))
