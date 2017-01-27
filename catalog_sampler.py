@@ -713,7 +713,7 @@ class RealCatalogue:
 		print("correlating jackknife regions with %s density sample, N=%s"%(dlabel,dCount))
 		os.system('cp %s %s'%(dens_sample,JKdir))
 		for i,jk in enumerate(JKsamples):
-			jkCount = len(np.loadtxt(join(patchDir,jk)))
+			jkCount = len(np.loadtxt(join(JKdir,jk)))
 			print("JK%s, shapes popn %s"%((i+1),jkCount))
 			os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(JKdir,dlabel,dCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,jk[:-4],nproc))
 			if largePi:
