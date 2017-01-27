@@ -26,7 +26,7 @@ import astropy.stats as astat
 
 class RealCatalogue:
 
-	def __init__(self, path, DEI):
+	def __init__(self, path, DEI): # ADD MORE SPECS HERE; FEWER ARGS FOR FNS!
 		"""""
 		read-in catalogue
 
@@ -107,6 +107,8 @@ class RealCatalogue:
 		if self.DEI:
 			print("DEIMOS: CUTTING MASK!=0")
 			bitmask_cut = np.where(total_bitmasks==0,True,False)
+		else:
+			print("KSB: check bitmasking")
 		if bitmask_[0] != None:
 			bitmask_ = bitmask_[0]
 			for i in range(len(bitmask_)):
@@ -347,6 +349,9 @@ class RealCatalogue:
 			elif BT:
 				reducedData = np.column_stack((realData[0][:,0], realData[i][:,3], Pproperr, realData[i][:,4], Xproperr, propgErrs)) # = [r_p, wgplus, Perr, wgcross, Xerr, analyticErrs]
 				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'BT+err', 'wgx', 'BTxerr', 'analyticerrs'])
+			elif JK:
+				reducedData = np.column_stack((realData[0][:,0], realData[i][:,3], Pproperr2, realData[i][:,4], Xproperr2, propgErrs)) # = [r_p, wgplus, Perr, wgcross, Xerr, analyticErrs]
+				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'JK+err', 'wgx', 'JKxerr', 'analyticerrs'])
 			else:
 				reducedData = zip(realData[0][:,0], realData[i][:,3], realData[i][:,4], propgErrs) # = [r_p, wgplus, wgcross, wgerr]
 				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wgplus', 'wgcross', 'wgerr'], formats={'r_p':np.float32, 'wgplus':np.float32, 'wgcross':np.float32, 'wgerr':np.float32})
@@ -594,7 +599,7 @@ class RealCatalogue:
 		for i,p in enumerate(patches):
 			pCount = len(np.loadtxt(join(patchDir,p)))
 			dCount = len(np.loadtxt(join(patchDir,dpatches[i])))
-			print("patch %s, density popn %s, shapes popn %s"%(i,dCount,pCount))
+			print("patch %s, density popn %s, shapes popn %s"%((i+1),dCount,pCount))
 			os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(patchDir,dpatches[i],dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-9],nproc))
 			if largePi:
 				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s_largePi %s 1 0'%(patchDir,dpatches[i],dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-9],nproc))
@@ -631,14 +636,14 @@ class RealCatalogue:
 		gc.collect()
 
 		# calculate covariance matrix & corr-coeffs (for +)
-		covP = np.cov(Pmeans,rowvar=0)
-		corrcoeffP = np.corrcoef(Pmeans,rowvar=0)
-		covX = np.cov(Xmeans,rowvar=0)
-		corrcoeffX = np.corrcoef(Xmeans,rowvar=0)
+		Cp = np.cov(Pmeans,rowvar=0)
+		Rp = np.corrcoef(Pmeans,rowvar=0)
+		Cx = np.cov(Xmeans,rowvar=0)
+		Rx = np.corrcoef(Xmeans,rowvar=0)
 
 		# calculate stdev over BT-realis'ns
-		Pstds = np.std(Pmeans,axis=0)
-		Xstds = np.std(Xmeans,axis=0)
+		Pstds = np.sqrt(np.diag(Cp))
+		Xstds = np.sqrt(np.diag(Cx))
 		# shape = (stdev-on-means-in-rp-bins)
 
 		BTstds = np.column_stack((Pstds,Xstds))
@@ -647,14 +652,14 @@ class RealCatalogue:
 		if largePi:
 			BTerrs_out = join(patchDir,'..','BTerrs_%s_largePi'%label)
 		ascii.write(BTstds, BTerrs_out, delimiter='\t', names=['#w(g+)err','#w(gx)err'])
-		cov_combos = [[covP,'P'],[covX,'X']]
+		cov_combos = [[Cp,'P'],[Cx,'X']]
 
 		toplotDir = join(patchDir,'../to_plot')
 		if not isdir(toplotDir):
 			mkdir(toplotDir)
 		if not largePi:
 			corrName = join(toplotDir,'BTcorrcoeff_%s'%label)
-			ascii.write(corrcoeffP, corrName, delimiter='\t')
+			ascii.write(Rp, corrName, delimiter='\t')
 
 			for covs in cov_combos:
 				covName = join(toplotDir,'BTcovar%s_%s'%(covs[1],label))
@@ -664,54 +669,90 @@ class RealCatalogue:
 				covName = join(toplotDir,'BTcovar%s_%s_largePi'%(covs[1],label))
 				ascii.write(covs[0], covName, delimiter='\t')
 
-		BTanalysis = np.column_stack((Pmeans,Xmeans,Pmeds,Xmeds))
-		BTanalysis_root = join(toplotDir,'BTanalysis_%s'%label)
+		# BTanalysis = np.column_stack((Pmeans,Xmeans,Pmeds,Xmeds))
+		# BTanalysis_root = join(toplotDir,'BTanalysis_%s'%label)
 		# ascii.write(BTanalysis,BTanalysis_root,delimiter='\t',
 		# 	names=['#wg+_pmean_rp%s'%i for i in range(Pmeans.shape[-1])]+['#wgx_pmean_rp%s'%i for i in range(Xmeans.shape[-1])]+['#wg+_pmed_rp%s'%i for i in range(Pmeds.shape[-1])]+['#wgx_pmed_rp%s'%i for i in range(Xmeds.shape[-1])])
-		del BTanalysis
-		gc.collect()
+		# del BTanalysis
+		# gc.collect()
 		return None
 
-	def jackknife_signals(self, patchDir, patchWeights, largePi):
-		pwcorrs = [x for x in listdir(patchDir) if ('.dat' in x)&('Pi' not in x)]
+	def jackknife_patches(self, patchDir, patchWeights):
+		# resample patches & save JK samples
+		patches = [x for x in listdir(patchDir) if ('patch' in x)&('_' in x)]
+		patch_cats = np.array([np.loadtxt(i) for i in patches])
+		JKdir = join(patchDir,'JKsamples')
+		if not isdir(JKdir):
+			mkdir(JKdir)
+		jkweights = np.empty([len(patch_cats)])
+		for i,pc in enumerate(patch_cats):
+			del_one = np.delete(patch_cats,i,axis=0)
+			new_cat = np.concatenate(del_one)
+			cat_name = join(JKdir,'JKsample%s.asc'%(str(i).zfill(2)))
+			ascii.write(new_cat, cat_name, delimiter='\t', names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
+			del_one_weights = np.delete(patchWeights,i)
+			jkweights[i] = np.mean(del_one_weights)
+		self.jkweights = jkweights
+		print('jkweights.shape: ',jkweights.shape)
+
+		return jkweights
+
+	def wcorr_jackknife(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi):
+		# wcorr JK samples
+		JKdir = join(patchDir,'JKsamples')
+		JKsamples = [x for x in listdir(JKdir) if 'JKsample' in x]
+		JKsamples.sort()
+		if 'highZ' in patchDir:
+			dens_sample = join(patchDir,'..','highZ.asc')
+		if 'lowZ' in patchDir:
+			dens_sample = join(patchDir,'..','lowZ.asc')
+		dlabel = basename(normpath(dens_sample))
+		dCount = len(np.loadtxt(dens_sample))
+		print("correlating jackknife regions with %s density sample, N=%s"%(dlabel,dCount))
+		os.system('cp %s %s'%(dens_sample,JKdir))
+		for i,jk in JKsamples:
+			jkCount = len(np.loadtxt(join(patchDir,jk)))
+			print("JK%s, shapes popn %s"%((i+1),jkCount))
+			os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(JKdir,dlabel,dCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,jk[:-4],nproc))
+			if largePi:
+				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s_largePi %s 1 0'%(JKdir,dlabel,dCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,jk[:-4],nproc))
+		return None
+
+	def pearson_r(self,covar_matrix):
+		c = covar_matrix
+		d = np.diag(c)
+		stddev = np.sqrt(d.real)
+		c /= stddev[:, None]
+		c /= stddev[None, :]
+		# Clip real and imaginary parts to [-1, 1]
+		np.clip(c.real, -1, 1, out=c.real)
+		if np.iscomplexobj(c):
+		    np.clip(c.imag, -1, 1, out=c.imag)
+		return c
+
+	def jackknife(self, patchDir, jkweights, largePi):
+		# read-in JK signals
+		JKdir = join(patchDir,'JKsamples')
+		jkwcorrs = [x for x in listdir(JKdir) if ('wcorr' in x)&('.dat' in x)]
+		# N patches <-> N signal files
 		if largePi:
-			pwcorrs = [x for x in listdir(patchDir) if 'Pi' in x]
-		psigs = []
-		for i,x in enumerate(pwcorrs):
-			path = join(patchDir,x)
-			data = np.array(np.loadtxt(path))
-			psigs.append([data[:,3],data[:,4],[patchWeights[i]]*len(data[:,3])]) 
-			# [+, x, pws]
-		psigs = np.array(psigs)
+			jkwcorrs = [x for x in listdir(JKdir) if ('Pi' in x)&('.dat' in x)]
+		jkwcorrs.sort()
+		jksignals = np.array([np.loadtxt(join(JKdir,i)) for i in jkwcorrs])
+		print('jksignals.shape: ',jksignals.shape)
+		wgp,wgx = jksignals[:,:,3],jksignals[:,:,4]
+		Pmeans = np.average(wgp,axis=0,weights=jkweights)
+		Xmeans = np.average(wgx,axis=0,weights=jkweights)
 
-		# construct delete-one jackknife resample of patches
-		ps_shape = psigs.shape
-		Nps = ps_shape[0]
-		JKsignals = np.empty([Nps,Nps-1,ps_shape[1],ps_shape[2]])
-		for i in range(Nps):
-			JKsignals[i] = np.delete(psigs,i,axis=0)
+		# compute jackknife covariance & pearson-r corrcoeffs
+		wgP,wgX = np.mat(wgp-Pmeans),np.mat(wgx-Xmeans)
+		Cp,Cx = ((wgp.shape[0]-1)/wgp.shape[0])*(wgP.T*wgP),((wgX.shape[0]-1)/wgX.shape[0])*(wgX.T*wgX)
+		Rp,Rx = pearson_r(Cp),pearson_r(Cx)
 
-		# compute JK errors & covariances, analogous to BT
-		wgplus = JKsignals[:,:,0,:]
-		wgcross = JKsignals[:,:,1,:]
-		pws = JKsignals[:,:,2,:]
-		Pmeans = np.average(wgplus,axis=1,weights=pws)
-		Xmeans = np.average(wgcross,axis=1,weights=pws)
-		covP = np.cov(Pmeans,rowvar=0)
-		corrcoeffP = np.corrcoef(Pmeans,rowvar=0)
-		covX = np.cov(Xmeans,rowvar=0)
-		corrcoeffX = np.corrcoef(Xmeans,rowvar=0)
-		Pstds = np.std(Pmeans,axis=0)
-		Xstds = np.std(Xmeans,axis=0)
-		del JKsignals,psigs,wgplus,wgcross
+		# compute JK stdev on signals
+		Pstds,Xstds = np.sqrt(np.diag(Cp)),np.sqrt(np.diag(Cx))
+		del jksignals
 		gc.collect()
-
-		# Variance across jackknife samples (i.e. N-1 patches) unrealistically small...
-		# and r_p bins highly correlated...
-		# -> significances blowing up
-		# Should I be removing 1 patch and then correlating the ENTIRE remaining sample,
-		# once for each patch, and then performing analysis?
-		# surely I should; why else remove 1 patch at a time? this would have no effect on the signal from each individual patch...
 
 		JKstds = np.column_stack((Pstds,Xstds))
 		label = basename(normpath(patchDir))
@@ -719,14 +760,14 @@ class RealCatalogue:
 		if largePi:
 			JKerrs_out = join(patchDir,'..','JKerrs_%s_largePi'%label)
 		ascii.write(JKstds, JKerrs_out, delimiter='\t', names=['#w(g+)err','#w(gx)err'])
-		cov_combos = [[covP,'P'],[covX,'X']]
+		cov_combos = [[Cp,'P'],[Cx,'X']]
 
 		toplotDir = join(patchDir,'../to_plot')
 		if not isdir(toplotDir):
 			mkdir(toplotDir)
 		if not largePi:
 			corrName = join(toplotDir,'JKcorrcoeff_%s'%label)
-			ascii.write(corrcoeffP, corrName, delimiter='\t')
+			ascii.write(Rp, corrName, delimiter='\t')
 
 			for covs in cov_combos:
 				covName = join(toplotDir,'JKcovar%s_%s'%(covs[1],label))
@@ -976,18 +1017,24 @@ if __name__ == "__main__":
 		if args.chiSqu:
 			print('CALC CHI^2')
 			# calculate chi^2 statistics & save to ascii
-			catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'BT')
+			if args.bootstrap:
+				catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'BT')
 			if args.jackknife:
 				catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'JK')
+			else:
+				print('No sample covariances estimated -> no chi^2')
 			sys.exit()
 		sys.exit()
 
 	if args.chiSqu:
 		print('CALC CHI^2')
 		# calculate chi^2 statistics & save to csv
-		catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'BT')
+		if args.bootstrap:
+			catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'BT')
 		if args.jackknife:
 			catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'JK')
+		else:
+			print('No sample covariances estimated -> no chi^2')
 		sys.exit()
 
 	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.BCGdens, args.BCGshap, args.bitmaskCut)
@@ -1019,7 +1066,7 @@ if __name__ == "__main__":
 	Write.write(str(Text))
 	Write.close()
 
-	if args.bootstrap:
+	if args.bootstrap or args.jackknife:
 		# patchData.shape = (6 subsamples, N patches)
 		patchData, patchWeights = catalog.patch_data(args.patchSize, args.bitmaskCut)
 		# print('MAPPING')
@@ -1031,14 +1078,20 @@ if __name__ == "__main__":
 				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j) # save_patches returns str(patchDir)
 		for lab in catalog.labels[:4]:
 			pDir = join(catalog.new_root,lab)
-			catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi)
-			catalog.bootstrap_signals(pDir, patchWeights, 0)
+			if args.bootstrap:
+				catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi)
+				catalog.bootstrap_signals(pDir, patchWeights, 0)
 			if args.jackknife:
-				catalog.jackknife_signals(pDir, patchWeights, 0)
+				jkweights = catalog.jackknife_patches(pDir, patchWeights, 0)
+				catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0)
+				catalog.jackknife(pDir, jkweights, 0)
 			if args.largePi:
-				catalog.bootstrap_signals(pDir, patchWeights, 1)
+				if args.bootstrap:
+					catalog.bootstrap_signals(pDir, patchWeights, 1)
 				if args.jackknife:
-					catalog.jackknife_signals(pDir, patchWeights, 1)
+					jkweights = catalog.jackknife_patches(pDir, patchWeights, 1)
+					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1)
+					catalog.jackknife(pDir, jkweights, 1)
 
 	catalog.make_combos()
 	catalog.prep_wcorr(catalog.new_root,catalog.wcorr_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
