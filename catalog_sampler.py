@@ -570,7 +570,9 @@ class RealCatalogue:
 		npixLost = np.array([np.count_nonzero(i) for i in pixpatchCuts])
 		pArLost = npixLost*pixar
 		weights = 1-(pArLost/patch_Ars)
-		assert all(weights>0),'patch-weighting broken'
+		print('negative weights?: ',weights)
+		weights = np.where(weights>0,weights,0)
+		# assert all(weights>0),'patch-weighting broken'
 		self.patchWeights = weights
 		print('patch weights: ',self.patchWeights)
 
@@ -980,7 +982,7 @@ if __name__ == "__main__":
 	default=1)
 	parser.add_argument(
 	'-patchSize',
-	help='preferred mean patch size (deg^2) for bootstrap error determination, defaults to 9sqdeg',
+	help='preferred mean patch size (deg^2) for sample covariance determinations, defaults to 9sqdeg',
 	type=np.float32,
 	default=9)
 	parser.add_argument(
@@ -1082,14 +1084,14 @@ if __name__ == "__main__":
 				catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi)
 				catalog.bootstrap_signals(pDir, patchWeights, 0)
 			if args.jackknife:
-				jkweights = catalog.jackknife_patches(pDir, patchWeights, 0)
+				jkweights = catalog.jackknife_patches(pDir, patchWeights)
 				catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0)
 				catalog.jackknife(pDir, jkweights, 0)
 			if args.largePi:
 				if args.bootstrap:
 					catalog.bootstrap_signals(pDir, patchWeights, 1)
 				if args.jackknife:
-					jkweights = catalog.jackknife_patches(pDir, patchWeights, 1)
+					jkweights = catalog.jackknife_patches(pDir, patchWeights)
 					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1)
 					catalog.jackknife(pDir, jkweights, 1)
 
