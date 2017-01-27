@@ -41,7 +41,14 @@ class RealCatalogue:
 			self.headers = KSBheads
 			self.DEI = 0
 		hdulist = fits.open(path)
-		self.data = hdulist[1].data
+		data = hdulist[1].data
+		# MAGNITUDE CUT
+		mc = -21
+		print('SELECTING R_MAG < %s'%mc)
+		data = data[data['absmag_r_1']<mc]
+		self.data = data
+		del data
+		gc.collect()
 		self.columns = hdulist[1].columns.names
 		# ascii (.asc) file IDs
 		self.labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
@@ -168,7 +175,7 @@ class RealCatalogue:
 			pgm = np.ones_like(pgm)
 		e1 = table[self.headers[3]]/pgm
 		e2 = table[self.headers[4]]/pgm
-		e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward ???
+		# e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward ???
 		e_weight = np.where(pgm<0.1,0,pgm)
 		if self.DEI:
 			e_weight = np.where(table['flag_DEIMOS']=='0000',1,0)
@@ -570,11 +577,10 @@ class RealCatalogue:
 		npixLost = np.array([np.count_nonzero(i) for i in pixpatchCuts])
 		pArLost = npixLost*pixar
 		weights = 1-(pArLost/patch_Ars)
-		print('negative weights?: ',weights)
+		print('patch weights (check none < -0.01) : ',weights)
 		weights = np.where(weights>0,weights,0)
-		# assert all(weights>0),'patch-weighting broken'
 		self.patchWeights = weights
-		print('patch weights: ',self.patchWeights)
+		# print('patch weights: ',self.patchWeights)
 
 		return self.patchedData, self.patchWeights
 
