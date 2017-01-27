@@ -682,7 +682,7 @@ class RealCatalogue:
 	def jackknife_patches(self, patchDir, patchWeights):
 		# resample patches & save JK samples
 		patches = [x for x in listdir(patchDir) if ('patch' in x)&('_' in x)]
-		patch_cats = np.array([np.loadtxt(i) for i in patches])
+		patch_cats = np.array([np.loadtxt(join(patchDir,i)) for i in patches])
 		JKdir = join(patchDir,'JKsamples')
 		if not isdir(JKdir):
 			mkdir(JKdir)
