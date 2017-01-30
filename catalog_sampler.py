@@ -634,10 +634,8 @@ class RealCatalogue:
 		gc.collect()
 
 		# calculate covariance matrix & corr-coeffs (for +)
-		Cp = np.cov(Pmeans,rowvar=0)
-		Rp = np.corrcoef(Pmeans,rowvar=0)
-		Cx = np.cov(Xmeans,rowvar=0)
-		Rx = np.corrcoef(Xmeans,rowvar=0)
+		Cp,Cx = np.cov(Pmeans,rowvar=0),np.cov(Xmeans,rowvar=0)
+		Rp,Rx = np.corrcoef(Pmeans,rowvar=0),np.corrcoef(Xmeans,rowvar=0)
 
 		# calculate stdev over BT-realis'ns
 		Pstds = np.sqrt(np.diag(Cp))
@@ -746,7 +744,9 @@ class RealCatalogue:
 		# compute jackknife covariance & pearson-r corrcoeffs
 		# wgP,wgX = np.mat(wgp-Pmeans),np.mat(wgx-Xmeans)
 		# Cp,Cx = ((wgp.shape[0]-1)/wgp.shape[0])*(wgP.T*wgP),((wgX.shape[0]-1)/wgX.shape[0])*(wgX.T*wgX)
-		Cp,Cx = np.cov(wgp,rowvar=0,aweights=jkweights),np.cov(wgx,rowvar=0,aweights=jkweights)
+		Cp,Cx = np.cov(wgp,rowvar=0),np.cov(wgx,rowvar=0)
+		print("Currently no weights applied to jackknife covariances...")
+		# UNWEIGHTED - all jk samples lose 0.52-0.56 of area, with majority close to 0.54
 		Cp,Cx = Cp*((Nobs-1)**2)/Nobs, Cx*((Nobs-1)**2)/Nobs # jackknife normalisation
 		Rp,Rx = self.pearson_r(Cp),self.pearson_r(Cx)
 
