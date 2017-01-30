@@ -52,6 +52,10 @@ class RealCatalogue:
 		self.columns = hdulist[1].columns.names
 		# ascii (.asc) file IDs
 		self.labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
+		ext_labels = ['%s_largePi'%i for i in self.labels[:-2]]
+		ext_labels = self.labels[:-2]+ext_labels
+		ext_labels.sort()
+		self.ext_labels = ext_labels
 		# bodies of wcorr output file IDs
 		self.wcorrLabels = ['highZ_vs_highZ_Red', 'highZ_vs_highZ_Blue', 'lowZ_vs_lowZ_Red', 'lowZ_vs_lowZ_Blue']
 
@@ -369,7 +373,7 @@ class RealCatalogue:
 		covarList.sort() # all Plus, then all Xross
 
 		dataArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in wcorrList])
-		dataArr = np.array([[i[:,1],i[:,3]] for i in dataArr]) # +, x signals
+		dataArr = np.array([[i[:,1],i[:,4]] for i in dataArr]) # +, x signals
 		covarArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in covarList])
 		covarSigma = []
 		chiFunc = lambda x: chi2.pdf(x, dof)
@@ -377,13 +381,22 @@ class RealCatalogue:
 		for j,ARR in enumerate([covarArr[:8],covarArr[8:]]):
 			print('plus (0), cross (1): %s'%j)
 			for i,cov in enumerate(ARR):
-				print('sample %s'%(i+1))
+				print('%s'%self.ext_labels[i])
 				cov = np.mat(cov)
-				invCov = np.linalg.inv(cov)
+				print('covariance:\n',cov)
 				sig = np.mat(dataArr[i][j])
+				if (~cov.any(axis=0)).any():
+					zero_ind = int(np.where(~cov.any(axis=0))[1])
+					cov = np.delete(cov,zero_ind,axis=0)
+					cov = np.delete(cov,zero_ind,axis=1)
+					sig = np.delete(sig,zero_ind)
+					print('SINGULAR MATRIX - low-z lack of large-r_p sampling? - discarding bin %s'%(zero_ind+1))
+				print('signal:\n',sig)
+				invCov = np.linalg.inv(cov)
 				chi = (sig*invCov)*sig.T
 				fchi = float(chi)
 				p_val = scint.quad(chiFunc, fchi, np.inf)[0]
+				print('chi2: ',fchi,', p =',p_val)
 				xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
 				covarSigma.append([fchi,p_val,xs])
 		covarSigma = np.array(covarSigma)
@@ -745,7 +758,7 @@ class RealCatalogue:
 		# wgP,wgX = np.mat(wgp-Pmeans),np.mat(wgx-Xmeans)
 		# Cp,Cx = ((wgp.shape[0]-1)/wgp.shape[0])*(wgP.T*wgP),((wgX.shape[0]-1)/wgX.shape[0])*(wgX.T*wgX)
 		Cp,Cx = np.cov(wgp,rowvar=0),np.cov(wgx,rowvar=0)
-		print("Currently no weights applied to jackknife covariances...")
+		print("Currently no weights applied to jackknife samples, as all are very similar...")
 		# UNWEIGHTED - all jk samples lose 0.52-0.56 of area, with majority close to 0.54
 		Cp,Cx = Cp*((Nobs-1)**2)/Nobs, Cx*((Nobs-1)**2)/Nobs # jackknife normalisation
 		Rp,Rx = self.pearson_r(Cp),self.pearson_r(Cx)
