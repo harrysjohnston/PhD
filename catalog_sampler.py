@@ -387,7 +387,9 @@ class RealCatalogue:
 		chiFunc = lambda x: chi2.pdf(x, dof)
 		# compute chi2, p-values, significance for a) plus and b) cross signals
 		for j,ARR in enumerate([covarArr[:8],covarArr[8:]]):
+			print('plus (0), cross (1): %s'%j)
 			for i,cov in enumerate(ARR):
+				print('sample %s'%(i+1))
 				cov = np.mat(cov)
 				invCov = np.linalg.inv(cov)
 				sig = np.mat(dataArr[i][j])
@@ -1027,8 +1029,10 @@ if __name__ == "__main__":
 			# calculate chi^2 statistics & save to ascii
 			if args.bootstrap:
 				catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'BT')
+				print('Bootstrap chi2 done')
 			if args.jackknife:
 				catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'JK')
+				print('Jackknife chi2 done')
 			else:
 				print('No sample covariances estimated -> no chi^2')
 			sys.exit()
@@ -1039,8 +1043,10 @@ if __name__ == "__main__":
 		# calculate chi^2 statistics & save to csv
 		if args.bootstrap:
 			catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'BT')
+			print('Bootstrap chi2 done')
 		if args.jackknife:
 			catalog.chi2(join(args.Path,'to_plot'), args.expec, args.rpBins, 'JK')
+			print('Jackknife chi2 done')
 		else:
 			print('No sample covariances estimated -> no chi^2')
 		sys.exit()
