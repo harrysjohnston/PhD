@@ -107,7 +107,8 @@ class RealCatalogue:
 			print("DEIMOS: CUTTING MASK!=0")
 			bitmask_cut = np.where(total_bitmasks==0,True,False)
 		else:
-			print("KSB: check bitmasking")
+			print("KSB: CUTTING MASK!=0")
+			bitmask_cut = np.where(total_bitmasks==0,True,False)
 		if bitmask_[0] != None:
 			bitmask_ = bitmask_[0]
 			for i in range(len(bitmask_)):
