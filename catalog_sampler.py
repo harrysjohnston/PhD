@@ -431,6 +431,9 @@ class RealCatalogue:
 		if self.DEI:
 			print("DEIMOS: CUTTING MASK!=0")
 			bitmask_cut = np.where(kidsBitmap==0,True,False)
+		else:
+			print("KSB: CUTTING MASK!=0")
+			bitmask_cut = np.where(kidsBitmap==0,True,False)
 		if bitmask_[0] != None:
 			bitmask_ = bitmask_[0]
 			for i in range(len(bitmask_)):
