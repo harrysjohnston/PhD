@@ -67,18 +67,6 @@ class RealCatalogue:
 		self.zstr = '%.f'%z_
 		self.cstr = '%.f'%colour_
 
-		# Remove duplicates in RA/DEC:
-		# coordStrings = ['RA_1_1', 'DEC_1_1']
-		# for i, col in enumerate(coordStrings):
-		#   coords = self.data[col]
-		#   uniqCoords = np.unique(coords, return_inverse=True, return_counts=True)
-		#   inverse = uniqCoords[1]
-		#   count = uniqCoords[2]
-		#   orderedCount = count[inverse]
-		#   duplicateCut = orderedCount == 1
-		#   self.data = self.data[duplicateCut]
-		#   print('Removed %s duplicates in %s' % ((len(duplicateCut)-len(self.data)), col[:-2]))
-
 		self.pre_count = len(self.data)
 		z = self.data[self.headers[2]]
 		self.pre_z = z
@@ -90,7 +78,7 @@ class RealCatalogue:
 			pgm = np.ones_like(pgm)
 		pgm_cut = np.array((pgm > pgm_))
 		zeroPgm_cut = np.array((pgm != 0))
-		print('pgm cut: \t', np.unique(pgm_cut))
+		print('pgm cut [unique]: \t', np.unique(pgm_cut))
 
 		# define colour, redshift, bitmask & BCG cuts
 		if colour_ != None:
@@ -100,7 +88,7 @@ class RealCatalogue:
 			red_cut = np.array([True]*len(self.data))
 			blue_cut = red_cut
 			print('Red catalog == Blue catalog')
-		print('c cut: \t', colour_, np.unique(red_cut))
+		print('c cut [unique]: \t', colour_, np.unique(red_cut))
 		if z_ != None:
 			z_cut = np.array((z > z_)) # HIGH-Z
 			z_cut_r = ~z_cut # LOW-Z
@@ -108,7 +96,7 @@ class RealCatalogue:
 			z_cut = np.array([True]*len(self.data))
 			z_cut_r = z_cut
 			print('highZ catalog == lowZ catalog')
-		print('z cut: \t', z_, np.unique(z_cut))
+		print('z cut [unique]: \t', z_, np.unique(z_cut))
 
 		bitmask_cut = [True]*len(total_bitmasks)
 		if self.DEI:
@@ -124,7 +112,7 @@ class RealCatalogue:
 
 		assert len(bitmask_cut) == len(total_bitmasks), "bitmask testing broken"
 		bitmask_cut = np.array(bitmask_cut)
-		print('bitmask cut: \t', np.unique(bitmask_cut))
+		print('bitmask cut [unique]: \t', np.unique(bitmask_cut))
 
 		BCGcut = np.where(self.data[self.headers[5]]==1,True,False)
 		BCG_dc = [True]*len(self.data)
@@ -579,7 +567,7 @@ class RealCatalogue:
 		npixLost = np.array([np.count_nonzero(i) for i in pixpatchCuts])
 		pArLost = npixLost*pixar
 		weights = 1-(pArLost/patch_Ars)
-		print('patch weights (check none < -0.01) : ',weights)
+		print('patch weights (check none << 0) : ',weights)
 		weights = np.where(weights>0,weights,0)
 		self.patchWeights = weights
 		# print('patch weights: ',self.patchWeights)
@@ -703,7 +691,7 @@ class RealCatalogue:
 			del_one_weights = np.delete(patchWeights,i)
 			jkweights[i] = np.mean(del_one_weights)
 		self.jkweights = jkweights
-		print('jkweights.shape: ',jkweights.shape)
+		print('jkweights: ',jkweights)
 
 		return jkweights
 
@@ -749,14 +737,17 @@ class RealCatalogue:
 			jkwcorrs = [x for x in listdir(JKdir) if ('Pi' in x)&('.dat' in x)]
 		jkwcorrs.sort()
 		jksignals = np.array([np.loadtxt(join(JKdir,i)) for i in jkwcorrs])
-		print('jksignals.shape: ',jksignals.shape)
+
 		wgp,wgx = jksignals[:,:,3],jksignals[:,:,4]
-		Pmeans = np.average(wgp,axis=0,weights=jkweights)
-		Xmeans = np.average(wgx,axis=0,weights=jkweights)
+		Nobs,Nvar = wgp.shape
+		# Pmeans = np.average(wgp,axis=0,weights=jkweights)
+		# Xmeans = np.average(wgx,axis=0,weights=jkweights)
 
 		# compute jackknife covariance & pearson-r corrcoeffs
-		wgP,wgX = np.mat(wgp-Pmeans),np.mat(wgx-Xmeans)
-		Cp,Cx = ((wgp.shape[0]-1)/wgp.shape[0])*(wgP.T*wgP),((wgX.shape[0]-1)/wgX.shape[0])*(wgX.T*wgX)
+		# wgP,wgX = np.mat(wgp-Pmeans),np.mat(wgx-Xmeans)
+		# Cp,Cx = ((wgp.shape[0]-1)/wgp.shape[0])*(wgP.T*wgP),((wgX.shape[0]-1)/wgX.shape[0])*(wgX.T*wgX)
+		Cp,Cx = np.cov(wgp,rowvar=0,aweights=jkweights),np.cov(wgx,rowvar=0,aweights=jkweights)
+		Cp,Cx = Cp*((Nobs-1)**2)/Nobs, Cx*((Nobs-1)**2)/Nobs # jackknife normalisation
 		Rp,Rx = self.pearson_r(Cp),self.pearson_r(Cx)
 
 		# compute JK stdev on signals
