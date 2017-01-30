@@ -26,7 +26,7 @@ import astropy.stats as astat
 
 class RealCatalogue:
 
-	def __init__(self, path, DEI): # ADD MORE SPECS HERE; FEWER ARGS FOR FNS!
+	def __init__(self, path, DEI): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
 		"""""
 		read-in catalogue
 
@@ -42,7 +42,7 @@ class RealCatalogue:
 			self.DEI = 0
 		hdulist = fits.open(path)
 		data = hdulist[1].data
-		# MAGNITUDE CUT
+		# MAGNITUDE CUT - TURN THIS INTO C-LINE ARG!
 		mc = -21
 		print('SELECTING R_MAG < %s'%mc)
 		data = data[data['absmag_r_1']<mc]
@@ -708,7 +708,7 @@ class RealCatalogue:
 	def wcorr_jackknife(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi):
 		# wcorr JK samples
 		JKdir = join(patchDir,'JKsamples')
-		JKsamples = [x for x in listdir(JKdir) if 'JKsample' in x]
+		JKsamples = [x for x in listdir(JKdir) if ('.asc' in x)&('JKsample' in x)]
 		JKsamples.sort()
 		if 'highZ' in patchDir:
 			dens_sample = join(patchDir,'..','highZ.asc')
@@ -755,7 +755,7 @@ class RealCatalogue:
 		# compute jackknife covariance & pearson-r corrcoeffs
 		wgP,wgX = np.mat(wgp-Pmeans),np.mat(wgx-Xmeans)
 		Cp,Cx = ((wgp.shape[0]-1)/wgp.shape[0])*(wgP.T*wgP),((wgX.shape[0]-1)/wgX.shape[0])*(wgX.T*wgX)
-		Rp,Rx = pearson_r(Cp),pearson_r(Cx)
+		Rp,Rx = self.pearson_r(Cp),self.pearson_r(Cx)
 
 		# compute JK stdev on signals
 		Pstds,Xstds = np.sqrt(np.diag(Cp)),np.sqrt(np.diag(Cx))
@@ -849,7 +849,7 @@ class RandomCatalogue(RealCatalogue):
 		self.lowz = self.data[z_cut_r]
 		self.samplecounts = [len(self.highz), len(self.lowz)]
 
-		[print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
+		[print('# objects %s: \t'%self.labels[i],v) for i,v in enumerate(self.samplecounts)]
 
 	def cut_columns(self, subsample, h): 
 		"""""
@@ -864,7 +864,7 @@ class RandomCatalogue(RealCatalogue):
 		Z = table['Z']
 		e1 = 2*np.random.random(len(table))
 		e2 = e1
-		e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
+		# e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
 		e_weight = np.array([1]*len(table))
 		comov = Planck13.comoving_distance(Z)
 		comov *= h
