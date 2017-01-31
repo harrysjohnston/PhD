@@ -5,6 +5,7 @@ import numpy as np
 from astropy.io import ascii
 from os.path import join, isdir, basename, normpath
 from os import listdir, mkdir
+import copy
 import os
 import argparse
 import csv
@@ -712,7 +713,6 @@ class RealCatalogue:
 			del_one_weights = np.delete(patchWeights,i)
 			jkweights[i] = np.mean(del_one_weights)
 		self.jkweights = jkweights
-		print('jkweights: ',jkweights)
 
 		return jkweights
 
@@ -752,7 +752,7 @@ class RealCatalogue:
 	def jackknife(self, patchDir, jkweights, largePi):
 		# read-in JK signals
 		JKdir = join(patchDir,'JKsamples')
-		jkwcorrs = [x for x in listdir(JKdir) if ('wcorr' in x)&('.dat' in x)]
+		jkwcorrs = [x for x in listdir(JKdir) if ('Pi' not in x)&('.dat' in x)]
 		# N patches <-> N signal files
 		if largePi:
 			jkwcorrs = [x for x in listdir(JKdir) if ('Pi' in x)&('.dat' in x)]
@@ -769,15 +769,17 @@ class RealCatalogue:
 		# Cp,Cx = ((wgp.shape[0]-1)/wgp.shape[0])*(wgP.T*wgP),((wgX.shape[0]-1)/wgX.shape[0])*(wgX.T*wgX)
 		Cp,Cx = np.cov(wgp,rowvar=0),np.cov(wgx,rowvar=0)
 		print("Currently no weights applied to jackknife samples, as all are very similar...")
+		print('jkweights: ',jkweights)
 		# UNWEIGHTED - all jk samples lose 0.52-0.56 of area, with majority close to 0.54
 		print('wg+ sample covariance:\n(boot-normalisation)\n',Cp)
 		Cp,Cx = Cp*((Nobs-1)**2)/Nobs, Cx*((Nobs-1)**2)/Nobs # jackknife normalisation
-		print('(jackknife-normalisation)\n',Cp)
-		print('N_obs (# jk samples): ',Nobs)
+		Cp_,Cx_ = copy.copy(Cp),copy.copy(Cx)
 		Rp,Rx = self.pearson_r(Cp),self.pearson_r(Cx)
+		print('(jackknife-normalisation)\n',Cp_)
+		print('copy-copy bullshit:\n',Cp)
 
 		# compute JK stdev on signals
-		Pstds,Xstds = np.sqrt(np.diag(Cp)),np.sqrt(np.diag(Cx))
+		Pstds,Xstds = np.sqrt(np.diag(Cp_)),np.sqrt(np.diag(Cx_))
 		del jksignals
 		gc.collect()
 
@@ -787,7 +789,7 @@ class RealCatalogue:
 		if largePi:
 			JKerrs_out = join(patchDir,'..','JKerrs_%s_largePi'%label)
 		ascii.write(JKstds, JKerrs_out, delimiter='\t', names=['#w(g+)err','#w(gx)err'])
-		cov_combos = [[Cp,'P'],[Cx,'X']]
+		cov_combos = [[Cp_,'P'],[Cx_,'X']]
 
 		toplotDir = join(patchDir,'../to_plot')
 		if not isdir(toplotDir):
@@ -1112,9 +1114,7 @@ if __name__ == "__main__":
 		for lab in catalog.labels[:4]:
 			pDir = join(catalog.new_root,lab)
 			if (args.zCut==None)&(lab.startswith('low')):
-				cplab = "high"+lab[3:]
-				cpDir = join(catalog.new_root,cplab)
-				os.system('cp %s/* %s'%(cpDir,pDir))
+				print('no z-cut; skipping low-z..')
 			else:
 				if args.bootstrap:
 					catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi)
@@ -1158,6 +1158,9 @@ if __name__ == "__main__":
 			new_table = catalog2.cut_columns(sample, args.H)
 			sample_num = catalog2.save_tables(new_table,outfile_root,catalog2.labels[i],args.zCut,args.cCut,Notes)
 			sample_numbers.append(sample_num)
+			if args.zCut==None:
+				print('no z-cut; skipping low-z..')
+				break
 
 		File = join(catalog.new_root, 'Sample_rand_popns')
 		Write = open(File, "w")
