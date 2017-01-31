@@ -209,7 +209,7 @@ class RealCatalogue:
 		elif z_cut != None:
 			outfile_root = outfile_root_ + "_z" + str(z_cut)
 		else:
-			outfile_root = outfile_root_
+			outfile_root = outfile_root_ + "_allz"
 
 		self.new_root = outfile_root
 		if not isdir(outfile_root):
@@ -309,7 +309,8 @@ class RealCatalogue:
 			mkdir(easyPlotDir)
 		flist = listdir(files_path)
 		zcheck = np.array([i in flist for i in wcorrIDs])
-		wcorrOutputs,rand_wcorrOutputs = np.array(wcorrOutputs)[zcheck],np.array(rand_wcorrOutputs)[zcheck]
+		wcorrOutputs,rand_wcorrOutputs = np.array(wcorrOutputs),np.array(rand_wcorrOutputs)
+		wcorrOutputs,rand_wcorrOutputs = wcorrOutputs[zcheck],rand_wcorrOutputs[zcheck]
 		for i, path in enumerate(wcorrOutputs):
 			realData.append(np.loadtxt(path))
 			randData.append(np.loadtxt(rand_wcorrOutputs[i]))
@@ -615,11 +616,12 @@ class RealCatalogue:
 		dpatches = listdir(dDir)
 		dpatches.sort()
 		os.system('cp %s/* %s'%(dDir,patchDir))
-		print('is BCGs: shape=%s, dens=%s'%(self.BCGargs[0],self.BCGargs[1]))
+		print('correlating patch (BCG=%s) densities with %s (BCG=%s) shapes...'%(self.BCGargs[0],label,self.BCGargs[1]))
+		# print('is BCGs: shape=%s, dens=%s'%(self.BCGargs[0],self.BCGargs[1]))
 		for i,p in enumerate(patches):
 			pCount = len(np.loadtxt(join(patchDir,p)))
 			dCount = len(np.loadtxt(join(patchDir,dpatches[i])))
-			print("patch %s, density popn %s, shapes popn %s"%((i+1),dCount,pCount))
+			# print("patch %s, density popn %s, shapes popn %s"%((i+1),dCount,pCount))
 			os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(patchDir,dpatches[i],dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-9],nproc))
 			if largePi:
 				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s_largePi %s 1 0'%(patchDir,dpatches[i],dCount,p,pCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,p[:-9],nproc))
@@ -724,12 +726,13 @@ class RealCatalogue:
 		if 'lowZ' in patchDir:
 			dens_sample = join(patchDir,'..','lowZ.asc')
 		dlabel = basename(normpath(dens_sample))
+		slabel = basename(normpath(patchDir))
 		dCount = len(np.loadtxt(dens_sample))
-		print("correlating jackknife regions with %s density sample, N=%s"%(dlabel,dCount))
+		print("correlating (BCG=%s) density sample with jackknife_i %s (BCG=%s) shapes..."%(self.BCGargs[0],slabel,self.BCGargs[1]))
 		os.system('cp %s %s'%(dens_sample,JKdir))
 		for i,jk in enumerate(JKsamples):
 			jkCount = len(np.loadtxt(join(JKdir,jk)))
-			print("JK%s, shapes popn %s"%((i+1),jkCount))
+			# print("JK%s, shapes popn %s"%((i+1),jkCount))
 			os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(JKdir,dlabel,dCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,jk[:-4],nproc))
 			if largePi:
 				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s_largePi %s 1 0'%(JKdir,dlabel,dCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,jk[:-4],nproc))
