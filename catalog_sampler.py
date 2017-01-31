@@ -68,8 +68,14 @@ class RealCatalogue:
 		for head in self.headers:
 			assert head in self.columns, "'%s' not in columns, see headers: %s"%(head,self.columns)
 
-		self.zstr = '%.f'%z_
-		self.cstr = '%.f'%colour_
+		if z_!=None:
+			self.zstr = '%.f'%z_
+		else:
+			self.zstr = None
+		if colour_!=None:
+			self.cstr = '%.f'%colour_
+		else:
+			self.cstr = None
 
 		self.pre_count = len(self.data)
 		z = self.data[self.headers[2]]
@@ -153,7 +159,7 @@ class RealCatalogue:
 
 		return None
 
-	def cut_columns(self, subsample, h): 
+	def cut_columns(self, subsample, h):
 		"""""
 		take subsample data 
 		& isolate columns for wcorr
@@ -903,7 +909,7 @@ if __name__ == "__main__":
 	'-zCut',
 	type=np.float32,
 	help='lowZ vs. highZ redshift threshold, between 0 - 0.5. Defaults to 0.22, set to 0 for no redshift cut',
-	default=0.22)
+	default=None)
 	parser.add_argument(
 	'-cCut',
 	type=np.float32,
