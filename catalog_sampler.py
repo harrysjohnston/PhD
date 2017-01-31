@@ -1071,29 +1071,11 @@ if __name__ == "__main__":
 	sample_numbers = [cuts]
 	outfile_root = join(args.Path,'Wcorr')
 
-	Notes = args.notes
-	if args.BCGdens:
-		if Notes != None:
-			Notes += 'BCGdens'
-		else:
-			Notes = 'BCGdens'
-	if args.BCGshap:
-		if Notes != None:
-			Notes += 'BCGshap'
-		else:
-			Notes = 'BCGshap'
-
 	print('CUTTING/SAVING SAMPLES...')
 	for i, sample in enumerate(samples):
 		new_table = catalog.cut_columns(sample, args.H)
-		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, Notes)
+		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
 		sample_numbers.append(sample_num)
-
-	File = join(catalog.new_root, 'Sample_popns')
-	Write = open(File, "w")
-	Text = "\n".join(sample_numbers)
-	Write.write(str(Text))
-	Write.close()
 
 	if args.bootstrap or args.jackknife:
 		print('COMPUTING SAMPLE COVARIANCES...')
@@ -1151,17 +1133,11 @@ if __name__ == "__main__":
 		for i, sample in enumerate(samples):
 			print('CUTTING/SAVING RANDOMS...')
 			new_table = catalog2.cut_columns(sample, args.H)
-			sample_num = catalog2.save_tables(new_table,outfile_root,catalog2.labels[i],args.zCut,args.cCut,Notes)
+			sample_num = catalog2.save_tables(new_table,outfile_root,catalog2.labels[i],args.zCut,args.cCut,args.notes)
 			sample_numbers.append(sample_num)
 			if args.zCut==None:
 				print('no z-cut; skipping low-z..')
 				break
-
-		File = join(catalog.new_root, 'Sample_rand_popns')
-		Write = open(File, "w")
-		Text = "\n".join(sample_numbers)
-		Write.write(str(Text))
-		Write.close()
 
 		rand_combos = [
 		[catalog2.labels[0]+'.asc', catalog2.samplecounts[0], catalog.labels[0]+'.asc', catalog.samplecounts[0], 'rand_'+catalog.wcorrLabels[0]],
@@ -1190,9 +1166,11 @@ if __name__ == "__main__":
 			[os.system('qsub '+ join(catalog.new_root, shell)) for shell in list_dir]
 
 	print('FINISHED!')
-	with open(join(catalog.new_root,'C-line_args.txt'),'a') as script:
+	with open(join(catalog.new_root,'C-lineArgs_SampleProps.txt'),'a') as script:
 		script.write(str(args))
 		script.write('\n')
+		[script.write('%s: \t%d'%(catalog.labels[i],catalog.samplecounts[i])) for i in range(len(catalog.labels))]
+		[script.write('random %s: \t%d'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
 
 
 
