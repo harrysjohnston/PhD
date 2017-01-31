@@ -211,12 +211,12 @@ class RealCatalogue:
 			outfile_root = outfile_root_
 
 		self.new_root = outfile_root
-		zcCuts = [z_cut, c_cut]
+		# zcCuts = [z_cut, c_cut]
 
 		if not isdir(outfile_root):
 			mkdir(outfile_root)
 
-		np.savetxt(join(outfile_root, 'ZC_cuts'), zcCuts, delimiter=',', fmt="%f")
+		# np.savetxt(join(outfile_root, 'ZC_cuts'), zcCuts, delimiter=',', fmt="%f")
 
 		ascii.write(new_table, join(outfile_root, label + ".asc"), names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
 
@@ -770,7 +770,10 @@ class RealCatalogue:
 		Cp,Cx = np.cov(wgp,rowvar=0),np.cov(wgx,rowvar=0)
 		print("Currently no weights applied to jackknife samples, as all are very similar...")
 		# UNWEIGHTED - all jk samples lose 0.52-0.56 of area, with majority close to 0.54
+		print('wg+ sample covariance:\n(boot-normalisation)\n',Cp)
 		Cp,Cx = Cp*((Nobs-1)**2)/Nobs, Cx*((Nobs-1)**2)/Nobs # jackknife normalisation
+		print('(jackknife-normalisation)\n',Cp)
+		print('N_obs (# jk samples): ',Nobs)
 		Rp,Rx = self.pearson_r(Cp),self.pearson_r(Cx)
 
 		# compute JK stdev on signals
@@ -1171,6 +1174,10 @@ if __name__ == "__main__":
 			r_shells = np.array([i.startswith('rand') for i in list_dir])
 			list_dir = list_dir[(shells&r_shells)]
 			[os.system('qsub '+ join(catalog.new_root, shell)) for shell in list_dir]
+
+	with open(join(catalog.new_root,'C-line_args.txt'),'a') as script:
+		script.write(str(args))
+		script.write('\n')
 
 
 
