@@ -212,15 +212,10 @@ class RealCatalogue:
 			outfile_root = outfile_root_
 
 		self.new_root = outfile_root
-		# zcCuts = [z_cut, c_cut]
-
 		if not isdir(outfile_root):
 			mkdir(outfile_root)
 
-		# np.savetxt(join(outfile_root, 'ZC_cuts'), zcCuts, delimiter=',', fmt="%f")
-
 		ascii.write(new_table, join(outfile_root, label + ".asc"), names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
-
 		sample_no = "%s # objects:\t%s"%(label,len(new_table))
 		return sample_no
 
@@ -297,9 +292,9 @@ class RealCatalogue:
 			# construct filenames.dat
 			wcorrOutputs.append('%s'%join(files_path, ('wcorr_' + item + '.dat')))
 			rand_wcorrOutputs.append('%s'%join(files_path, ('wcorr_rand_' + item + '.dat')))
-		realData = []
-		randData = []
-		wgplus = []
+		realData = [] # clean this up by directly building the to_plot data file,
+		randData = [] # starting from np.empty([bins=6,cols=8]) - poss fewer cols
+		wgplus = [] #   if no BT or JK
 		wgcross = []
 		wgerr = []
 		Pproperrs = []
@@ -312,6 +307,9 @@ class RealCatalogue:
 		easyPlotDir = join(files_path, 'to_plot')
 		if not isdir(easyPlotDir):
 			mkdir(easyPlotDir)
+		flist = listdir(files_path)
+		zcheck = np.array([i in flist for i in wcorrIDs])
+		wcorrOutputs,rand_wcorrOutputs = np.array(wcorrOutputs)[zcheck],np.array(rand_wcorrOutputs)[zcheck]
 		for i, path in enumerate(wcorrOutputs):
 			realData.append(np.loadtxt(path))
 			randData.append(np.loadtxt(rand_wcorrOutputs[i]))
@@ -771,12 +769,9 @@ class RealCatalogue:
 		print("Currently no weights applied to jackknife samples, as all are very similar...")
 		print('jkweights: ',jkweights)
 		# UNWEIGHTED - all jk samples lose 0.52-0.56 of area, with majority close to 0.54
-		print('wg+ sample covariance:\n(boot-normalisation)\n',Cp)
 		Cp,Cx = Cp*((Nobs-1)**2)/Nobs, Cx*((Nobs-1)**2)/Nobs # jackknife normalisation
 		Cp_,Cx_ = copy.copy(Cp),copy.copy(Cx)
 		Rp,Rx = self.pearson_r(Cp),self.pearson_r(Cx)
-		print('(jackknife-normalisation)\n',Cp_)
-		print('copy-copy bullshit:\n',Cp)
 
 		# compute JK stdev on signals
 		Pstds,Xstds = np.sqrt(np.diag(Cp_)),np.sqrt(np.diag(Cx_))
@@ -886,10 +881,10 @@ class RandomCatalogue(RealCatalogue):
 		e1 = 2*np.random.random(len(table))
 		e2 = e1
 		# e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
-		e_weight = np.array([1]*len(table))
+		e_weight = np.ones_like(e1)
 		comov = Planck13.comoving_distance(Z)
 		comov *= h
-		new_table = np.column_stack((RA, DEC, comov, e1, e2, e_weight))
+		new_table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
 		return new_table
 
 if __name__ == "__main__":
