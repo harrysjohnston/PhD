@@ -1086,6 +1086,7 @@ if __name__ == "__main__":
 		else:
 			Notes = 'BCGshap'
 
+	print('CUTTING/SAVING SAMPLES...')
 	for i, sample in enumerate(samples):
 		new_table = catalog.cut_columns(sample, args.H)
 		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, Notes)
@@ -1098,6 +1099,7 @@ if __name__ == "__main__":
 	Write.close()
 
 	if args.bootstrap or args.jackknife:
+		print('COMPUTING SAMPLE COVARIANCES...')
 		# patchData.shape = (6 subsamples, N patches)
 		patchData, patchWeights = catalog.patch_data(args.patchSize, args.bitmaskCut)
 		# print('MAPPING')
@@ -1109,25 +1111,35 @@ if __name__ == "__main__":
 				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j) # save_patches returns str(patchDir)
 		for lab in catalog.labels[:4]:
 			pDir = join(catalog.new_root,lab)
-			if args.bootstrap:
-				catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi)
-				catalog.bootstrap_signals(pDir, patchWeights, 0)
-			if args.jackknife:
-				jkweights = catalog.jackknife_patches(pDir, patchWeights)
-				catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0)
-				catalog.jackknife(pDir, jkweights, 0)
-			if args.largePi:
+			if (args.zCut==None)&(lab.startswith('low')):
+				cplab = "high"+lab[3:]
+				cpDir = join(catalog.new_root,cplab)
+				os.system('cp %s/* %s'%(cpDir,pDir))
+			else:
 				if args.bootstrap:
-					catalog.bootstrap_signals(pDir, patchWeights, 1)
+					catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi)
+					catalog.bootstrap_signals(pDir, patchWeights, 0)
 				if args.jackknife:
 					jkweights = catalog.jackknife_patches(pDir, patchWeights)
-					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1)
-					catalog.jackknife(pDir, jkweights, 1)
+					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0)
+					catalog.jackknife(pDir, jkweights, 0)
+				if args.largePi:
+					if args.bootstrap:
+						catalog.bootstrap_signals(pDir, patchWeights, 1)
+					if args.jackknife:
+						jkweights = catalog.jackknife_patches(pDir, patchWeights)
+						catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1)
+						catalog.jackknife(pDir, jkweights, 1)
 
 	catalog.make_combos()
-	catalog.prep_wcorr(catalog.new_root,catalog.wcorr_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
+	if args.zCut==None:
+		allz_combos = catalog.wcorr_combos[:2]
+		catalog.prep_wcorr(catalog.new_root,allz_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
+	else:
+		catalog.prep_wcorr(catalog.new_root,catalog.wcorr_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
 
 	if args.wcorr:
+		print('QSUBBING REAL_WCORR..')
 		list_dir = np.array(listdir(catalog.new_root))
 		shells = np.array([i.endswith('.sh') for i in list_dir])
 		r_shells = np.array([i.startswith('real') for i in list_dir])
@@ -1142,6 +1154,7 @@ if __name__ == "__main__":
 		sample_numbers = [cuts]
 
 		for i, sample in enumerate(samples):
+			print('CUTTING/SAVING RANDOMS...')
 			new_table = catalog2.cut_columns(sample, args.H)
 			sample_num = catalog2.save_tables(new_table,outfile_root,catalog2.labels[i],args.zCut,args.cCut,Notes)
 			sample_numbers.append(sample_num)
@@ -1158,6 +1171,8 @@ if __name__ == "__main__":
 		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[2]+'.asc', catalog.samplecounts[2], 'rand_'+catalog.wcorrLabels[2]],
 		[catalog2.labels[1]+'.asc', catalog2.samplecounts[1], catalog.labels[3]+'.asc', catalog.samplecounts[3], 'rand_'+catalog.wcorrLabels[3]]
 		]
+		if args.zCut==None:
+			rand_combos = rand_combos[:2]
 
 		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'rand_wcorr')
 
@@ -1169,12 +1184,14 @@ if __name__ == "__main__":
 				script.write('\n')
 
 		if args.wcorr:
+			print('QSUBBING RANDOM_WCORR..')
 			list_dir = np.array(listdir(catalog.new_root))
 			shells = np.array([i.endswith('.sh') for i in list_dir])
 			r_shells = np.array([i.startswith('rand') for i in list_dir])
 			list_dir = list_dir[(shells&r_shells)]
 			[os.system('qsub '+ join(catalog.new_root, shell)) for shell in list_dir]
 
+	print('FINISHED!')
 	with open(join(catalog.new_root,'C-line_args.txt'),'a') as script:
 		script.write(str(args))
 		script.write('\n')
