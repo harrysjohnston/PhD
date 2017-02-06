@@ -27,7 +27,7 @@ import astropy.stats as astat
 
 class RealCatalogue:
 
-	def __init__(self, path, DEI): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
+	def __init__(self, path, DEI, psize): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
 		"""""
 		read-in catalogue
 
@@ -59,6 +59,10 @@ class RealCatalogue:
 		self.ext_labels = ext_labels
 		# bodies of wcorr output file IDs
 		self.wcorrLabels = ['highZ_vs_highZ_Red', 'highZ_vs_highZ_Blue', 'lowZ_vs_lowZ_Red', 'lowZ_vs_lowZ_Blue']
+		Npatch = {'3':96,'4':54,'9':24}
+		self.Npatch = Npatch[psize]
+
+		# MEASURE WG+ SIGNALS
 
 	def cut_data(self, pgm_, z_, colour_, BCGdens, BCGshap, *bitmask_):
 		"""""
@@ -364,11 +368,7 @@ class RealCatalogue:
 
 		return wcorrOutputs
 
-	def chiFunc(self, y, dof):
-		return chi2.pdf(y, dof)
-
-	def normFunc(self, y):
-		return stat.norm(0,1).pdf(y)
+		# COMPUTE SAMPLE COVARIANCE & ERRORS
 
 	def chi2(self, path2data, expec, dof, covartype):
 		filesList = np.array(listdir(path2data))
@@ -386,11 +386,11 @@ class RealCatalogue:
 		chiFunc = lambda x: chi2.pdf(x, dof)
 		# compute chi2, p-values, significance for a) plus and b) cross signals
 		for j,ARR in enumerate([covarArr[:8],covarArr[8:]]):
-			print('plus (0), cross (1): %s'%j)
+			print('plus (0), cross (1): %s'%j) # THIS FOR-LOOP BREAKS FOR ALL-Z RUNS
 			for i,cov in enumerate(ARR):
-				print('%s'%self.ext_labels[i])
+				# print('%s'%self.ext_labels[i])
 				cov = np.mat(cov)
-				print('covariance:\n',cov)
+				# print('covariance:\n',cov)
 				sig = np.mat(dataArr[i][j])
 				if (~cov.any(axis=0)).any():
 					zero_ind = int(np.where(~cov.any(axis=0))[1])
@@ -399,7 +399,9 @@ class RealCatalogue:
 					sig = np.delete(sig,zero_ind)
 					print('SINGULAR MATRIX - low-z lack of large-r_p sampling? - discarding bin %s'%(zero_ind+1))
 				print('signal:\n',sig)
-				invCov = np.linalg.inv(cov)
+				N_d = len(sig)
+				N_s = self.Npatch
+				invCov = np.linalg.inv(cov) * (N_s-1)/(N_s-N_d-2) # HARTLAP FACTOR
 				chi = (sig*invCov)*sig.T
 				fchi = float(chi)
 				p_val = scint.quad(chiFunc, fchi, np.inf)[0]
@@ -448,7 +450,7 @@ class RealCatalogue:
 		lostpixIDs = [j for j,b in enumerate(bitmask_cut) if b==False]
 		lostfromGK = np.where(GKpix[lostpixIDs]!=0,1,0) #1=pixel-lost,0=not-lost
 		lostmap = np.bincount(lostpixIDs,minlength=npix)
-		hp.write_map(join(self.new_root,'lostpixmap.fits'),lostmap)
+		# hp.write_map(join(self.new_root,'lostpixmap.fits'),lostmap)
 		print('Lost npix, fraction of area: %s, %.3f'%(sum(lostfromGK),sum(lostfromGK)/sum(GKpix)))
 		if lostpixIDs != []:
 			thetaPhis = hp.pix2ang(nside,lostpixIDs)
@@ -1007,7 +1009,7 @@ if __name__ == "__main__":
 	default=1)
 	parser.add_argument(
 	'-patchSize',
-	help='preferred mean patch size (deg^2) for sample covariance determinations, defaults to 9sqdeg',
+	help='preferred mean patch size (deg^2) for sample covariance determinations, defaults to 9sqdeg - USE THIS ARG IF DOING CHI2',
 	type=np.float32,
 	default=9)
 	parser.add_argument(
@@ -1027,7 +1029,7 @@ if __name__ == "__main__":
 	default=1)
 	args = parser.parse_args()
 
-	catalog = RealCatalogue(args.Catalog, args.DEIMOS)
+	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.patchSize)
 
 	if args.plotNow:
 		# reduce & save data files, returning filename-list
@@ -1172,8 +1174,8 @@ if __name__ == "__main__":
 	with open(join(catalog.new_root,'C-lineArgs_SampleProps.txt'),'a') as script:
 		script.write(str(args))
 		script.write('\n')
-		[script.write('%s: \t%d'%(catalog.labels[i],catalog.samplecounts[i])) for i in range(len(catalog.labels))]
-		[script.write('random %s: \t%d'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
+		[script.write('%s: \t%d\n'%(catalog.labels[i],catalog.samplecounts[i])) for i in range(len(catalog.labels))]
+		[script.write('random %s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
 
 
 
