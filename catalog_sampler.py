@@ -59,7 +59,7 @@ class RealCatalogue:
 		self.ext_labels = ext_labels
 		# bodies of wcorr output file IDs
 		self.wcorrLabels = ['highZ_vs_highZ_Red', 'highZ_vs_highZ_Blue', 'lowZ_vs_lowZ_Red', 'lowZ_vs_lowZ_Blue']
-		Npatch = {'3':96,'4':54,'9':24}
+		Npatch = {3.0:96,4.0:54,9.0:24}
 		self.Npatch = Npatch[psize]
 
 		# MEASURE WG+ SIGNALS
@@ -241,7 +241,7 @@ class RealCatalogue:
 		'#!/bin/tcsh',
 		'#PBS -q compute',
 		'#PBS -N %s'%out_sh,
-		'#PBS -l nodes=1',
+		'#PBS -l nodes=1:ppn=%s'%nproc,
 		'#PBS -l walltime=120:00:00',
 		'#PBS -l mem=50gb',
 		'#PBS -o %s'%join(files_path,out_sh+'.out'),
@@ -772,7 +772,7 @@ class RealCatalogue:
 		# Cp,Cx = ((wgp.shape[0]-1)/wgp.shape[0])*(wgP.T*wgP),((wgX.shape[0]-1)/wgX.shape[0])*(wgX.T*wgX)
 		Cp,Cx = np.cov(wgp,rowvar=0),np.cov(wgx,rowvar=0)
 		print("Currently no weights applied to jackknife samples, as all are very similar...")
-		print('jkweights: ',jkweights)
+
 		# UNWEIGHTED - all jk samples lose 0.52-0.56 of area, with majority close to 0.54
 		Cp,Cx = Cp*((Nobs-1)**2)/Nobs, Cx*((Nobs-1)**2)/Nobs # jackknife normalisation
 		Cp_,Cx_ = copy.copy(Cp),copy.copy(Cx)
@@ -1158,7 +1158,7 @@ if __name__ == "__main__":
 		if args.plot:
 			with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
 				script.write(
-				'\npython /share/splinter/hj/PhD/catalog_sampler.py %s %s -plotNow 1 -chiSqu 1'%(args.Catalog, catalog.new_root)
+				'\npython /share/splinter/hj/PhD/catalog_sampler.py %s %s -patchSize %s -plotNow 1 -chiSqu 1'%(args.Catalog,catalog.new_root,int(args.patchSize))
 				)
 				script.write('\n')
 

@@ -28,6 +28,7 @@ def compute_Wz(z,nofz):
     Wz_nom = (pz**2)/(Xz2*Xprime)
     Wz_dom = sum(Wz_nom)*h
     Wz = Wz_nom/Wz_dom
+    # redshift & luminosity free params!!
     return Wz # WILL NEED TO EDIT FOR HIGH- & LOW-Z 
 
 def compute_wgp(Wz,wgp_rz,nbin,dz):
