@@ -152,6 +152,9 @@ class RealCatalogue:
 		self.samplecounts = []
 
 		# save cuts for later use
+		self.Rmags = []
+		for sample in [self.highz_R,self.highz_B,self.lowZ_R,self.lowZ_B]:
+			self.Rmags.append(np.mean(sample['absmag_r_1']))
 		self.zcut = z_cut
 		self.zcut_r = z_cut_r
 		self.redcut = red_cut
@@ -323,6 +326,7 @@ class RealCatalogue:
 			realErr = realData[i][:,6]
 			randErr = randData[i][:,6]
 
+			Pproperr,Xproperr = np.ones_like(realErr),np.ones_like(realErr)
 			if BT:
 				BTerrs = np.loadtxt(join(files_path,'BTerrs_%s'%self.labels[i]))
 				if largePi:
@@ -334,6 +338,7 @@ class RealCatalogue:
 				Pproperrs.append(Pproperr)
 				Xproperrs.append(Xproperr)
 
+			Pproperr2,Xproperr2 = np.ones_like(realErr),np.ones_like(realErr)
 			if JK:
 				JKerrs = np.loadtxt(join(files_path,'JKerrs_%s'%self.labels[i]))
 				if largePi:
@@ -353,18 +358,9 @@ class RealCatalogue:
 			rand_wgcross.append(randData[i][:,4])
 			rand_wgerr.append(randData[i][:,6])
 			# save reduced data to ascii for easy plotting
-			if BT&JK:
-				reducedData = np.column_stack((realData[0][:,0], realData[i][:,3], Pproperr, Pproperr2, realData[i][:,4], Xproperr, Xproperr2, propgErrs)) # = [r_p, wgplus, BTPerr, JKPerr, wgcross, BTXerr, JKXerr, analyticErrs]
-				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'BT+err', 'JK+err', 'wgx', 'BTxerr', 'JKxerr', 'analyticerrs'])
-			elif BT:
-				reducedData = np.column_stack((realData[0][:,0], realData[i][:,3], Pproperr, realData[i][:,4], Xproperr, propgErrs)) # = [r_p, wgplus, Perr, wgcross, Xerr, analyticErrs]
-				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'BT+err', 'wgx', 'BTxerr', 'analyticerrs'])
-			elif JK:
-				reducedData = np.column_stack((realData[0][:,0], realData[i][:,3], Pproperr2, realData[i][:,4], Xproperr2, propgErrs)) # = [r_p, wgplus, Perr, wgcross, Xerr, analyticErrs]
-				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'JK+err', 'wgx', 'JKxerr', 'analyticerrs'])
-			else:
-				reducedData = zip(realData[0][:,0], realData[i][:,3], realData[i][:,4], propgErrs) # = [r_p, wgplus, wgcross, wgerr]
-				ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wgplus', 'wgcross', 'wgerr'], formats={'r_p':np.float32, 'wgplus':np.float32, 'wgcross':np.float32, 'wgerr':np.float32})
+
+			reducedData = np.column_stack((realData[0][:,0], realData[i][:,3], Pproperr, Pproperr2, realData[i][:,4], Xproperr, Xproperr2, propgErrs)) # = [r_p, wgplus, BTPerr, JKPerr, wgcross, BTXerr, JKXerr, analyticErrs]
+			ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'BT+err', 'JK+err', 'wgx', 'BTxerr', 'JKxerr', 'analyticerrs'])
 
 		return wcorrOutputs
 
@@ -1174,7 +1170,7 @@ if __name__ == "__main__":
 	with open(join(catalog.new_root,'C-lineArgs_SampleProps.txt'),'a') as script:
 		script.write(str(args))
 		script.write('\n')
-		[script.write('%s: \t%d\n'%(catalog.labels[i],catalog.samplecounts[i])) for i in range(len(catalog.labels))]
+		[script.write('%s: \t%d, mean R_mag: %.4f\n'%(catalog.labels[i],catalog.samplecounts[i],catalog.Rmags[i])) for i in range(len(catalog.labels))]
 		[script.write('random %s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
 
 

@@ -28,7 +28,11 @@ def compute_Wz(z,nofz):
     Wz_nom = (pz**2)/(Xz2*Xprime)
     Wz_dom = sum(Wz_nom)*h
     Wz = Wz_nom/Wz_dom
-    # redshift & luminosity free params!!
+    # redshift & luminosity dep. -> eta,beta free params when fitting!!
+    zfactor = ((1+z)/(1+0.3))**2.27 # eta=2.27, z0=0.3
+    Rmag = -22.2081 # highz red sample
+    Lfactor = 10**(0.4*(-22-Rmag)*1.13) # beta=1.13, R0=-22
+    Wz *= zfactor*Lfactor
     return Wz # WILL NEED TO EDIT FOR HIGH- & LOW-Z 
 
 def compute_wgp(Wz,wgp_rz,nbin,dz):
