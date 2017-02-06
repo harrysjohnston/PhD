@@ -312,7 +312,7 @@ class RealCatalogue:
 		if not isdir(easyPlotDir):
 			mkdir(easyPlotDir)
 		flist = listdir(files_path)
-		zcheck = np.array([i in flist for i in wcorrIDs])
+		zcheck = np.array(['wcorr_'+i+'.dat' in flist for i in wcorrIDs])
 		wcorrOutputs,rand_wcorrOutputs = np.array(wcorrOutputs),np.array(rand_wcorrOutputs)
 		wcorrOutputs,rand_wcorrOutputs = wcorrOutputs[zcheck],rand_wcorrOutputs[zcheck]
 		for i, path in enumerate(wcorrOutputs):
