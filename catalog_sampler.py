@@ -43,8 +43,8 @@ class RealCatalogue:
 			self.DEI = 0
 		hdulist = fits.open(path)
 		data = hdulist[1].data
-		print('SELECTING R_MAG < %s'%mc)
-		data = data[data['absmag_r_1']<mc]
+		print('SELECTING R_MAG < %s'%(-mc))
+		data = data[data['absmag_r_1']<(-mc)]
 		self.data = data
 		del data
 		gc.collect()
@@ -1023,9 +1023,9 @@ if __name__ == "__main__":
 	default=1)
 	parser.add_argument(
 	'-rmagCut',
-	help='R-band magnitude above which to exclude faint sources, defaults to -21',
+	help='R-band magnitude above which to exclude faint sources, sign flipped internally, defaults to 21',
 	type=int,
-	default=-21)
+	default=21)
 	args = parser.parse_args()
 
 	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.patchSize, args.rmagCut)
