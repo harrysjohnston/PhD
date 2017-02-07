@@ -765,7 +765,7 @@ class RealCatalogue:
 		# wgP,wgX = np.mat(wgp-Pmeans),np.mat(wgx-Xmeans)
 		# Cp,Cx = ((wgp.shape[0]-1)/wgp.shape[0])*(wgP.T*wgP),((wgX.shape[0]-1)/wgX.shape[0])*(wgX.T*wgX)
 		Cp,Cx = np.cov(wgp,rowvar=0),np.cov(wgx,rowvar=0)
-		print("Currently no weights applied to jackknife samples, as all are very similar...")
+		# print("Currently no weights applied to jackknife samples, as all are very similar...")
 
 		# UNWEIGHTED - all jk samples lose 0.52-0.56 of area, with majority close to 0.54
 		Cp,Cx = Cp*((Nobs-1)**2)/Nobs, Cx*((Nobs-1)**2)/Nobs # jackknife normalisation
@@ -1173,7 +1173,7 @@ if __name__ == "__main__":
 	with open(join(catalog.new_root,'C-lineArgs_SampleProps.txt'),'a') as script:
 		script.write(str(args))
 		script.write('\n')
-		[script.write('%s: \t%d, mean R_mag: %.4f\n'%(catalog.labels[i],catalog.samplecounts[i],catalog.Rmags[i])) for i in range(len(catalog.labels))]
+		[script.write('%s: \t%d, mean R_mag: %.4f\n'%(catalog.labels[i],catalog.samplecounts[i],catalog.Rmags[i])) for i in range(len(catalog.labels[:4]))]
 		[script.write('random %s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
 
 
