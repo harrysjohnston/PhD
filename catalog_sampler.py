@@ -27,7 +27,7 @@ import astropy.stats as astat
 
 class RealCatalogue:
 
-	def __init__(self, path, DEI, psize): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
+	def __init__(self, path, DEI, psize, mc): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
 		"""""
 		read-in catalogue
 
@@ -43,8 +43,6 @@ class RealCatalogue:
 			self.DEI = 0
 		hdulist = fits.open(path)
 		data = hdulist[1].data
-		# MAGNITUDE CUT - TURN THIS INTO C-LINE ARG!
-		mc = -21
 		print('SELECTING R_MAG < %s'%mc)
 		data = data[data['absmag_r_1']<mc]
 		self.data = data
@@ -153,7 +151,7 @@ class RealCatalogue:
 
 		# save cuts for later use
 		self.Rmags = []
-		for sample in [self.highz_R,self.highz_B,self.lowZ_R,self.lowZ_B]:
+		for sample in [self.highz_R,self.highz_B,self.lowz_R,self.lowz_B]:
 			self.Rmags.append(np.mean(sample['absmag_r_1']))
 		self.zcut = z_cut
 		self.zcut_r = z_cut_r
@@ -1023,9 +1021,14 @@ if __name__ == "__main__":
 	help='DEIMOS shapes (1), or KSB shapes (0), defaults to 1',
 	type=int,
 	default=1)
+	parser.add_argument(
+	'-rmagCut',
+	help='R-band magnitude above which to exclude faint sources, defaults to -21',
+	type=int,
+	default=-21)
 	args = parser.parse_args()
 
-	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.patchSize)
+	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.patchSize, args.rmagCut)
 
 	if args.plotNow:
 		# reduce & save data files, returning filename-list
