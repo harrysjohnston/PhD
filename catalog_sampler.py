@@ -278,18 +278,6 @@ class RealCatalogue:
 		Write.write(str(Text))
 		Write.close()
 
-		wcorr_spec = [] # record wcorr specification
-		wcorr_spec.append('Comoving transverse separation r_p: %s - %s Mpc/h in %s log-spaced bins'%(rp_lims[0], rp_lims[1], rp_bins))
-		wcorr_spec.append('Comoving line-of-sight separation \Pi: %s - %s Mpc/h in %s bins'%(los_lim*(-1), los_lim, los_bins))
-		wcorr_spec.append('No. processors: %s'%nproc)
-		wcorr_spec.append('Large-Pi systematics testing: %s'%large_pi)
-
-		File = join(files_path, 'wcorr_spec')
-		Write = open(File, 'w')
-		Text = '\n'.join(wcorr_spec)
-		Write.write(str(Text))
-		Write.close()
-
 	def plot_wcorr(self, files_path, wcorrIDs, BT, JK, largePi):
 		wcorrOutputs = []
 		rand_wcorrOutputs = []
@@ -392,14 +380,14 @@ class RealCatalogue:
 					cov = np.delete(cov,zero_ind,axis=1)
 					sig = np.delete(sig,zero_ind)
 					print('SINGULAR MATRIX - low-z lack of large-r_p sampling? - discarding bin %s'%(zero_ind+1))
-				print('signal:\n',sig)
+				# print('signal:\n',sig)
 				N_d = len(sig)
 				N_s = self.Npatch
 				invCov = np.linalg.inv(cov) * (N_s-1)/(N_s-N_d-2) # HARTLAP FACTOR
 				chi = (sig*invCov)*sig.T
 				fchi = float(chi)
 				p_val = scint.quad(chiFunc, fchi, np.inf)[0]
-				print('chi2: ',fchi,', p =',p_val)
+				# print('chi2: ',fchi,', p =',p_val)
 				xs = abs(stat.norm.interval((1-p_val), loc=0, scale=1)[0])
 				covarSigma.append([fchi,p_val,xs])
 		covarSigma = np.array(covarSigma)
@@ -1157,7 +1145,7 @@ if __name__ == "__main__":
 		if args.plot:
 			with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
 				script.write(
-				'\npython /share/splinter/hj/PhD/catalog_sampler.py %s %s -patchSize %s -plotNow 1 -chiSqu 1'%(args.Catalog,catalog.new_root,int(args.patchSize))
+				'\npython /share/splinter/hj/PhD/catalog_sampler.py %s %s -patchSize %s -plotNow 1 -chiSqu 1 -bootstrap %s -jackknife %s'%(args.Catalog,catalog.new_root,int(args.patchSize,args.bootstrap,args.jackknife))
 				)
 				script.write('\n')
 
