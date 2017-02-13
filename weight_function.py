@@ -8,7 +8,7 @@ def fivept_stencil(func,x,h):
     # returns f'(x), via 5pt stencil, for grid-spacing h
     return (-func(x+2*h)+8*func(x+h)-8*func(x-h)+func(x-2*h))/(12*h)
 
-def compute_Wz(z,nofz):
+def compute_Wz(z,nofz,eta,beta,Rmag):
     # Wz = [p^2 / X^2*X'] / int[p^2 / X^2*X' dz]
 
     # compute p(z) = unconditional pdf
@@ -29,11 +29,11 @@ def compute_Wz(z,nofz):
     Wz_dom = sum(Wz_nom)*h
     Wz = Wz_nom/Wz_dom
     # redshift & luminosity dep. -> eta,beta free params when fitting!!
-    zfactor = ((1+z)/(1+0.3))**2.27 # eta=2.27, z0=0.3
-    Rmag = -22.2081 # highz red sample
-    Lfactor = 10**(0.4*(-22-Rmag)*1.13) # beta=1.13, R0=-22
+    # defaults; eta=-0.27, beta=1.13 (Joa+'11, all-sample-fit)
+    zfactor = ((1+z)/(1+0.3))**eta # z0=0.3
+    Lfactor = 10**(0.4*(-22-Rmag)*beta) # R0=-22
     Wz *= zfactor*Lfactor
-    return Wz # WILL NEED TO EDIT FOR HIGH- & LOW-Z 
+    return Wz
 
 def compute_wgp(Wz,wgp_rz,nbin,dz):
     # Riemann sum over W(z) for wgp(r,z) -> wgp(r)
