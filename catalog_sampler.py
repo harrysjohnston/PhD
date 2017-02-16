@@ -916,8 +916,8 @@ if __name__ == "__main__":
 	parser.add_argument(
 	'-lmstarCut',
 	type=np.float32,
-	help='stellar mass cut, logmstar i.e. 10^(x), defaults to 11',
-	default=11)
+	help='stellar mass cut, logmstar i.e. 10^(x), defaults to None',
+	default=None)
 	parser.add_argument(
 	'-bitmaskCut',
 	nargs='*',
