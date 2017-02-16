@@ -112,7 +112,7 @@ class RealCatalogue:
 			print('highZ catalog == lowZ catalog')
 		print('z cut [unique]: \t', z_, np.unique(z_cut))
 		if lmstar_ != None:
-			lmstar_cut = np.array(logmstar > lmstar_)
+			lmstar_cut = np.array((logmstar>lmstar_[0])&(logmstar<lmstar_[1]))
 		else:
 			lmstar_cut = np.array([True]*len(self.data))
 		print('lmstar cut [unique]: \t', lmstar_, np.unique(lmstar_cut))
@@ -916,8 +916,9 @@ if __name__ == "__main__":
 	default=1.0)
 	parser.add_argument(
 	'-lmstarCut',
+	nargs=2,
 	type=np.float32,
-	help='stellar mass cut, logmstar i.e. 10^(x), defaults to None',
+	help='stellar mass window cut [min, max], logmstar i.e. 10^(x), defaults to None',
 	default=None)
 	parser.add_argument(
 	'-bitmaskCut',
