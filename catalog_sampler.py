@@ -33,8 +33,8 @@ class RealCatalogue:
 
 		"""""
 		self.path = path
-		KSBheads = ['RA_1_1','DEC_1_1','Z_1_1','e1c','e2c','RankBCG_1','logmstar','pgm','absmag_g_1','absmag_i_1','col3']
-		DEIheads = ['RA_GAMA','DEC_GAMA','Z','e1','e2','RankBCG','logmstar','pgm','absmag_g_1','absmag_i_1','MASK']
+		KSBheads = ['RA_1_1','DEC_1_1','Z_TONRY','e1c','e2c','RankBCG_1','logmstar','pgm','absmag_g_1','absmag_i_1','col3']
+		DEIheads = ['RA_GAMA','DEC_GAMA','Z_TONRY','e1','e2','RankBCG','logmstar','pgm','absmag_g_1','absmag_i_1','MASK']
 		if DEI:
 			self.headers = DEIheads
 			self.DEI = 1
@@ -191,10 +191,12 @@ class RealCatalogue:
 		e_weight = np.where(pgm<0.1,0,pgm)
 		if self.DEI:
 			e_weight = np.where(table['flag_DEIMOS']=='0000',1,0)
-		e1m,e2m = e1[np.where(e_weight==1,True,False)],e2[np.where(e_weight==1,True,False)]
-		e1m,e2m = np.mean(e1m),np.mean(e2m)
-		e1 -= e1m
-		e2 -= e2m
+		if len(e1)>1000:
+			e1m,e2m = e1[np.array(e_weight,dtype=bool)],e2[np.array(e_weight,dtype=bool)]
+			e1m,e2m = np.mean(e1m),np.mean(e2m)
+			e1 -= e1m
+			e2 -= e2m
+
 		e1,e2,e_weight = map(lambda x: np.nan_to_num(x), [e1,e2,e_weight])
 
 		# random re-shuffle test - density-shape corr should now ~ 0
