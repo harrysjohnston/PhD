@@ -696,6 +696,7 @@ class RealCatalogue:
 		# resample patches & save JK samples
 		patches = [x for x in listdir(patchDir) if ('patch' in x)&('_' in x)]
 		patch_cats = np.array([np.loadtxt(join(patchDir,i)) for i in patches])
+		patch_cats = np.array([i for i in patch_cats if i.shape!=(0,)])
 		JKdir = join(patchDir,'JKsamples')
 		if not isdir(JKdir):
 			mkdir(JKdir)
