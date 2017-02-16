@@ -33,8 +33,8 @@ class RealCatalogue:
 
 		"""""
 		self.path = path
-		KSBheads = ['RA_1_1','DEC_1_1','Z_1_1','e1c','e2c','RankBCG_1','pgm','absmag_g_1','absmag_i_1','col3']
-		DEIheads = ['RA_GAMA','DEC_GAMA','Z','e1','e2','RankBCG','pgm','absmag_g_1','absmag_i_1','MASK']
+		KSBheads = ['RA_1_1','DEC_1_1','Z_1_1','e1c','e2c','RankBCG_1','logmstar','pgm','absmag_g_1','absmag_i_1','col3']
+		DEIheads = ['RA_GAMA','DEC_GAMA','Z','e1','e2','RankBCG','logmstar','pgm','absmag_g_1','absmag_i_1','MASK']
 		if DEI:
 			self.headers = DEIheads
 			self.DEI = 1
@@ -62,7 +62,7 @@ class RealCatalogue:
 
 		# MEASURE WG+ SIGNALS
 
-	def cut_data(self, pgm_, z_, colour_, BCGdens, BCGshap, *bitmask_):
+	def cut_data(self, pgm_, z_, colour_, lmstar_ , BCGdens, BCGshap, *bitmask_):
 		"""""
 		cut catalogue according to bitmasks, 
 		PGM, & into subsamples
@@ -85,6 +85,7 @@ class RealCatalogue:
 		self.pre_z = z
 		colour = self.data[self.headers[-3]] - self.data[self.headers[-2]]
 		total_bitmasks = self.data[self.headers[-1]]
+		logmstar = self.data[self.headers[6]]
 
 		pgm = self.data['pgm']
 		if self.DEI:
@@ -110,6 +111,11 @@ class RealCatalogue:
 			z_cut_r = z_cut
 			print('highZ catalog == lowZ catalog')
 		print('z cut [unique]: \t', z_, np.unique(z_cut))
+		if lmstar_ != None:
+			lmstar_cut = np.array(logmstar > lmstar_)
+		else:
+			lmstar_cut = np.array([True]*len(self.data))
+		print('lmstar cut [unique]: \t', lmstar_, np.unique(lmstar_cut))
 
 		bitmask_cut = [True]*len(total_bitmasks)
 		if self.DEI:
@@ -140,12 +146,12 @@ class RealCatalogue:
 			BCGargs[0] = 1
 
 		# apply cuts
-		self.highz_R = self.data[(z_cut&red_cut&bitmask_cut&BCG_sc)]
-		self.highz_B = self.data[(z_cut&blue_cut&bitmask_cut&BCG_sc)]
-		self.lowz_R = self.data[(z_cut_r&red_cut&bitmask_cut&BCG_sc)]
-		self.lowz_B = self.data[(z_cut_r&blue_cut&bitmask_cut&BCG_sc)]
-		self.highz = self.data[(z_cut&BCG_dc)]
-		self.lowz = self.data[(z_cut_r&BCG_dc)]
+		self.highz_R = self.data[(z_cut&red_cut&bitmask_cut&BCG_sc&lmstar_cut)]
+		self.highz_B = self.data[(z_cut&blue_cut&bitmask_cut&BCG_sc&lmstar_cut)]
+		self.lowz_R = self.data[(z_cut_r&red_cut&bitmask_cut&BCG_sc&lmstar_cut)]
+		self.lowz_B = self.data[(z_cut_r&blue_cut&bitmask_cut&BCG_sc&lmstar_cut)]
+		self.highz = self.data[(z_cut&BCG_dc&lmstar_cut)]
+		self.lowz = self.data[(z_cut_r&BCG_dc&lmstar_cut)]
 
 		self.samplecounts = []
 
@@ -157,6 +163,7 @@ class RealCatalogue:
 		self.zcut_r = z_cut_r
 		self.redcut = red_cut
 		self.bluecut = blue_cut
+		self.lmstarcut = lmstar_cut
 		self.bitmaskcut = bitmask_cut
 		self.pgmcut = pgm_cut
 		self.BCG_dc = BCG_dc
@@ -184,6 +191,10 @@ class RealCatalogue:
 		e_weight = np.where(pgm<0.1,0,pgm)
 		if self.DEI:
 			e_weight = np.where(table['flag_DEIMOS']=='0000',1,0)
+		e1m,e2m = e1[np.where(e_weight==1,True,False)],e2[np.where(e_weight==1,True,False)]
+		e1m,e2m = np.mean(e1m),np.mean(e2m)
+		e1 -= e1m
+		e2 -= e2m
 		e1,e2,e_weight = map(lambda x: np.nan_to_num(x), [e1,e2,e_weight])
 
 		# random re-shuffle test - density-shape corr should now ~ 0
@@ -554,12 +565,12 @@ class RealCatalogue:
 		assert patchCuts.shape[0] == raCuts.shape[0]*decCuts.shape[0],'patch-cuts broken'
 
 		# combine patch & z/colour cuts, coerce into ndarrays for slicing
-		highzR_pcuts = [(self.zcut&self.redcut&self.bitmaskcut&self.BCG_sc&pc) for pc in patchCuts]
-		highzB_pcuts = [(self.zcut&self.bluecut&self.bitmaskcut&self.BCG_sc&pc) for pc in patchCuts]
-		lowzR_pcuts = [(self.zcut_r&self.redcut&self.bitmaskcut&self.BCG_sc&pc) for pc in patchCuts]
-		lowzB_pcuts = [(self.zcut_r&self.bluecut&self.bitmaskcut&self.BCG_sc&pc) for pc in patchCuts]
-		highz_pcuts = [(self.zcut&self.BCG_dc&pc) for pc in patchCuts]
-		lowz_pcuts = [(self.zcut_r&self.BCG_dc&pc) for pc in patchCuts]
+		highzR_pcuts = [(self.zcut&self.redcut&self.bitmaskcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
+		highzB_pcuts = [(self.zcut&self.bluecut&self.bitmaskcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
+		lowzR_pcuts = [(self.zcut_r&self.redcut&self.bitmaskcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
+		lowzB_pcuts = [(self.zcut_r&self.bluecut&self.bitmaskcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
+		highz_pcuts = [(self.zcut&self.BCG_dc&self.lmstarcut&pc) for pc in patchCuts]
+		lowz_pcuts = [(self.zcut_r&self.BCG_dc&self.lmstarcut&pc) for pc in patchCuts]
 		highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts = map(lambda x: np.array(x),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts])
 
 		# cut data into 6xpatch-arrays, w/ each element is a fits-table
@@ -903,6 +914,11 @@ if __name__ == "__main__":
 	help='red vs. blue colour threshold, between 0 - 1.4 (meaningfully, between approx 0.7 - 1.1). Defaults to 1.0, set to 0 for no colour cut',
 	default=1.0)
 	parser.add_argument(
+	'-lmstarCut',
+	type=np.float32,
+	help='stellar mass cut, logmstar i.e. 10^(x), defaults to 11',
+	default=11)
+	parser.add_argument(
 	'-bitmaskCut',
 	nargs='*',
 	type=int,
@@ -1057,7 +1073,7 @@ if __name__ == "__main__":
 			print('No sample covariances estimated -> no chi^2')
 		sys.exit()
 
-	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.BCGdens, args.BCGshap, args.bitmaskCut)
+	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.lmstarCut, args.BCGdens, args.BCGshap, args.bitmaskCut)
 	samples = [catalog.highz_R,catalog.highz_B,catalog.lowz_R,catalog.lowz_B,catalog.highz,catalog.lowz]
 	cuts = 'z-cut: %s\t colour-cut (g-i): %s'%(args.zCut,args.cCut)
 	sample_numbers = [cuts]
