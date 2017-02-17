@@ -114,8 +114,8 @@ class RealCatalogue:
 		# define colour, redshift, bitmask & BCG cuts
 		if LRG:
 			red_cut = LRGcut
-			blue_cut = ~LRGcut
-			print('cutting for LRGs...!', np.unique(red_cut))
+			blue_cut = LRGcut
+			print('cutting for LRGs...! red==blue...!', np.unique(red_cut))
 		elif colour_ != None:
 			red_cut = np.array((colour > colour_)) # larger (B-V) <-> 'redder' colour
 			blue_cut = ~red_cut
