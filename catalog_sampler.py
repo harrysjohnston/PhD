@@ -95,13 +95,14 @@ class RealCatalogue:
 			cperp = (r_s-i_s)-(g_s-r_s)/4.-0.18
 			dperp = (r_s-i_s)-(g_s-r_s)/8.
 
-			rscut = 16.<=r_s<=19.6
-			rscpar = r_s<(13.5+cpar/0.3)
+			rscut = (16.<=r_s)&(r_s<=19.6)
+			rscpar = r_s<(13.5+cpar/0.26)
 			abscperp = abs(cperp)<0.2
 			cperpcut = cperp>(0.45-(g_s-r_s/6.))
 			gsrscut = (g_s-r_s)>(1.3+0.25*(r_s-i_s))
 
-			LRGcut = rscut&rscpar&abscperp&cperpcut&gsrscut
+			LRGcut = rscut&rscpar&abscperp&gsrscut#&cperpcut
+			print('LRG cut is FIDDLED - missing c_perp_cut & c_par fine-tuned...!')
 
 		pgm = self.data['pgm']
 		if self.DEI:
