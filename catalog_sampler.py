@@ -112,11 +112,7 @@ class RealCatalogue:
 		print('pgm cut [unique]: \t', np.unique(pgm_cut))
 
 		# define colour, redshift, bitmask & BCG cuts
-		if LRG:
-			red_cut = LRGcut
-			blue_cut = LRGcut
-			print('cutting for LRGs...! red==blue...!', np.unique(red_cut))
-		elif colour_ != None:
+		if colour_ != None:
 			red_cut = np.array((colour > colour_)) # larger (B-V) <-> 'redder' colour
 			blue_cut = ~red_cut
 			print('c cut [unique]: \t', colour_, np.unique(red_cut))
@@ -134,6 +130,9 @@ class RealCatalogue:
 		print('z cut [unique]: \t', z_, np.unique(z_cut))
 		if lmstar_ != None:
 			lmstar_cut = np.array((logmstar>lmstar_[0])&(logmstar<lmstar_[1]))
+		elif LRG:
+			lmstar_cut = LRGcut
+			print('cutting for (~%s) LRGs...!'%sum(LRGcut))
 		else:
 			lmstar_cut = np.array([True]*len(self.data))
 		print('lmstar cut [unique]: \t', lmstar_, np.unique(lmstar_cut))
@@ -250,7 +249,7 @@ class RealCatalogue:
 		else:
 			outfile_root = outfile_root_ + "_allz"
 		if self.cstr=='LRGs':
-			outfile_root = outfile_root_ + "LRGs"
+			outfile_root = outfile_root + "LRGs"
 
 		self.new_root = outfile_root
 		if not isdir(outfile_root):
@@ -750,14 +749,15 @@ class RealCatalogue:
 		dlabel = basename(normpath(dens_sample))
 		slabel = basename(normpath(patchDir))
 		dCount = len(np.loadtxt(dens_sample))
-		print("correlating (BCG=%s) density sample with jackknife_i %s (BCG=%s) shapes..."%(self.BCGargs[0],slabel,self.BCGargs[1]))
+		print("correlating (BCG=%s) density sample with jackknife_i %s (BCG=%s) shapes (largePi=%s)..."%(self.BCGargs[0],slabel,self.BCGargs[1],largePi))
 		os.system('cp %s %s'%(dens_sample,JKdir))
 		for i,jk in enumerate(JKsamples):
 			jkCount = len(np.loadtxt(join(JKdir,jk)))
 			# print("JK%s, shapes popn %s"%((i+1),jkCount))
-			os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(JKdir,dlabel,dCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,jk[:-4],nproc))
 			if largePi:
 				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s_largePi %s 1 0'%(JKdir,dlabel,dCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,jk[:-4],nproc))
+			else:
+				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(JKdir,dlabel,dCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,jk[:-4],nproc))
 		return None
 
 	def pearson_r(self,covar_matrix):
