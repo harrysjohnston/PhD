@@ -62,7 +62,7 @@ class RealCatalogue:
 
 		# MEASURE WG+ SIGNALS
 
-	def cut_data(self, pgm_, z_, colour_, lmstar_ , BCGdens, BCGshap, *bitmask_):
+	def cut_data(self, pgm_, z_, colour_, lmstar_, LRG, BCGdens, BCGshap, *bitmask_):
 		"""""
 		cut catalogue according to bitmasks, 
 		PGM, & into subsamples
@@ -77,6 +77,8 @@ class RealCatalogue:
 			self.zstr = None
 		if colour_!=None:
 			self.cstr = '%.f'%colour_
+		elif LRG:
+			self.cstr = 'LRGs'
 		else:
 			self.cstr = None
 
@@ -87,6 +89,20 @@ class RealCatalogue:
 		total_bitmasks = self.data[self.headers[-1]]
 		logmstar = self.data[self.headers[6]]
 
+		if LRG:
+			g_s,r_s,i_s = self.data['fitphot_g'],self.data['fitphot_r'],self.data['fitphot_i']
+			cpar = 0.7*(g_s-r_s)+1.2*(r_s-i_s-0.18)
+			cperp = (r_s-i_s)-(g_s-r_s)/4.-0.18
+			dperp = (r_s-i_s)-(g_s-r_s)/8.
+
+			rscut = 16.<=r_s<=19.6
+			rscpar = r_s<(13.5+cpar/0.3)
+			abscperp = abs(cperp)<0.2
+			cperpcut = cperp>(0.45-(g_s-r_s/6.))
+			gsrscut = (g_s-r_s)>(1.3+0.25*(r_s-i_s))
+
+			LRGcut = rscut&rscpar&abscperp&cperpcut&gsrscut
+
 		pgm = self.data['pgm']
 		if self.DEI:
 			pgm = np.ones_like(pgm)
@@ -95,14 +111,18 @@ class RealCatalogue:
 		print('pgm cut [unique]: \t', np.unique(pgm_cut))
 
 		# define colour, redshift, bitmask & BCG cuts
-		if colour_ != None:
+		if LRG:
+			red_cut = LRGcut
+			blue_cut = ~LRGcut
+			print('cutting for LRGs...!', np.unique(red_cut))
+		elif colour_ != None:
 			red_cut = np.array((colour > colour_)) # larger (B-V) <-> 'redder' colour
 			blue_cut = ~red_cut
+			print('c cut [unique]: \t', colour_, np.unique(red_cut))
 		else:
 			red_cut = np.array([True]*len(self.data))
 			blue_cut = red_cut
 			print('Red catalog == Blue catalog')
-		print('c cut [unique]: \t', colour_, np.unique(red_cut))
 		if z_ != None:
 			z_cut = np.array((z > z_)) # HIGH-Z
 			z_cut_r = ~z_cut # LOW-Z
@@ -228,6 +248,8 @@ class RealCatalogue:
 			outfile_root = outfile_root_ + "_z" + str(z_cut)
 		else:
 			outfile_root = outfile_root_ + "_allz"
+		if self.cstr=='LRGs':
+			outfile_root = outfile_root_ + "LRGs"
 
 		self.new_root = outfile_root
 		if not isdir(outfile_root):
@@ -377,10 +399,11 @@ class RealCatalogue:
 		dataArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in wcorrList])
 		dataArr = np.array([[i[:,1],i[:,4]] for i in dataArr]) # +, x signals
 		covarArr = np.array([np.loadtxt(join(path2data, i),skiprows=1) for i in covarList])
+		halflen = len(covarArr)/2 # 1st half will be + covars, 2nd will be x
 		covarSigma = []
 		chiFunc = lambda x: chi2.pdf(x, dof)
 		# compute chi2, p-values, significance for a) plus and b) cross signals
-		for j,ARR in enumerate([covarArr[:8],covarArr[8:]]):
+		for j,ARR in enumerate([covarArr[:halflen],covarArr[halflen:]]):
 			print('plus (0), cross (1): %s'%j) # THIS FOR-LOOP BREAKS FOR ALL-Z RUNS
 			for i,cov in enumerate(ARR):
 				# print('%s'%self.ext_labels[i])
@@ -914,14 +937,19 @@ if __name__ == "__main__":
 	parser.add_argument(
 	'-cCut',
 	type=np.float32,
-	help='red vs. blue colour threshold, between 0 - 1.4 (meaningfully, between approx 0.7 - 1.1). Defaults to 1.0, set to 0 for no colour cut',
-	default=1.0)
+	help='red vs. blue colour threshold, between 0 - 1.4 (meaningfully, between approx 0.7 - 1.1). Defaults to None',
+	default=None)
 	parser.add_argument(
 	'-lmstarCut',
 	nargs=2,
 	type=np.float32,
 	help='stellar mass window cut [min, max], logmstar i.e. 10^(x), defaults to None',
 	default=None)
+	parser.add_argument(
+	'-LRGs',
+	type=int,
+	help='employ BOSS-LOWZ-style observer-mag cuts for LRG selection (1), or not (0), defaults to 0',
+	default=0)
 	parser.add_argument(
 	'-bitmaskCut',
 	nargs='*',
@@ -1077,7 +1105,7 @@ if __name__ == "__main__":
 			print('No sample covariances estimated -> no chi^2')
 		sys.exit()
 
-	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.lmstarCut, args.BCGdens, args.BCGshap, args.bitmaskCut)
+	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.lmstarCut, args.LRGs, args.BCGdens, args.BCGshap, args.bitmaskCut)
 	samples = [catalog.highz_R,catalog.highz_B,catalog.lowz_R,catalog.lowz_B,catalog.highz,catalog.lowz]
 	cuts = 'z-cut: %s\t colour-cut (g-i): %s'%(args.zCut,args.cCut)
 	sample_numbers = [cuts]
@@ -1185,22 +1213,6 @@ if __name__ == "__main__":
 		[script.write('%s: \t%d\n'%(catalog.labels[i],catalog.samplecounts[i])) for i in range(len(catalog.labels[4:6]))]
 		[script.write('%s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
 	os.system('cp %s %s'%(join(catalog.new_root,'C-lineArgs_SampleProps.txt'),join(catalog.new_root,'to_plot')))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
