@@ -90,19 +90,29 @@ class RealCatalogue:
 		logmstar = self.data[self.headers[6]]
 
 		if LRG:
-			g_s,r_s,i_s = self.data['fitphot_g'],self.data['fitphot_r'],self.data['fitphot_i']
+			g_s,r_s,i_s = data['dered_g'],data['dered_r'],data['dered_i']
+			ext_r = data['extinction_r']
+			rpetro = data['petroMag_r']
 			cpar = 0.7*(g_s-r_s)+1.2*(r_s-i_s-0.18)
 			cperp = (r_s-i_s)-(g_s-r_s)/4.-0.18
 			dperp = (r_s-i_s)-(g_s-r_s)/8.
 
-			rscut = (16.<=r_s)&(r_s<=19.6)
-			rscpar = r_s<(13.5+cpar/0.26)
+			#cutI
+			rscut = (16.<=(rpetro-ext_r))&((rpetro-ext_r)<=19.2)
+			rscpar = (rpetro-ext_r)<(13.1+(cpar/0.3))
 			abscperp = abs(cperp)<0.2
+			#cut2
+			rscut2 = (16.<=(rpetro-ext_r))&((rpetro-ext_r)<=19.5)
 			cperpcut = cperp>(0.45-(g_s-r_s/6.))
 			gsrscut = (g_s-r_s)>(1.3+0.25*(r_s-i_s))
+			#LOWZcut
+			rscutL = (16.<=(rpetro-ext_r))&((rpetro-ext_r)<=19.6)
+			rscparL = (rpetro-ext_r)<(13.5+(cpar/0.3))
 
-			LRGcut = rscut&rscpar&abscperp&gsrscut#&cperpcut
-			print('LRG cut is FIDDLED - missing c_perp_cut & c_par fine-tuned...!')
+			cut1 = rscut&rscpar&abscperp
+			cut2 = rscut2&cperpcut&gsrscut
+			LOWZcut = rscutL&rscparL&abscperp
+			LRGcut = cut1|cut2|LOWZcut
 
 		pgm = self.data['pgm']
 		if self.DEI:
@@ -248,8 +258,6 @@ class RealCatalogue:
 			outfile_root = outfile_root_ + "_z" + str(z_cut)
 		else:
 			outfile_root = outfile_root_ + "_allz"
-		if self.cstr=='LRGs':
-			outfile_root = outfile_root + "LRGs"
 
 		self.new_root = outfile_root
 		if not isdir(outfile_root):
@@ -1040,7 +1048,7 @@ if __name__ == "__main__":
 	default=1)
 	parser.add_argument(
 	'-patchSize',
-	help='preferred mean patch size (deg^2) for sample covariance determinations, defaults to 9sqdeg - USE THIS ARG IF DOING CHI2',
+	help='****fix me - will break if not 3, 4, or 9****\npreferred mean patch size (deg^2) for sample covariance determinations, defaults to 9sqdeg - USE THIS ARG IF DOING CHI2',
 	type=np.float32,
 	default=9)
 	parser.add_argument(
