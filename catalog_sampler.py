@@ -1174,7 +1174,10 @@ if __name__ == "__main__":
 
 	if args.Random != None:
 		catalog2 = RandomCatalogue(args.Random)
-		catalog2.cut_data(args.zCut, catalog.pre_count, catalog.pre_z)
+		precount = catalog.pre_count
+		if args.LRG:
+			precount /= 4
+		catalog2.cut_data(args.zCut, precount, catalog.pre_z)
 		samples = [catalog2.highz, catalog2.lowz]
 		cuts = 'z-cut: %s'%args.zCut
 		sample_numbers = [cuts]
