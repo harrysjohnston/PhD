@@ -1175,7 +1175,7 @@ if __name__ == "__main__":
 	if args.Random != None:
 		catalog2 = RandomCatalogue(args.Random)
 		precount = catalog.pre_count
-		if args.LRG:
+		if args.LRGs:
 			precount /= 4
 		catalog2.cut_data(args.zCut, precount, catalog.pre_z)
 		samples = [catalog2.highz, catalog2.lowz]
