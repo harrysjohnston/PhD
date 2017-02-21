@@ -258,8 +258,6 @@ class RealCatalogue:
 			outfile_root = outfile_root_ + "_z" + str(z_cut)
 		else:
 			outfile_root = outfile_root_ + "_allz"
-		if self.cstr=='LRGs':
-			outfile_root = outfile_root + "LRGs"
 
 		self.new_root = outfile_root
 		if not isdir(outfile_root):
