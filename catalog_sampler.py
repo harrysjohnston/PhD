@@ -112,7 +112,9 @@ class RealCatalogue:
 			cut1 = rscut&rscpar&abscperp
 			cut2 = rscut2&cperpcut&gsrscut
 			LOWZcut = rscutL&rscparL&abscperp
+			nancut = ~np.isnan(self.data['dered_g'])
 			LRGcut = cut1|cut2|LOWZcut
+			LRGcut = LRGcut&nancut
 
 		pgm = self.data['pgm']
 		if self.DEI:
