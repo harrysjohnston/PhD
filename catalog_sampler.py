@@ -90,9 +90,9 @@ class RealCatalogue:
 		logmstar = self.data[self.headers[6]]
 
 		if LRG:
-			g_s,r_s,i_s = data['dered_g'],data['dered_r'],data['dered_i']
-			ext_r = data['extinction_r']
-			rpetro = data['petroMag_r']
+			g_s,r_s,i_s = self.data['dered_g'],self.data['dered_r'],self.data['dered_i']
+			ext_r = self.data['extinction_r']
+			rpetro = self.data['petroMag_r']
 			cpar = 0.7*(g_s-r_s)+1.2*(r_s-i_s-0.18)
 			cperp = (r_s-i_s)-(g_s-r_s)/4.-0.18
 			dperp = (r_s-i_s)-(g_s-r_s)/8.
