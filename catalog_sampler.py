@@ -973,14 +973,14 @@ if __name__ == "__main__":
 	parser.add_argument(
 	'-rpBins',
 	type=int,
-	help='specify no. of (log-spaced) bins in comoving transverse separation r_p (Mpc/h), for measurement of density-shape correlations. Defaults to 6',
-	default=6)
+	help='specify no. of (log-spaced) bins in comoving transverse separation r_p (Mpc/h), for measurement of density-shape correlations. Defaults to 8',
+	default=8)
 	parser.add_argument(
 	'-rpLims',
 	nargs=2,
 	type=np.float32,
-	help='specify upper & lower (2 args, space-separated) limit in comoving transverse separation r_p (Mpc/h), for measurement of density-shape correlations. Defaults to 0.3, 60 Mpc/h',
-	default=[0.3, 60])
+	help='specify upper & lower (2 args, space-separated) limit in comoving transverse separation r_p (Mpc/h), for measurement of density-shape correlations. Defaults to 0.1 - 60 Mpc/h',
+	default=[0.1, 60])
 	parser.add_argument(
 	'-losBins',
 	type=int,
