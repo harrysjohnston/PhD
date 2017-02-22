@@ -1069,9 +1069,9 @@ if __name__ == "__main__":
 	default=1)
 	parser.add_argument(
 	'-rmagCut',
-	help='R-band magnitude above which to exclude faint sources, defaults to -21',
+	help='R-band magnitude above which to exclude faint sources, defaults to 0',
 	type=np.float32,
-	default=-21)
+	default=0)
 	args = parser.parse_args()
 
 	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.patchSize, args.rmagCut)

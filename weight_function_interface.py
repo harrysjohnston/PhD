@@ -31,7 +31,7 @@ def execute(block, config):
     wgp_rz = np.array([block[wgp_section,'bin_%s_%s'%(i+1,i+1)] for i in range(nbin)])
     nofz_shap = block[nz_section,'nofz_shapes']
     nofz_dens = block[nz_section,'nofz_density']
-    eta = block.get_double(IA_section,'eta',default=-0.27)
+    eta = block.get_double(IA_section,'eta',default=0)
     beta = block.get_double(IA_section,'beta',default=1.13)
     # bin_popns = [block[nz_section,"bin_%s"%(i+1)] for i in range(nbin)]
 
