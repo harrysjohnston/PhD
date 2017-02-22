@@ -6,8 +6,8 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
     x_section = "wgp_correlation"
     x_name    = "theta"
     y_section = "wgp_correlation"
-    y_name    = "wgp_r"
-    like_name = "IAwgp"
+    y_name    = "wgp_r_minus"
+    like_name = "wgplus_like"
 
     def build_data(self):
         #use self.options to find the data_file and load ell, tt from it
