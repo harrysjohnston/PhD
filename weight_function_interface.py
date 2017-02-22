@@ -39,6 +39,7 @@ def execute(block, config):
     Wz = compute_Wz(z,nofz_shap,nofz_dens,eta,beta,Rmag)
     wgp_r = compute_wgp(Wz,wgp_rz,nbin,dz)
     block.put_double_array_1d(wgp_section,'wgp_r',wgp_r)
+    block.put_double_array_1d(wgp_section,'wgp_r_minus',-wgp_r)
     block.put_double_array_1d(wgp_section,'W_z',Wz)
 
     # return zero == all done, no probs
