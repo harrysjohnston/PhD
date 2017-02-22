@@ -29,13 +29,14 @@ def execute(block, config):
     z = block[nz_section,'z']
     dz = z[1]-z[0]
     wgp_rz = np.array([block[wgp_section,'bin_%s_%s'%(i+1,i+1)] for i in range(nbin)])
-    nofz = block[nz_section,'nofz']
+    nofz_shap = block[nz_section,'nofz_shapes']
+    nofz_dens = block[nz_section,'nofz_density']
     eta = block.get_double(IA_section,'eta',default=-0.27)
     beta = block.get_double(IA_section,'beta',default=1.13)
     # bin_popns = [block[nz_section,"bin_%s"%(i+1)] for i in range(nbin)]
 
     # compute W(z), wgp(r)
-    Wz = compute_Wz(z,nofz,eta,beta,Rmag)
+    Wz = compute_Wz(z,nofz_shap,nofz_dens,eta,beta,Rmag)
     wgp_r = compute_wgp(Wz,wgp_rz,nbin,dz)
     block.put_double_array_1d(wgp_section,'wgp_r',wgp_r)
     block.put_double_array_1d(wgp_section,'W_z',Wz)

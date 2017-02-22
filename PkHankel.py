@@ -3,15 +3,10 @@ import numpy as np
 from astropy.io import fits
 from astropy.io import ascii
 
-def read_z(path):
-    fitsdata = fits.open(path)
-    data = fitsdata[1].data
-    if 'DEI' in path:
-        zcol = 'Z'
-    else:
-        zcol = 'Z_1_1'
-    gal_z = data[zcol]
-    return gal_z
+def read_z(shapes,dens):
+    shap_z = np.loadtxt(shapes)
+    dens_z = np.loadtxt(dens)
+    return shap_z,dens_z
 
 def create_nz(gal_z,nz,nbin,outfile):
     # NOTE: this is written specifically for zrange=[0,0.5]

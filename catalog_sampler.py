@@ -245,7 +245,7 @@ class RealCatalogue:
 
 		self.samplecounts.append(len(new_table))
 
-		return new_table
+		return new_table,Z
 
 	def save_tables(self, new_table, outfile_root_, label, z_cut, c_cut, notes):
 		"""""
@@ -1124,8 +1124,9 @@ if __name__ == "__main__":
 
 	print('CUTTING/SAVING SAMPLES...')
 	for i, sample in enumerate(samples):
-		new_table = catalog.cut_columns(sample, args.H)
+		new_table,sample_z = catalog.cut_columns(sample, args.H)
 		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
+		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'))
 		sample_numbers.append(sample_num)
 
 	if args.bootstrap or args.jackknife:
@@ -1137,7 +1138,7 @@ if __name__ == "__main__":
 		# print('MAPPED')
 		for i,sam in enumerate(patchData):
 			for j,p in enumerate(sam):
-				new_p = catalog.cut_columns(p, args.H)
+				new_p,patch_z = catalog.cut_columns(p, args.H)
 				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j) # save_patches returns str(patchDir)
 		for lab in catalog.labels[:4]:
 			pDir = join(catalog.new_root,lab)
