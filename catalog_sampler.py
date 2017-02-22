@@ -112,9 +112,8 @@ class RealCatalogue:
 			cut1 = rscut&rscpar&abscperp
 			cut2 = rscut2&cperpcut&gsrscut
 			LOWZcut = rscutL&rscparL&abscperp
-			nancut = ~np.isnan(self.data['dered_g'])
-			LRGcut = cut1|cut2|LOWZcut
-			LRGcut = LRGcut&nancut
+			print('selecting LOWZ exact...!!')
+			LRGcut = LOWZcut#|cut1|cut2
 
 		pgm = self.data['pgm']
 		if self.DEI:
@@ -1126,7 +1125,7 @@ if __name__ == "__main__":
 	for i, sample in enumerate(samples):
 		new_table,sample_z = catalog.cut_columns(sample, args.H)
 		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
-		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'))
+		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'),sample_z)
 		sample_numbers.append(sample_num)
 
 	if args.bootstrap or args.jackknife:
