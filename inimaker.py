@@ -6,7 +6,8 @@ import argparse
 
 def main(datadir,tag,param_sampler,*samples):
     cosmosis_root = '/share/splinter/hj/PhD/cosmosis'
-    if samples=='all':
+    if samples[0][0]=='all':
+	print('GENERATING .ini files for all high/low red/blue samples...!')
         samples = [['hzr','hzb','lzr','lzb']]
     for sample in samples[0]:
         if 'h' in sample:
@@ -19,56 +20,58 @@ def main(datadir,tag,param_sampler,*samples):
             col = 'Blue'
         if param_sampler=='grid':
             iniparams = [
-            '[runtime]',
-            'sampler = grid',
-            '',
-            '[DEFAULT]',
-            'N_BIN=50',
-            'N_Z=50',
-            'MY_ROOT=/share/splinter/hj/PhD',
-            'DATA_PATH=%%(MY_ROOT)s/%s'%datadir,
-            'TAG=%s'%tag,
-            'Z_SAMPLE=%s'%z,
-            'COLOUR=%s'%col,
-            'SHAPEZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_%%(COLOUR)s_galZs.txt',
-            'DENSZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_galZs.txt',
-            'SAVE_NZ=%%(DATA_PATH)s/nofz',
-            '',
-            '[grid]',
-            'fatal_errors=T',
-            'nsample_dimension=10',
+            '[runtime]\n',
+            'sampler = grid\n',
+            '\n',
+            '[DEFAULT]\n',
+            'N_BIN=50\n',
+            'N_Z=50\n',
+            'MY_ROOT=/share/splinter/hj/PhD\n',
+            'DATA_PATH=%%(MY_ROOT)s/%s\n'%datadir,
+            'TAG=%s\n'%tag,
+            'Z_SAMPLE=%s\n'%z,
+            'COLOUR=%s\n'%col,
+            'SHAPEZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_%%(COLOUR)s_galZs.txt\n',
+            'DENSZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_galZs.txt\n',
+            'SAVE_NZ=%%(DATA_PATH)s/nofz\n',
+            '\n',
+            '[grid]\n',
+            'fatal_errors=T\n',
+            'nsample_dimension=10\n',
 
-            '[output]',
-            'format=text',
-            'filename=IAs_%%(TAG)s_likelihoodtest'
+            '[output]\n',
+            'format=text\n',
+            'filename=IAs_%%(TAG)s_likelihoodtest\n'
             ]
         elif param_sampler=='test':
             iniparams = [
-            '[runtime]',
-            'sampler = test',
-            '',
-            '[DEFAULT]',
-            'N_BIN=50',
-            'N_Z=50',
-            'MY_ROOT=/share/splinter/hj/PhD',
-            'DATA_PATH=%%(MY_ROOT)s/%s'%datadir,
-            'TAG=%s'%tag,
-            'Z_SAMPLE=%s'%z,
-            'COLOUR=%s'%col,
-            'SHAPEZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_%%(COLOUR)s_galZs.txt',
-            'DENSZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_galZs.txt',
-            'SAVE_NZ=%%(DATA_PATH)s/nofz',
-            '',
-            '[test]',
-            'fatal_errors=T',
-            'save_dir=IAs_%%(TAG)s'
+            '[runtime]\n',
+            'sampler = test\n',
+            '\n',
+            '[DEFAULT]\n',
+            'N_BIN=50\n',
+            'N_Z=50\n',
+            'MY_ROOT=/share/splinter/hj/PhD\n',
+            'DATA_PATH=%%(MY_ROOT)s/%s\n'%datadir,
+            'TAG=%s\n'%tag,
+            'Z_SAMPLE=%s\n'%z,
+            'COLOUR=%s\n'%col,
+            'SHAPEZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_%%(COLOUR)s_galZs.txt\n',
+            'DENSZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_galZs.txt\n',
+            'SAVE_NZ=%%(DATA_PATH)s/nofz\n',
+            '\n',
+            '[test]\n',
+            'fatal_errors=T\n',
+            'save_dir=IAs_%%(TAG)s\n'
             ]
 
         os.system('cp %s/wgplus/shell.ini %s/wgplus/%s_like.ini'%(cosmosis_root,cosmosis_root,sample))
         with open("%s/wgplus/%s_like.ini"%(cosmosis_root,sample), "r+") as f:
-            old = f.read() # read everything in the file
+            old = f.readlines()
+	    for line in old:
+	    	iniparams.append(line)
             f.seek(0) # rewind
-            f.write(iniparams + old)
+            f.writelines(iniparams)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
