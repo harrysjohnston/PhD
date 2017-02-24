@@ -1227,7 +1227,8 @@ if __name__ == "__main__":
 		[script.write('%s: \t%d\n'%(catalog.labels[i],catalog.samplecounts[i])) for i in range(len(catalog.labels[4:6]))]
 		[script.write('%s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
 	os.system('cp %s %s'%(join(catalog.new_root,'C-lineArgs_SampleProps.txt'),join(catalog.new_root,'to_plot')))
-
+	np.savetxt(join(catalog.new_root,'Rmags.txt'),catalog.Rmags,header='mean absmag_r; hzr,hzb,lzr,lzb')
+	os.system('cp %s %s'%(join(catalog.new_root,'Rmags.txt'),join(catalog.new_root,'to_plot')))
 
 
 
