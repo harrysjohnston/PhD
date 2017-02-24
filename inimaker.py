@@ -2,6 +2,7 @@ from __future__ import print_function,division
 import numpy as np
 from os.path import join
 import os
+import argparse
 
 def main(datadir,tag,param_sampler,*samples):
     cosmosis_root = '/share/splinter/hj/PhD/cosmosis'
@@ -27,8 +28,8 @@ def main(datadir,tag,param_sampler,*samples):
             'MY_ROOT=/share/splinter/hj/PhD',
             'DATA_PATH=%%(MY_ROOT)s/%s'%datadir,
             'TAG=%s'%tag,
-            'Z_SAMPLE=%s'z,
-            'COLOUR=%s'col,
+            'Z_SAMPLE=%s'%z,
+            'COLOUR=%s'%col,
             'SHAPEZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_%%(COLOUR)s_galZs.txt',
             'DENSZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_galZs.txt',
             'SAVE_NZ=%%(DATA_PATH)s/nofz',
@@ -52,8 +53,8 @@ def main(datadir,tag,param_sampler,*samples):
             'MY_ROOT=/share/splinter/hj/PhD',
             'DATA_PATH=%%(MY_ROOT)s/%s'%datadir,
             'TAG=%s'%tag,
-            'Z_SAMPLE=%s'z,
-            'COLOUR=%s'col,
+            'Z_SAMPLE=%s'%z,
+            'COLOUR=%s'%col,
             'SHAPEZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_%%(COLOUR)s_galZs.txt',
             'DENSZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_galZs.txt',
             'SAVE_NZ=%%(DATA_PATH)s/nofz',
