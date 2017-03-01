@@ -31,9 +31,9 @@ def main(datadir,tag,param_sampler,*samples):
             'TAG=%s\n'%tag,
             'Z_SAMPLE=%s\n'%z,
             'COLOUR=%s\n'%col,
-            'SHAPEZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_%%(COLOUR)s_galZs.txt\n',
-            'DENSZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_galZs.txt\n',
-            'SAVE_NZ=%%(DATA_PATH)s/nofz\n',
+            'SHAPEZ=%(DATA_PATH)s/%(Z_SAMPLE)sZ_%(COLOUR)s_galZs.txt\n',
+            'DENSZ=%(DATA_PATH)s/%(Z_SAMPLE)sZ_galZs.txt\n',
+            'SAVE_NZ=%(DATA_PATH)s/nofz\n',
             '\n',
             '[grid]\n',
             'fatal_errors=T\n',
@@ -41,7 +41,7 @@ def main(datadir,tag,param_sampler,*samples):
 
             '[output]\n',
             'format=text\n',
-            'filename=IAs_%%(TAG)s_%%(Z_SAMPLE)sZ_%%(COLOUR)s\n'
+            'filename=IAs_%(TAG)s_%(Z_SAMPLE)sZ_%(COLOUR)s\n'
             ]
         elif param_sampler=='test':
             iniparams = [
@@ -56,13 +56,13 @@ def main(datadir,tag,param_sampler,*samples):
             'TAG=%s\n'%tag,
             'Z_SAMPLE=%s\n'%z,
             'COLOUR=%s\n'%col,
-            'SHAPEZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_%%(COLOUR)s_galZs.txt\n',
-            'DENSZ=%%(DATA_PATH)s/%%(Z_SAMPLE)sZ_galZs.txt\n',
-            'SAVE_NZ=%%(DATA_PATH)s/nofz\n',
+            'SHAPEZ=%(DATA_PATH)s/%(Z_SAMPLE)sZ_%(COLOUR)s_galZs.txt\n',
+            'DENSZ=%(DATA_PATH)s/%(Z_SAMPLE)sZ_galZs.txt\n',
+            'SAVE_NZ=%(DATA_PATH)s/nofz\n',
             '\n',
             '[test]\n',
             'fatal_errors=T\n',
-            'save_dir=IAs_%%(TAG)s_%%(Z_SAMPLE)sZ_%%(COLOUR)s\n'
+            'save_dir=IAs_%(TAG)s_%(Z_SAMPLE)sZ_%(COLOUR)s\n'
             ]
 
         os.system('cp %s/wgplus/shell.ini %s/wgplus/%s_like.ini'%(cosmosis_root,cosmosis_root,sample))
