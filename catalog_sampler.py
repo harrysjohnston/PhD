@@ -98,16 +98,18 @@ class RealCatalogue:
 			dperp = (r_s-i_s)-(g_s-r_s)/8.
 
 			#cutI
-			rscut = (16.<=(rpetro-ext_r))&((rpetro-ext_r)<=19.2)
-			rscpar = (rpetro-ext_r)<(13.1+(cpar/0.3))
+			print('CUTTING by r_s NOT r_petro-ext_r...!')
+			# rscut = (16.<=(rpetro-ext_r))&((rpetro-ext_r)<=19.2)
+			rscut = (16.<=(r_s))&((r_s)<=19.2)
+			rscpar = (r_s)<(13.1+(cpar/0.3))
 			abscperp = abs(cperp)<0.2
 			#cut2
-			rscut2 = (16.<=(rpetro-ext_r))&((rpetro-ext_r)<=19.5)
+			rscut2 = (16.<=(r_s))&((r_s)<=19.5)
 			cperpcut = cperp>(0.45-(g_s-r_s/6.))
 			gsrscut = (g_s-r_s)>(1.3+0.25*(r_s-i_s))
 			#LOWZcut
-			rscutL = (16.<=(rpetro-ext_r))&((rpetro-ext_r)<=19.6)
-			rscparL = (rpetro-ext_r)<(13.5+(cpar/0.3))
+			rscutL = (16.<=(r_s))&((r_s)<=19.6)
+			rscparL = (r_s)<(13.5+(cpar/0.3))
 
 			cut1 = rscut&rscpar&abscperp
 			cut2 = rscut2&cperpcut&gsrscut
@@ -238,7 +240,10 @@ class RealCatalogue:
 		# e2 = e12[:,1]
 		#   #   #   #   #   #   #   #   #   #   #   #   #   #   #   
 
-		comov = Planck13.comoving_distance(Z)
+		if 'chi_comov' in table.columns.names:
+			comov = table['chi_comov']
+		else:
+			comov = Planck13.comoving_distance(Z)
 		comov *= h
 		new_table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
 

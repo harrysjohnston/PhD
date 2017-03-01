@@ -41,7 +41,7 @@ def main(datadir,tag,param_sampler,*samples):
 
             '[output]\n',
             'format=text\n',
-            'filename=IAs_%%(TAG)s_likelihoodtest\n'
+            'filename=IAs_%%(TAG)s_%%(Z_SAMPLE)sZ_%%(COLOUR)s\n'
             ]
         elif param_sampler=='test':
             iniparams = [
@@ -62,7 +62,7 @@ def main(datadir,tag,param_sampler,*samples):
             '\n',
             '[test]\n',
             'fatal_errors=T\n',
-            'save_dir=IAs_%%(TAG)s\n'
+            'save_dir=IAs_%%(TAG)s_%%(Z_SAMPLE)sZ_%%(COLOUR)s\n'
             ]
 
         os.system('cp %s/wgplus/shell.ini %s/wgplus/%s_like.ini'%(cosmosis_root,cosmosis_root,sample))
