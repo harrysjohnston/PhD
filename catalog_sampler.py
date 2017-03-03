@@ -881,13 +881,15 @@ class RandomCatalogue(RealCatalogue):
 		assert 'RAND_NUM' in self.columns, "'RAND_NUM' not in columns, see column headers: "+ str(self.columns)
 
 		# compute shapes' n(z) & target for rands
-		sh_zhist = np.histogram(d_sample_Zs,bins=50,range=(0.,0.5))
+		nbin = 10
+		print('# z-bins for RANDOM downsampling = %s'%nbin)
+		sh_zhist = np.histogram(d_sample_Zs,bins=nbin,range=(0.,0.5))
 		sh_nz = sh_zhist[0]
 		sh_Nz = sh_nz/len(d_sample_Zs)
 
 		# compute rand n(z) & downsample each bin
 		rnd_z = self.data['Z']
-		rnd_zhist = np.histogram(rnd_z,bins=50,range=(0.,0.5))
+		rnd_zhist = np.histogram(rnd_z,bins=nbin,range=(0.,0.5))
 		zbins = rnd_zhist[1]
 		rnd_nz = rnd_zhist[0]
 		f_redc = 11*(sh_nz/rnd_nz)
@@ -1233,7 +1235,7 @@ if __name__ == "__main__":
 		script.write(str(args))
 		script.write('\n')
 		[script.write('%s: \t%d, mean R_mag: %.4f\n'%(catalog.labels[i],catalog.samplecounts[i],catalog.Rmags[i])) for i in range(len(catalog.labels[:4]))]
-		[script.write('%s: \t%d\n'%(catalog.labels[i],catalog.samplecounts[i])) for i in range(len(catalog.labels[4:6]))]
+		[script.write('%s: \t%d\n'%(catalog.labels[i+4],catalog.samplecounts[i+4])) for i in range(len(catalog.labels[4:6]))]
 		[script.write('%s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
 	os.system('cp %s %s'%(join(catalog.new_root,'C-lineArgs_SampleProps.txt'),join(catalog.new_root,'to_plot')))
 	np.savetxt(join(catalog.new_root,'Rmags.txt'),catalog.Rmags,header='mean absmag_r; hzr,hzb,lzr,lzb')
