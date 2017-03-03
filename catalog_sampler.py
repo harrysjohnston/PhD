@@ -905,7 +905,7 @@ class RandomCatalogue(RealCatalogue):
 		self.samples.append(new_dat)
 		self.samplecounts.append(len(new_dat))
 		newz = new_dat['Z']
-		new_nz = np.histogram(newz,bins=50,range=(0.,0.5))[0]
+		new_nz = np.histogram(newz,bins=nbin,range=(0.,0.5))[0]
 		new_Nz = new_nz/len(newz)
 		print('real/random N(z) (should be ~1): ',sh_Nz/new_Nz)
 
