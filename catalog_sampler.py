@@ -866,9 +866,11 @@ class RandomCatalogue(RealCatalogue):
 		hdulist = fits.open(path)
 		self.data = hdulist[1].data
 		self.columns = hdulist[1].columns.names
-		self.labels = ['rand_highZ', 'rand_lowZ']
+		self.labels = ['rand_highZ','rand_lowZ']
+		self.samples = []
+		self.samplecounts = []
 
-	def cut_data(self, z_, len_reals, z_reals): 
+	def cut_data(self, d_sample_Zs):
 		"""""
 		cut catalogue into redshift subsamples
 
@@ -878,33 +880,32 @@ class RandomCatalogue(RealCatalogue):
 		assert 'Z' in self.columns, "'Z' not in columns, see column headers: "+ str(self.columns)
 		assert 'RAND_NUM' in self.columns, "'RAND_NUM' not in columns, see column headers: "+ str(self.columns)
 
-		# cut down (randomly) for correlation
-		randNum = self.data['RAND_NUM']
-		current = len(randNum)
-		target = len_reals*10
-		fraction = target/current
-		randCut = (randNum > fraction) & (randNum <= 2*fraction)
-		self.data = self.data[randCut]
-		print('Randoms cut down from %s objects to %s' % (len(randNum), len(self.data)))
+		# compute shapes' n(z) & target for rands
+		sh_zhist = np.histogram(d_sample_Zs,bins=50,range=(0.,0.5))
+		sh_nz = sh_zhist[0]
+		sh_Nz = sh_nz/len(d_sample_Zs)
 
-		z = self.data['z']
-		pre_z_cut = (z >= z_reals.min()) & (z <= z_reals.max()) # GET RID OF THIS CUT??
-		self.data = self.data[pre_z_cut]
-		z = self.data['z']
+		# compute rand n(z) & downsample each bin
+		rnd_z = self.data['Z']
+		rnd_zhist = np.histogram(rnd_z,bins=50,range=(0.,0.5))
+		zbins = rnd_zhist[1]
+		rnd_nz = rnd_zhist[0]
+		f_redc = 11*(sh_nz/rnd_nz)
 
-		if z_ != None:
-			z_cut = np.array((z > z_))
-			z_cut_r = ~z_cut
-		else:
-			z_cut = np.array([True]*len(self.data))
-			z_cut_r = z_cut
-			print('highZ catalog == lowZ catalog')
+		nztune = np.zeros_like(rnd_z,dtype=bool)
+		for i,nzbin in enumerate(rnd_nz):
+			bincut = (zbins[i]<rnd_z)&(rnd_z<=zbins[i+1])
+			nzcut = (f_redc[i]<self.data['RAND_NUM'])&(self.data['RAND_NUM']<=f_redc[i]*2)
+			nzbincut = bincut&nzcut
+			nztune = np.where(nzbincut,True,nztune)
 
-		self.highz = self.data[z_cut]
-		self.lowz = self.data[z_cut_r]
-		self.samplecounts = [len(self.highz), len(self.lowz)]
-
-		[print('# objects %s: \t'%self.labels[i],v) for i,v in enumerate(self.samplecounts)]
+		new_dat = self.data[nztune]
+		self.samples.append(new_dat)
+		self.samplecounts.append(len(new_dat))
+		newz = new_dat['Z']
+		new_nz = np.histogram(newz,bins=50,range=(0.,0.5))[0]
+		new_Nz = new_nz/len(newz)
+		print('real/random N(z) (should be ~1): ',sh_Nz/new_Nz)
 
 	def cut_columns(self, subsample, h): 
 		"""""
@@ -1127,11 +1128,14 @@ if __name__ == "__main__":
 	outfile_root = join(args.Path,'Wcorr')
 
 	print('CUTTING/SAVING SAMPLES...')
+	sample_zs = []
 	for i, sample in enumerate(samples):
 		new_table,sample_z = catalog.cut_columns(sample, args.H)
+		sample_zs.append(sample_z)
 		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
 		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'),sample_z)
 		sample_numbers.append(sample_num)
+	sample_zs = sample_zs[4:]
 
 	if args.bootstrap or args.jackknife:
 		print('COMPUTING SAMPLE COVARIANCES...')
@@ -1181,15 +1185,15 @@ if __name__ == "__main__":
 
 	if args.Random != None:
 		catalog2 = RandomCatalogue(args.Random)
-		precount = catalog.pre_count
-		if args.LRGs:
-			precount /= 4
-		catalog2.cut_data(args.zCut, precount, catalog.pre_z)
-		samples = [catalog2.highz, catalog2.lowz]
-		cuts = 'z-cut: %s'%args.zCut
-		sample_numbers = [cuts]
+		for sam_z in sample_zs:
+			catalog2.cut_data(sam_z) # generates catalog2.samples (dens x2) & counts
 
-		for i, sample in enumerate(samples):
+		[print('# objects %s: \t'%catalog2.labels[i],v) for i,v in enumerate(catalog2.samplecounts)]
+
+		cuts = 'z-cut: %s'%args.zCut
+		sample_numbers = [cuts] # get rid?
+
+		for i, sample in enumerate(catalog2.samples):
 			print('CUTTING/SAVING RANDOMS...')
 			new_table = catalog2.cut_columns(sample, args.H)
 			sample_num = catalog2.save_tables(new_table,outfile_root,catalog2.labels[i],args.zCut,args.cCut,args.notes)
