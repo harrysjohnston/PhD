@@ -47,10 +47,10 @@ def execute(block, config):
     # aim for simplicity
     # here, cutting k,P(k) & saving back to db in format for Hankel transfm
     k_h,p_k = cut_krange(k_h,p_k, kmin=10**-2.2, kmax=10**1.2) # k-limits in h/Mpc
-    block.put_double_array_1d(power_section,'ell',k_h)
-    block.put_int(power_section,'nbin',nbin)
+    block[power_section,'ell'] = k_h
+    block[power_section,'nbin'] = nbin
     for i in range(len(p_k)):
-        block.put_double_array_1d(power_section,'bin_%s_%s'%(i+1,i+1),p_k[i])
+        block[power_section,'bin_%s_%s'%(i+1,i+1)] = p_k[i]
 
     if make_nz:
         block.put_double_array_1d(nz_section,'z',z_mids)
