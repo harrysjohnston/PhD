@@ -3,9 +3,9 @@ import numpy as np
 
 class wgg_likelihood(GaussianLikelihood):
 
-    x_section = self.options.get_string("theory_section")
+    x_section = self.options.get_string("hkl_section",default="hankel_out")
     x_name    = "theta"
-    y_section = x_section
+    y_section = self.options.get_string("theory_section")
     y_name    = "wgg_r"
     like_name = "wgg"
 
