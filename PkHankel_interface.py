@@ -16,7 +16,7 @@ def setup(options):
 
     power_section = options[option_section,'power_section'] # options[] must be in .ini
     nbin = options[option_section,'nbin']
-    make_nz = options.get_bool(option_section,'make_nz',default=False)
+    make_nz = options.get_bool(option_section,'make_nz',default=True)
     nz_section = options.get_string(option_section,'nz_section',default=None)
     shapz_path = options.get_string(option_section,'shapZ_path',default=None)
     densz_path = options.get_string(option_section,'densZ_path',default=None)

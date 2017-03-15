@@ -1,20 +1,20 @@
 from cosmosis.gaussian_likelihood import GaussianLikelihood
 import numpy as np
 
-class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
+class wgg_likelihood(GaussianLikelihood):
 
-    x_section = self.options.get_string("hkl_section")
+    x_section = self.options.get_string("theory_section")
     x_name    = "theta"
-    y_section = self.options.get_string("theory_section")
-    y_name    = "wgp_r_minus"
-    like_name = y_section # eg. 'wgp_hzr'
+    y_section = x_section
+    y_name    = "wgg_r"
+    like_name = "wgg"
 
     def build_data(self):
         #use self.options to find the data_file and load ell, tt from it
         data_file = self.options.get_string("data_file")
-        print("loading wgp measurement, skipping row=1 (column heads)...!")
-        rp,wgp = np.loadtxt(data_file,skiprows=1).T[:2]
-        return rp,wgp
+        print("loading wgg measurement, NOT skipping rows...!")
+        rp,wgg = np.loadtxt(data_file).T[:2]
+        return rp,wgg
 
     def build_covariance(self):
         cov_file = self.options.get_string("cov_file")
@@ -22,4 +22,4 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
         covmat = np.loadtxt(cov_file,skiprows=1)
         return covmat
 
-setup,execute,cleanup = DEI_GAMA_wgplusLikelihood.build_module()
+setup,execute,cleanup = wgg_likelihood.build_module()
