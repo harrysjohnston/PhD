@@ -5,7 +5,7 @@ from weight_function import compute_Wz
 from weight_function import compute_wgp
 
 cosmo = names.cosmological_parameters
-bias = names.bias_field
+bias_section = names.bias_field
 
 def setup(options):
     # this function is called ONCE per processor per chain
@@ -18,16 +18,17 @@ def setup(options):
 
     wgg = options.get_bool(option_section,'do_wgg',default=False)
     wg_section = options[option_section,'wg_section']
+    bias = options[option_section,'bias']
     nbin = options[option_section,'nbin']
     Rmag = options.get_double(option_section,'Rmag')
 
     # return the config for execute fn
-    return nz_section,IA_section,hkl_section,wg_section,nbin,Rmag,wgg
+    return nz_section,IA_section,hkl_section,wg_section,bias,nbin,Rmag,wgg
 
 def execute(block, config):
     # this function is called every time you have a new sample of cosmological and other parameters
 
-    nz_section,IA_section,hkl_section,wg_section,nbin,Rmag,wgg = config
+    nz_section,IA_section,hkl_section,wg_section,bias,nbin,Rmag,wgg = config
 
     # load from block
     z = block[nz_section,'z']
@@ -45,7 +46,7 @@ def execute(block, config):
     wg_r = compute_wgp(Wz,wg_rz,nbin,dz)
 
     tags = ['wgp','wgg']
-    bg = block[bias,'b_g']
+    bg = block[bias_section,'b_g_%s'%bias]
     if wgg:
         print('do_wgg=T ; wgg *= b_g^2 ...!')
         wg_r *= bg**2
