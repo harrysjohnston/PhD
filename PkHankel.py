@@ -1,7 +1,6 @@
 from __future__ import print_function,division
 import numpy as np
-from astropy.io import fits
-from astropy.io import ascii
+from astropy.io import fits,ascii
 
 def read_z(shapes,dens):
     shap_z = np.loadtxt(shapes)
