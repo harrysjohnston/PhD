@@ -273,10 +273,10 @@ class RealCatalogue:
 		sample_no = "%s # objects:\t%s"%(label,len(new_table))
 		return sample_no
 
-	def make_combos(self, dens_colours):
+	def make_combos(self, densColours):
 		# construct sets of filenames, counts, & IDs for wcorr-calls
 
-		wcorr_ind = [[4,4,5,5], [0,1,2,3]][dens_colours]
+		wcorr_ind = [[4,4,5,5], [0,1,2,3]][densColours]
 
 		self.wcorr_combos = [
 		[self.labels[wcorr_ind[0]]+'.asc', self.samplecounts[wcorr_ind[0]], self.labels[0]+'.asc', self.samplecounts[0], catalog.wcorrLabels[0]],
@@ -754,13 +754,13 @@ class RealCatalogue:
 
 		return jkweights
 
-	def wcorr_jackknife(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi, dens_colours):
+	def wcorr_jackknife(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi, densColours):
 		# wcorr JK samples
 		JKdir = join(patchDir,'JKsamples')
 		JKsamples = [x for x in listdir(JKdir) if ('.asc' in x)&('JKsample' in x)]
 		JKsamples.sort()
 
-		if dens_colours:
+		if densColours:
 			dlabel = basename(normpath(patchDir))
 			dens_sample = join(patchDir,'..',dlabel)
 		else:
@@ -865,7 +865,7 @@ class RealCatalogue:
 
 class RandomCatalogue(RealCatalogue):
 
-	def __init__(self, path, dens_colours):
+	def __init__(self, path, densColours):
 		"""""
 		read-in catalogue
 
@@ -874,7 +874,7 @@ class RandomCatalogue(RealCatalogue):
 		hdulist = fits.open(path)
 		self.data = hdulist[1].data
 		self.columns = hdulist[1].columns.names
-		self.labels = [['rand_highZ','rand_lowZ'],['rand_highZ_Red','rand_highZ_Blue','rand_lowZ_Red','rand_lowZ_Blue']][dens_colours]
+		self.labels = [['rand_highZ','rand_lowZ'],['rand_highZ_Red','rand_highZ_Blue','rand_lowZ_Red','rand_lowZ_Blue']][densColours]
 		self.samples = []
 		self.samplecounts = []
 
@@ -1089,7 +1089,7 @@ if __name__ == "__main__":
 	type=np.float32,
 	default=0)
 	parser.add_argument(
-	'-dens_colours',
+	'-densColours',
 	help='use redshift&colour-cut samples as position samples for correlations (1), or just redshift-cut samples (0), defaults to 0',
 	type=int,
 	default=0)
@@ -1150,7 +1150,7 @@ if __name__ == "__main__":
 		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
 		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'),sample_z)
 		sample_numbers.append(sample_num)
-	if args.dens_colours:
+	if args.densColours:
 		sample_zs = sample_zs[:-2]
 	else:
 		sample_zs = sample_zs[4:]
@@ -1176,17 +1176,17 @@ if __name__ == "__main__":
 					catalog.bootstrap_signals(pDir, patchWeights, 0)
 				if args.jackknife:
 					jkweights = catalog.jackknife_patches(pDir, patchWeights)
-					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.dens_colours)
+					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
 					catalog.jackknife(pDir, jkweights, 0)
 				if args.largePi:
 					if args.bootstrap:
 						catalog.bootstrap_signals(pDir, patchWeights, 1)
 					if args.jackknife:
 						jkweights = catalog.jackknife_patches(pDir, patchWeights)
-						catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.dens_colours)
+						catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
 						catalog.jackknife(pDir, jkweights, 1)
 
-	catalog.make_combos(args.dens_colours)
+	catalog.make_combos(args.densColours)
 	if args.zCut==None:
 		allz_combos = catalog.wcorr_combos[:2]
 		catalog.prep_wcorr(catalog.new_root,allz_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
@@ -1202,7 +1202,7 @@ if __name__ == "__main__":
 		[os.system('qsub '+ join(catalog.new_root, shell)) for shell in list_dir]
 
 	if args.Random != None:
-		catalog2 = RandomCatalogue(args.Random,args.dens_colours)
+		catalog2 = RandomCatalogue(args.Random,args.densColours)
 		for sam_z in sample_zs:
 			catalog2.cut_data(sam_z) # generates randoms samples & counts
 
@@ -1220,7 +1220,7 @@ if __name__ == "__main__":
 			else:
 				print('no z-cut; skipping %s...'%catalog2.labels[i])
 
-		rand_ind = [[0,0,1,1], [0,1,2,3]][args.dens_colours]
+		rand_ind = [[0,0,1,1], [0,1,2,3]][args.densColours]
 		print('CHECK THIS rand_ind: ',rand_ind)
 		rand_combos = [
 		[catalog2.labels[rand_ind[0]]+'.asc', catalog2.samplecounts[rand_ind[0]], catalog.labels[0]+'.asc', catalog.samplecounts[0], 'rand_'+catalog.wcorrLabels[0]],
