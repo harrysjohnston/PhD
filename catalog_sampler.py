@@ -50,9 +50,11 @@ class RealCatalogue:
 		gc.collect()
 		self.columns = hdulist[1].columns.names
 		# ascii (.asc) file IDs
-		self.labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue', 'highZ', 'lowZ']
-		ext_labels = ['%s_largePi'%i for i in self.labels[:-2]]
-		ext_labels = self.labels[:-2]+ext_labels
+		self.labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue',
+						'highZ_Red_UnMasked', 'highZ_Blue_UnMasked', 'lowZ_Red_UnMasked', 'lowZ_Blue_UnMasked',
+						'highZ', 'lowZ']
+		ext_labels = ['%s_largePi'%i for i in self.labels[:4]]
+		ext_labels = self.labels[:4]+ext_labels
 		ext_labels.sort()
 		self.ext_labels = ext_labels
 		# bodies of wcorr output file IDs
@@ -183,6 +185,12 @@ class RealCatalogue:
 		self.highz_B = self.data[(z_cut&blue_cut&bitmask_cut&BCG_sc&lmstar_cut)]
 		self.lowz_R = self.data[(z_cut_r&red_cut&bitmask_cut&BCG_sc&lmstar_cut)]
 		self.lowz_B = self.data[(z_cut_r&blue_cut&bitmask_cut&BCG_sc&lmstar_cut)]
+
+		self.highz_R_UnM = self.data[(z_cut&red_cut&BCG_sc&lmstar_cut)]
+		self.highz_B_UnM = self.data[(z_cut&blue_cut&BCG_sc&lmstar_cut)]
+		self.lowz_R_UnM = self.data[(z_cut_r&red_cut&BCG_sc&lmstar_cut)]
+		self.lowz_B_UnM = self.data[(z_cut_r&blue_cut&BCG_sc&lmstar_cut)]
+
 		self.highz = self.data[(z_cut&BCG_dc&lmstar_cut)]
 		self.lowz = self.data[(z_cut_r&BCG_dc&lmstar_cut)]
 
@@ -276,7 +284,7 @@ class RealCatalogue:
 	def make_combos(self, densColours):
 		# construct sets of filenames, counts, & IDs for wcorr-calls
 
-		wcorr_ind = [[4,4,5,5], [0,1,2,3]][densColours]
+		wcorr_ind = [[-2,-2,-1,-1], [4,5,6,7]][densColours]
 
 		self.wcorr_combos = [
 		[self.labels[wcorr_ind[0]]+'.asc', self.samplecounts[wcorr_ind[0]], self.labels[0]+'.asc', self.samplecounts[0], catalog.wcorrLabels[0]],
@@ -284,10 +292,11 @@ class RealCatalogue:
 		[self.labels[wcorr_ind[2]]+'.asc', self.samplecounts[wcorr_ind[2]], self.labels[2]+'.asc', self.samplecounts[2], catalog.wcorrLabels[2]],
 		[self.labels[wcorr_ind[3]]+'.asc', self.samplecounts[wcorr_ind[3]], self.labels[3]+'.asc', self.samplecounts[3], catalog.wcorrLabels[3]]
 		]
-		self.samplecounts = self.samplecounts[:6]
+		print('CHECK THIS wcorr call combinations:\n',self.wcorr_combos)
+		self.samplecounts = self.samplecounts[:10]
 		[print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
-		print('total shapes: \t%s'%np.sum(self.samplecounts[:4]))
-		print('total density: \t%s'%np.sum(self.samplecounts[4:]))
+		# print('total shapes: \t%s'%np.sum(self.samplecounts[:4]))
+		# print('total density: \t%s'%np.sum(self.samplecounts[4:]))
 
 	def prep_wcorr(self, files_path, wcorr_combos, rp_bins, rp_lims, los_bins, los_lim, nproc, large_pi, out_sh):
 		shell_script = [
@@ -611,17 +620,25 @@ class RealCatalogue:
 		highzB_pcuts = [(self.zcut&self.bluecut&self.bitmaskcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
 		lowzR_pcuts = [(self.zcut_r&self.redcut&self.bitmaskcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
 		lowzB_pcuts = [(self.zcut_r&self.bluecut&self.bitmaskcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
+
+		highzR_UnM_pcuts = [(self.zcut&self.redcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
+		highzB_UnM_pcuts = [(self.zcut&self.bluecut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
+		lowzR_UnM_pcuts = [(self.zcut_r&self.redcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
+		lowzB_UnM_pcuts = [(self.zcut_r&self.bluecut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
+
 		highz_pcuts = [(self.zcut&self.BCG_dc&self.lmstarcut&pc) for pc in patchCuts]
 		lowz_pcuts = [(self.zcut_r&self.BCG_dc&self.lmstarcut&pc) for pc in patchCuts]
-		highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts = map(lambda x: np.array(x),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts])
 
-		# cut data into 6xpatch-arrays, w/ each element is a fits-table
-		hizR_patches,hizB_patches,lozR_patches,lozB_patches,hiz_patches,loz_patches = map(lambda x: np.array([self.data[pc] for pc in x]),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts])
+		# all lists of patch-cuts -> arrays
+		highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts, highzR_UnM_pcuts,highzB_UnM_pcuts,lowzR_UnM_pcuts,lowzB_UnM_pcuts, highz_pcuts,lowz_pcuts = map(lambda x: np.array(x),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts, highzR_UnM_pcuts,highzB_UnM_pcuts,lowzR_UnM_pcuts,lowzB_UnM_pcuts, highz_pcuts,lowz_pcuts])
 
-		del highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highz_pcuts,lowz_pcuts
+		# cut data into 10xpatch-arrays, w/ each element is a fits-table
+		hizR_patches,hizB_patches,lozR_patches,lozB_patches, hizR_UnM_patches,hizB_UnM_patches,lozR_UnM_patches,lozB_UnM_patches, hiz_patches,loz_patches = map(lambda x: np.array([self.data[pc] for pc in x]),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts, highzR_UnM_pcuts,highzB_UnM_pcuts,lowzR_UnM_pcuts,lowzB_UnM_pcuts, highz_pcuts,lowz_pcuts])
+
+		del highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highzR_UnM_pcuts,highzB_UnM_pcuts,lowzR_UnM_pcuts,lowzB_UnM_pcuts,highz_pcuts,lowz_pcuts
 		gc.collect()
 
-		self.patchedData = np.array([hizR_patches,hizB_patches,lozR_patches,lozB_patches,hiz_patches,loz_patches])
+		self.patchedData = np.array([hizR_patches,hizB_patches,lozR_patches,lozB_patches, hizR_UnM_patches,hizB_UnM_patches,lozR_UnM_patches,lozB_UnM_patches, hiz_patches,loz_patches])
 
 		# count lost pixels within each patch for weighting
 		npixLost = np.array([np.count_nonzero(i) for i in pixpatchCuts])
@@ -751,6 +768,7 @@ class RealCatalogue:
 			del_one_weights = np.delete(patchWeights,i)
 			jkweights[i] = np.mean(del_one_weights)
 		self.jkweights = jkweights
+		print('CHECK THIS jackknife sample weights:\n',self.jkweights)
 
 		return jkweights
 
@@ -761,7 +779,7 @@ class RealCatalogue:
 		JKsamples.sort()
 
 		if densColours:
-			dlabel = basename(normpath(patchDir))
+			dlabel = basename(normpath(patchDir))+'_UnMasked.asc'
 			dens_sample = join(patchDir,'..',dlabel)
 		else:
 			if 'highZ' in patchDir:
@@ -1137,7 +1155,7 @@ if __name__ == "__main__":
 		sys.exit()
 
 	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.lmstarCut, args.LRGs, args.BCGdens, args.BCGshap, args.bitmaskCut)
-	samples = [catalog.highz_R,catalog.highz_B,catalog.lowz_R,catalog.lowz_B,catalog.highz,catalog.lowz]
+	samples = [catalog.highz_R,catalog.highz_B,catalog.lowz_R,catalog.lowz_B, catalog.highz_R_UnM,catalog.highz_B_UnM,catalog.lowz_R_UnM,catalog.lowz_B_UnM, catalog.highz,catalog.lowz]
 	cuts = 'z-cut: %s\t colour-cut (g-i): %s'%(args.zCut,args.cCut)
 	sample_numbers = [cuts]
 	outfile_root = join(args.Path,'Wcorr')
@@ -1151,13 +1169,13 @@ if __name__ == "__main__":
 		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'),sample_z)
 		sample_numbers.append(sample_num)
 	if args.densColours:
-		sample_zs = sample_zs[:-2]
+		sample_zs = sample_zs[4:-2]
 	else:
-		sample_zs = sample_zs[4:]
+		sample_zs = sample_zs[8:]
 
 	if args.bootstrap or args.jackknife:
 		print('COMPUTING SAMPLE COVARIANCES...')
-		# patchData.shape = (6 subsamples, N patches)
+		# patchData.shape = (10 subsamples, N patches)
 		patchData, patchWeights = catalog.patch_data(args.patchSize, args.bitmaskCut)
 		# print('MAPPING')
 		# catalog.map_test(patchData[0])
@@ -1168,8 +1186,8 @@ if __name__ == "__main__":
 				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j) # save_patches returns str(patchDir)
 		for lab in catalog.labels[:4]:
 			pDir = join(catalog.new_root,lab)
-			if (args.zCut==None)&(lab.startswith('low')):
-				print('no z-cut; skipping %s..'%lab)
+			if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
+				print('no z/colour-cut; skipping %s..'%lab)
 			else:
 				if args.bootstrap:
 					catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi)
@@ -1187,11 +1205,18 @@ if __name__ == "__main__":
 						catalog.jackknife(pDir, jkweights, 1)
 
 	catalog.make_combos(args.densColours)
-	if args.zCut==None:
-		allz_combos = catalog.wcorr_combos[:2]
-		catalog.prep_wcorr(catalog.new_root,allz_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
-	else:
-		catalog.prep_wcorr(catalog.new_root,catalog.wcorr_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
+
+	if (args.zCut==None)&(args.cCut==None):
+		adjusted_combos = [catalog.wcorr_combos[0]]
+	elif (args.zCut==None)&(args.cCut!=None):
+		adjusted_combos = catalog.wcorr_combos[:2]
+	elif (args.zCut!=None)&(args.cCut==None):
+		adjusted_combos = catalog.wcorr_combos[[0,2]]
+	elif (args.zCut!=None)&(args.cCut!=None):
+		adjusted_combos = catalog.wcorr_combos
+	print('CHECK THIS adjusted combos:\n',adjusted_combos)
+
+	catalog.prep_wcorr(catalog.new_root,adjusted_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
 
 	if args.wcorr:
 		print('QSUBBING REAL_WCORR..')
@@ -1212,24 +1237,29 @@ if __name__ == "__main__":
 		sample_numbers = [cuts] # get rid?
 
 		for i, sample in enumerate(catalog2.samples):
-			if (args.zCut!=None)|('lowZ' not in catalog2.labels[i]):
-				print('CUTTING/SAVING RANDOMS (%s)...'%catalog2.labels[i])
-				new_table = catalog2.cut_columns(sample, args.H)
-				sample_num = catalog2.save_tables(new_table,outfile_root,catalog2.labels[i],args.zCut,args.cCut,args.notes)
-				sample_numbers.append(sample_num)
+			label = catalog2.labels[i]
+			if ((args.zCut==None)&('lowZ' in label))|((args.cCut==None)&('Blue' in label))
+				print('no z/colour-cut; skipping %s...'%label)
 			else:
-				print('no z-cut; skipping %s...'%catalog2.labels[i])
+				print('CUTTING/SAVING RANDOMS (%s)...'%label)
+				new_table = catalog2.cut_columns(sample, args.H)
+				sample_num = catalog2.save_tables(new_table,outfile_root,label,args.zCut,args.cCut,args.notes)
+				sample_numbers.append(sample_num)
 
 		rand_ind = [[0,0,1,1], [0,1,2,3]][args.densColours]
-		print('CHECK THIS rand_ind: ',rand_ind)
 		rand_combos = [
 		[catalog2.labels[rand_ind[0]]+'.asc', catalog2.samplecounts[rand_ind[0]], catalog.labels[0]+'.asc', catalog.samplecounts[0], 'rand_'+catalog.wcorrLabels[0]],
 		[catalog2.labels[rand_ind[1]]+'.asc', catalog2.samplecounts[rand_ind[1]], catalog.labels[1]+'.asc', catalog.samplecounts[1], 'rand_'+catalog.wcorrLabels[1]],
 		[catalog2.labels[rand_ind[2]]+'.asc', catalog2.samplecounts[rand_ind[2]], catalog.labels[2]+'.asc', catalog.samplecounts[2], 'rand_'+catalog.wcorrLabels[2]],
 		[catalog2.labels[rand_ind[3]]+'.asc', catalog2.samplecounts[rand_ind[3]], catalog.labels[3]+'.asc', catalog.samplecounts[3], 'rand_'+catalog.wcorrLabels[3]]
 		]
-		if args.zCut==None:
+		if (args.zCut==None)&(args.cCut==None):
+			rand_combos = [rand_combos[0]]
+		elif (args.zCut!=None)&(args.cCut==None):
+			rand_combos = rand_combos[[0,2]]
+		elif (args.zCut==None)&(args.cCut!=None):
 			rand_combos = rand_combos[:2]
+		print('CHECK THIS rand combos:\n',rand_combos)
 
 		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'rand_wcorr')
 
@@ -1253,7 +1283,7 @@ if __name__ == "__main__":
 		script.write(str(args))
 		script.write('\n')
 		[script.write('%s: \t%d, mean R_mag: %.4f\n'%(catalog.labels[i],catalog.samplecounts[i],catalog.Rmags[i])) for i in range(len(catalog.labels[:4]))]
-		[script.write('%s: \t%d\n'%(catalog.labels[i+4],catalog.samplecounts[i+4])) for i in range(len(catalog.labels[4:6]))]
+		[script.write('%s: \t%d\n'%(catalog.labels[i+4],catalog.samplecounts[i+4])) for i in range(len(catalog.labels[4:]))]
 		[script.write('%s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
 	os.system('cp %s %s'%(join(catalog.new_root,'C-lineArgs_SampleProps.txt'),join(catalog.new_root,'to_plot')))
 	np.savetxt(join(catalog.new_root,'Rmags.txt'),catalog.Rmags,header='mean absmag_r; hzr,hzb,lzr,lzb')
