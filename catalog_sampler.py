@@ -1238,7 +1238,7 @@ if __name__ == "__main__":
 
 		for i, sample in enumerate(catalog2.samples):
 			label = catalog2.labels[i]
-			if ((args.zCut==None)&('lowZ' in label))|((args.cCut==None)&('Blue' in label))
+			if ((args.zCut==None)&('lowZ' in label))|((args.cCut==None)&('Blue' in label)):
 				print('no z/colour-cut; skipping %s...'%label)
 			else:
 				print('CUTTING/SAVING RANDOMS (%s)...'%label)
