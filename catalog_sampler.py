@@ -64,7 +64,7 @@ class RealCatalogue:
 
 		# MEASURE WG+ SIGNALS
 
-	def cut_data(self, pgm_, z_, colour_, lmstar_, LRG, BCGdens, BCGshap, *bitmask_):
+	def cut_data(self, pgm_, z_, colour_, lmstar_, LRG, LRG1, LRG2, LRG3, LRG4, LRG5, LRG6, BCGdens, BCGshap, *bitmask_):
 		"""""
 		cut catalogue according to bitmasks, 
 		PGM, & into subsamples
@@ -113,11 +113,23 @@ class RealCatalogue:
 			rscutL = (16.<=(r_s))&((r_s)<=19.6)
 			rscparL = (r_s)<(13.5+(cpar/0.3))
 
-			cut1 = rscut&rscpar&abscperp
-			cut2 = rscut2&cperpcut&gsrscut
-			LOWZcut = rscutL&rscparL&abscperp
-			print('selecting LOWZ exact...!!')
-			LRGcut = LOWZcut#|cut1|cut2
+			cut1 = abscperp
+			if LRG1:
+				cut1 &= rscut
+			if LRG2:
+				cut1 &= rscpar
+			cut2 = cperpcut
+			if LRG3:
+				cut2 &= rscut2
+			if LRG4:
+				cut2 &= gsrscut
+			LOWZcut = abscperp
+			if LRG5:
+				LOWZcut &= rscutL
+			if LRG6:
+				LOWZcut &= rscparL
+			# print('selecting LOWZ exact...!!')
+			LRGcut = LOWZcut|cut1|cut2
 
 		pgm = self.data['pgm']
 		if self.DEI:
@@ -644,7 +656,7 @@ class RealCatalogue:
 		npixLost = np.array([np.count_nonzero(i) for i in pixpatchCuts])
 		pArLost = npixLost*pixar
 		weights = 1-(pArLost/patch_Ars)
-		print('patch weights (check none << 0) : ',weights)
+		print('patch weights (check none << 0) :\n',weights)
 		weights = np.where(weights>0,weights,0)
 		self.patchWeights = weights
 		# print('patch weights: ',self.patchWeights)
@@ -768,7 +780,8 @@ class RealCatalogue:
 			del_one_weights = np.delete(patchWeights,i)
 			jkweights[i] = np.mean(del_one_weights)
 		self.jkweights = jkweights
-		print('CHECK THIS jackknife sample weights:\n',self.jkweights)
+		# print('CHECK THIS jackknife sample weights:\n',self.jkweights) 
+		# JK SAMPLE WEIGHTS DIFFER ON ORDER <=0.01 FOR PSIZE 9, 4...
 
 		return jkweights
 
@@ -1111,6 +1124,42 @@ if __name__ == "__main__":
 	help='use redshift&colour-cut samples as position samples for correlations (1), or just redshift-cut samples (0), defaults to 0',
 	type=int,
 	default=0)
+	parser.add_argument(
+	'-LRG1',
+	type=int,
+	choices=[0,1],
+	default=1,
+	help='if selecting LRGs, choose (0) to drop colour/magnitude cut 1 of 6, or (1) to keep the cut. Default=1 for all -LRGX')
+	parser.add_argument(
+	'-LRG2',
+	type=int,
+	choices=[0,1],
+	default=1,
+	help='(0) drop cut 2 of 6, or (1) to keep the cut')
+	parser.add_argument(
+	'-LRG3',
+	type=int,
+	choices=[0,1],
+	default=1,
+	help='(0) drop cut 3 of 6, or (1) to keep the cut')
+	parser.add_argument(
+	'-LRG4',
+	type=int,
+	choices=[0,1],
+	default=1,
+	help='(0) drop cut 4 of 6, or (1) to keep the cut')
+	parser.add_argument(
+	'-LRG5',
+	type=int,
+	choices=[0,1],
+	default=1,
+	help='(0) drop cut 5 of 6, or (1) to keep the cut')
+	parser.add_argument(
+	'-LRG6',
+	type=int,
+	choices=[0,1],
+	default=1,
+	help='(0) drop cut 6 of 6, or (1) to keep the cut')
 	args = parser.parse_args()
 
 	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.patchSize, args.rmagCut)
@@ -1154,7 +1203,7 @@ if __name__ == "__main__":
 			print('No sample covariances estimated -> no chi^2')
 		sys.exit()
 
-	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.lmstarCut, args.LRGs, args.BCGdens, args.BCGshap, args.bitmaskCut)
+	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.lmstarCut, args.LRGs, args.LRG1, args.LRG2, args.LRG3, args.LRG4, args.LRG5, args.LRG6, args.BCGdens, args.BCGshap, args.bitmaskCut)
 	samples = [catalog.highz_R,catalog.highz_B,catalog.lowz_R,catalog.lowz_B, catalog.highz_R_UnM,catalog.highz_B_UnM,catalog.lowz_R_UnM,catalog.lowz_B_UnM, catalog.highz,catalog.lowz]
 	cuts = 'z-cut: %s\t colour-cut (g-i): %s'%(args.zCut,args.cCut)
 	sample_numbers = [cuts]
@@ -1214,7 +1263,7 @@ if __name__ == "__main__":
 		adjusted_combos = catalog.wcorr_combos[[0,2]]
 	elif (args.zCut!=None)&(args.cCut!=None):
 		adjusted_combos = catalog.wcorr_combos
-	print('CHECK THIS adjusted combos:\n',adjusted_combos)
+	print('CHECK THIS z/colour cut-adjusted combos:\n',adjusted_combos)
 
 	catalog.prep_wcorr(catalog.new_root,adjusted_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
 
