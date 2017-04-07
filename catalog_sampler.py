@@ -89,7 +89,7 @@ class RealCatalogue:
 		self.pre_z = z
 		colour = self.data[self.headers[-3]] - self.data[self.headers[-2]]
 		total_bitmasks = self.data[self.headers[-1]]
-		logmstar = self.data[self.headers[6]]
+		logmstar = self.data[self.headers[6]]+np.log10(self.data['fluxscale'])
 
 		if LRG:
 			g_s,r_s,i_s = self.data['dered_g'],self.data['dered_r'],self.data['dered_i']
@@ -296,7 +296,7 @@ class RealCatalogue:
 	def make_combos(self, densColours):
 		# construct sets of filenames, counts, & IDs for wcorr-calls
 
-		wcorr_ind = [[-2,-2,-1,-1], [4,5,6,7]][densColours]
+		wcorr_ind = [[8,8,9,9], [4,5,6,7]][densColours]
 
 		self.wcorr_combos = [
 		[self.labels[wcorr_ind[0]]+'.asc', self.samplecounts[wcorr_ind[0]], self.labels[0]+'.asc', self.samplecounts[0], catalog.wcorrLabels[0]],
@@ -1217,6 +1217,7 @@ if __name__ == "__main__":
 		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
 		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'),sample_z)
 		sample_numbers.append(sample_num)
+	print('SAVING TO DIRECTORY: %s'%catalog.new_root)
 	if args.densColours:
 		sample_zs = sample_zs[4:-2]
 	else:
