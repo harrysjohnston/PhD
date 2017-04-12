@@ -100,9 +100,9 @@ class RealCatalogue:
 			dperp = (r_s-i_s)-(g_s-r_s)/8.
 
 			#cutI
-			print('CUTTING by r_s NOT r_petro-ext_r...!')
-			# rscut = (16.<=(rpetro-ext_r))&((rpetro-ext_r)<=19.2)
-			rscut = (16.<=(r_s))&((r_s)<=19.2)
+			# print('CUTTING by r_s NOT r_petro-ext_r...!')
+			rscut = (16.<=(rpetro-ext_r))&((rpetro-ext_r)<=19.2)
+			# rscut = (16.<=(r_s))&((r_s)<=19.2)
 			rscpar = (r_s)<(13.1+(cpar/0.3))
 			abscperp = abs(cperp)<0.2
 			#cut2
@@ -292,6 +292,32 @@ class RealCatalogue:
 		ascii.write(new_table, join(outfile_root, label + ".asc"), names=['#RA/rad', '#DEC/rad', '#comov_dist/Mpc/h', '#e1', '#e2', '#e_weight'])
 		sample_no = "%s # objects:\t%s"%(label,len(new_table))
 		return sample_no
+
+	def save_swotfiles(self, subsample, label):
+		"""""
+		save samples in SWOT format (ra[deg],dec[deg],z)
+
+		"""""
+		RA = subsample[self.headers[0]]
+		DEC = subsample[self.headers[1]]
+		Z = subsample[self.headers[2]]
+		newtable = np.column_stack((RA,DEC,Z))
+
+		ascii.write(newtable,join(self.new_root,'swot_%s.asc'%label),names=['#ra[deg]','dec[deg]','z'],delimiter='\t')
+
+		return Z # for random downsampling
+
+	def save_swotpatches(self, patch, label, pnum):
+		RA = patch[self.headers[0]]
+		DEC = patch[self.headers[1]]
+		Z = patch[self.headers[2]]
+		newpatch = np.column_stack((RA,DEC,Z))
+
+		sw_pDir = join(self.new_root,'swot_%s'%label)
+		if not isdir(sw_pDir):
+			mkdir(sw_pDir)
+
+		ascii.write(newpatch,join(sw_pDir,label+'%spatch.asc'%str(pnum).zfill(2)),names=['#ra[deg]','dec[deg]','z'],delimiter='\t')
 
 	def make_combos(self, densColours):
 		# construct sets of filenames, counts, & IDs for wcorr-calls
@@ -1204,24 +1230,29 @@ if __name__ == "__main__":
 		sys.exit()
 
 	catalog.cut_data(args.pgm_cut, args.zCut, args.cCut, args.lmstarCut, args.LRGs, args.LRG1, args.LRG2, args.LRG3, args.LRG4, args.LRG5, args.LRG6, args.BCGdens, args.BCGshap, args.bitmaskCut)
-	samples = [catalog.highz_R,catalog.highz_B,catalog.lowz_R,catalog.lowz_B, catalog.highz_R_UnM,catalog.highz_B_UnM,catalog.lowz_R_UnM,catalog.lowz_B_UnM, catalog.highz,catalog.lowz]
+	samples = [catalog.highz_R,catalog.highz_B,catalog.lowz_R,catalog.lowz_B, 
+				catalog.highz_R_UnM,catalog.highz_B_UnM,catalog.lowz_R_UnM,catalog.lowz_B_UnM, 
+				catalog.highz,catalog.lowz]
 	cuts = 'z-cut: %s\t colour-cut (g-i): %s'%(args.zCut,args.cCut)
-	sample_numbers = [cuts]
 	outfile_root = join(args.Path,'Wcorr')
 
 	print('CUTTING/SAVING SAMPLES...')
 	sample_zs = []
+	swot_z = []
 	for i, sample in enumerate(samples):
 		new_table,sample_z = catalog.cut_columns(sample, args.H)
 		sample_zs.append(sample_z)
 		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
 		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'),sample_z)
-		sample_numbers.append(sample_num)
+		if i>3:
+			swot_z.append(catalog.save_swotfiles(sample,catalog.labels[i]))
 	print('SAVING TO DIRECTORY: %s'%catalog.new_root)
 	if args.densColours:
 		sample_zs = sample_zs[4:-2]
+		swot_z = swot_z[:-2]
 	else:
 		sample_zs = sample_zs[8:]
+		swot_z = swot_z[-2:]
 
 	if args.bootstrap or args.jackknife:
 		print('COMPUTING SAMPLE COVARIANCES...')
@@ -1234,6 +1265,7 @@ if __name__ == "__main__":
 			for j,p in enumerate(sam):
 				new_p,patch_z = catalog.cut_columns(p, args.H)
 				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j) # save_patches returns str(patchDir)
+				catalog.save_swotpatches(p, catalog.labels[i], j)
 		for lab in catalog.labels[:4]:
 			pDir = join(catalog.new_root,lab)
 			if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
@@ -1284,7 +1316,6 @@ if __name__ == "__main__":
 		[print('# objects %s: \t'%catalog2.labels[i],v) for i,v in enumerate(catalog2.samplecounts)]
 
 		cuts = 'z-cut: %s'%args.zCut
-		sample_numbers = [cuts] # get rid?
 
 		for i, sample in enumerate(catalog2.samples):
 			label = catalog2.labels[i]
@@ -1294,7 +1325,7 @@ if __name__ == "__main__":
 				print('CUTTING/SAVING RANDOMS (%s)...'%label)
 				new_table = catalog2.cut_columns(sample, args.H)
 				sample_num = catalog2.save_tables(new_table,outfile_root,label,args.zCut,args.cCut,args.notes)
-				sample_numbers.append(sample_num)
+				rand_sw_zs = catalog2.save_swotfiles(sample,label)
 
 		rand_ind = [[0,0,1,1], [0,1,2,3]][args.densColours]
 		rand_combos = [
