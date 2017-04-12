@@ -931,6 +931,7 @@ class RandomCatalogue(RealCatalogue):
 		hdulist = fits.open(path)
 		self.data = hdulist[1].data
 		self.columns = hdulist[1].columns.names
+		self.headers = ['RA','DEC','Z']
 		self.labels = [['rand_highZ','rand_lowZ'],['rand_highZ_Red','rand_highZ_Blue','rand_lowZ_Red','rand_lowZ_Blue']][densColours]
 		self.samples = []
 		self.samplecounts = []
@@ -1265,7 +1266,8 @@ if __name__ == "__main__":
 			for j,p in enumerate(sam):
 				new_p,patch_z = catalog.cut_columns(p, args.H)
 				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j) # save_patches returns str(patchDir)
-				catalog.save_swotpatches(p, catalog.labels[i], j)
+				if i>3:
+					catalog.save_swotpatches(p, catalog.labels[i], j)
 		for lab in catalog.labels[:4]:
 			pDir = join(catalog.new_root,lab)
 			if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
