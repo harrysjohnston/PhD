@@ -260,8 +260,8 @@ class RealCatalogue:
 		# e2 = e12[:,1]
 		#   #   #   #   #   #   #   #   #   #   #   #   #   #   #   
 
-		if 'chi_comov' in table.columns.names:
-			comov = table['chi_comov']
+		if 'chi_comov_TONRY' in table.columns.names:
+			comov = table['chi_comov_TONRY']
 		else:
 			comov = Planck13.comoving_distance(Z)
 		comov *= h
@@ -403,6 +403,7 @@ class RealCatalogue:
 		zcheck = np.array(['wcorr_'+i+'.dat' in flist for i in wcorrIDs])
 		wcorrOutputs,rand_wcorrOutputs = np.array(wcorrOutputs),np.array(rand_wcorrOutputs)
 		wcorrOutputs,rand_wcorrOutputs = wcorrOutputs[zcheck],rand_wcorrOutputs[zcheck]
+		new_labels = [j for i,j in enumerate(self.labels[:4]) if 'wcorr_'+self.wcorrLabels[i]+'.dat' in listdir(files_path)]
 		for i, path in enumerate(wcorrOutputs):
 			realData.append(np.loadtxt(path))
 			randData.append(np.loadtxt(rand_wcorrOutputs[i]))
@@ -413,9 +414,9 @@ class RealCatalogue:
 
 			Pproperr,Xproperr = np.ones_like(realErr),np.ones_like(realErr)
 			if BT:
-				BTerrs = np.loadtxt(join(files_path,'BTerrs_%s'%self.labels[i]))
+				BTerrs = np.loadtxt(join(files_path,'BTerrs_%s'%new_labels[i]))
 				if largePi:
-					BTerrs = np.loadtxt(join(files_path,'BTerrs_%s_largePi'%self.labels[i]))
+					BTerrs = np.loadtxt(join(files_path,'BTerrs_%s_largePi'%new_labels[i]))
 				Perr = BTerrs[:,0]
 				Xerr = BTerrs[:,1]
 				Pproperr = np.sqrt((Perr**2) + (randErr**2))
@@ -425,9 +426,13 @@ class RealCatalogue:
 
 			Pproperr2,Xproperr2 = np.ones_like(realErr),np.ones_like(realErr)
 			if JK:
-				JKerrs = np.loadtxt(join(files_path,'JKerrs_%s'%self.labels[i]))
-				if largePi:
-					JKerrs = np.loadtxt(join(files_path,'JKerrs_%s_largePi'%self.labels[i]))
+				try:
+					JKerrs = np.loadtxt(join(files_path,'JKerrs_%s'%new_labels[i]))
+					if largePi:
+						JKerrs = np.loadtxt(join(files_path,'JKerrs_%s_largePi'%new_labels[i]))
+				except IOError:
+					print('IOError THROWN for JKerrs_%s.. (largePi=%s)!!'%(new_labels[i],largePi))
+					JKerrs = np.ones_like(np.array([realErr,randErr]).T)
 				Perr2 = JKerrs[:,0]
 				Xerr2 = JKerrs[:,1]
 				Pproperr2 = np.sqrt((Perr2**2) + (randErr**2))
@@ -1194,10 +1199,12 @@ if __name__ == "__main__":
 	if args.plotNow:
 		# reduce & save data files, returning filename-list
 		print('PLOTTING')
-		wcorrOuts = catalog.plot_wcorr(args.Path, catalog.wcorrLabels, args.bootstrap, args.jackknife, 0)
+		ldir = listdir(args.Path)
+		ia_datfiles = [i for i in catalog.wcorrLabels if 'wcorr_'+i+'.dat' in ldir]
+		wcorrOuts = catalog.plot_wcorr(args.Path, ia_datfiles, args.bootstrap, args.jackknife, 0)
 		largePi_outs = [basename(normpath(out[:-4] + '_largePi.dat')) for out in wcorrOuts]
 		# check for largePi .dat files
-		isIn = [i in listdir(args.Path) for i in largePi_outs]
+		isIn = [i in ldir for i in largePi_outs]
 		uniq = np.unique(isIn)
 		if uniq.all() == True:
 			IDs = [outs[6:-4] for outs in largePi_outs]
@@ -1295,7 +1302,7 @@ if __name__ == "__main__":
 	elif (args.zCut==None)&(args.cCut!=None):
 		adjusted_combos = catalog.wcorr_combos[:2]
 	elif (args.zCut!=None)&(args.cCut==None):
-		adjusted_combos = catalog.wcorr_combos[[0,2]]
+		adjusted_combos = np.array(catalog.wcorr_combos)[np.array([0,2])]
 	elif (args.zCut!=None)&(args.cCut!=None):
 		adjusted_combos = catalog.wcorr_combos
 	print('CHECK THIS z/colour cut-adjusted combos:\n',adjusted_combos)
@@ -1339,7 +1346,7 @@ if __name__ == "__main__":
 		if (args.zCut==None)&(args.cCut==None):
 			rand_combos = [rand_combos[0]]
 		elif (args.zCut!=None)&(args.cCut==None):
-			rand_combos = rand_combos[[0,2]]
+			rand_combos = np.array(rand_combos)[np.array([0,2])]
 		elif (args.zCut==None)&(args.cCut!=None):
 			rand_combos = rand_combos[:2]
 		print('CHECK THIS rand combos:\n',rand_combos)
