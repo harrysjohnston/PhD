@@ -12,47 +12,49 @@ def setup(options):
     # use to load fixed parameters, perform one-off calculations (i.e. not changing
     # with sampling) etc.
 
+    # sections from which to read n(z), proj-fns, NLA power-laws(opt)
     nz_section = options.get_string(option_section,'nz_section',default='wl_number_density')
     IA_section = options.get_string(option_section,'IA_section',default='intrinsic_alignment_parameters')
-    hkl_section = options.get_string(option_section,'hkl_section',default='hankel_out')
+    hkl_section = options.get_string(option_section,'projn_section',default='hankel_out')
+    nbin = options.get_int(option_section,'nbin',default=50)
 
+    nla = options.get_bool(option_section,'NLA',default=False) # only need bias factors if using NLA
+    bias = options.get_string(option_section,'sample_bias',default=None) # None == using HOD
+    Rmag = options.get_double(option_section,'Rmag',default=None) # if fitting luminosity scaling
     wgg = options.get_bool(option_section,'do_wgg',default=False)
-    wg_section = options[option_section,'wg_section']
-    bias = options[option_section,'bias']
-    nbin = options[option_section,'nbin']
-    Rmag = options.get_double(option_section,'Rmag')
+
+    wg_section = options[option_section,'wg_section'] # for weight/corrn fn outputs
 
     # return the config for execute fn
-    return nz_section,IA_section,hkl_section,wg_section,bias,nbin,Rmag,wgg
+    return nz_section,IA_section,hkl_section,wg_section,bias,nbin,Rmag,nla,wgg
 
 def execute(block, config):
     # this function is called every time you have a new sample of cosmological and other parameters
 
-    nz_section,IA_section,hkl_section,wg_section,bias,nbin,Rmag,wgg = config
+    nz_section,IA_section,hkl_section,wg_section,bias,nbin,Rmag,nla,wgg = config
 
     # load from block
     z = block[nz_section,'z']
     dz = z[1]-z[0]
-
     wg_rz = np.array([block[hkl_section,'bin_%s_%s'%(i+1,i+1)] for i in range(nbin)])
     nofz_shap = block[nz_section,'nofz_shapes']
     nofz_dens = block[nz_section,'nofz_density']
+    if wgg:
+        nofz_shap = nofz_dens
     eta = block.get_double(IA_section,'eta',default=0)
     beta = block.get_double(IA_section,'beta',default=0)
-    # bin_popns = [block[nz_section,"bin_%s"%(i+1)] for i in range(nbin)]
 
-    # compute W(z), wg_(r)
-    Wz = compute_Wz(z,nofz_shap,nofz_dens,eta,beta,Rmag,wgg)
-    wg_r = compute_wgp(Wz,wg_rz,nbin,dz)
+    # compute W(z), wg+(r)/wgg(r)
+    Wz,Wz_scaled = compute_Wz(z,nofz_shap,nofz_dens,eta,beta,Rmag,wgg) # wgg switch prevents application of power-law scalings to gg
+    wgp_r = compute_wgp(Wz_scaled,wg_rz,nbin,dz)
 
     tags = ['wgp','wgg']
-    bg = block[bias_section,'b_g_%s'%bias]
-    if wgg:
-        print('do_wgg=T ; wgg *= b_g^2 ...!')
-        wg_r *= bg**2
-    else:
-        print('do_wgg=F ; wgp *= b_g ...!')
+    if (bias!=None)&(nla):
+        bg = block[bias_section,'b_g_%s'%bias]
         wg_r *= bg
+        if wgg:
+            print('COMPUTING w_gg; bias factor squared')
+            wg_r *= bg
     block.put_double_array_1d(wg_section,'%s_r'%tags[int(wgg)],wg_r)
     block.put_double_array_1d(wg_section,'%s_r_minus'%tags[int(wgg)],-wg_r)
     block.put_double_array_1d(wg_section,'W_z',Wz)
