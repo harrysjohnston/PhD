@@ -22,8 +22,8 @@ def setup(options):
     # create n(z) files for weight functions
     make_nz = options.get_bool(option_section,'make_nz',default=False)
     nz_section = options.get_string(option_section,'nz_section',default=None)
-    shapz_path = options.get_string(option_section,'shapZ_path',default=None)
-    densz_path = options.get_string(option_section,'densZ_path',default=None)
+    shapz_path = options.get_string(option_section,'path1',default=None)
+    densz_path = options.get_string(option_section,'path2',default=None)
     nz = options.get_int(option_section,'nz',default=50)
     outfile = options.get_string(option_section,'outfile',default=None)
 

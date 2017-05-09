@@ -20,8 +20,8 @@ def create_nz(gal_z,nz,nbin,outfile):
     for i in range(nbin):
         nz_table[:,i+1] = np.where(
             (bin_ranges[i]<=z_mids)&(z_mids<bin_ranges[i+1]),n_of_z,0)
-    # outfile = outfile+'_nz%snbin%s.asc'%(nz,nbin)
-    ascii.write(nz_table,outfile,names=['#z_mid']+['#bin_%s'%(i+1) for i in range(nbin)],delimiter='\t')
+    if outfile!=None:
+        ascii.write(nz_table,outfile,names=['#z_mid']+['#bin_%s'%(i+1) for i in range(nbin)],delimiter='\t')
     return z_mids,n_of_z
 
 def cut_krange(k_h,p_k,kmin=10**-2.2,kmax=10**1.2):
