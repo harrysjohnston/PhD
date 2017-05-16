@@ -16,28 +16,28 @@ def setup(options):
 
     # prep P(k) for hankel transformation
     coerce_pk = options.get_bool(option_section,'coerce_pk',default=False)
-    power_section = options.get_string(option_section,'power_section',default=None)
+    power_section = options.get_string(option_section,'power_section',default='dummy')
     nbin = options.get_int(option_section,'nbin',default=50)
 
     # create n(z) files for weight functions
     make_nz = options.get_bool(option_section,'make_nz',default=False)
-    nz_section = options.get_string(option_section,'nz_section',default=None)
-    shapz_path = options.get_string(option_section,'path1',default=None)
-    densz_path = options.get_string(option_section,'path2',default=None)
+    nz_section = options.get_string(option_section,'nz_section',default='dummy')
+    shapz_path = options.get_string(option_section,'path1',default='dummy')
+    densz_path = options.get_string(option_section,'path2',default='dummy')
     nz = options.get_int(option_section,'nz',default=50)
-    outfile = options.get_string(option_section,'outfile',default=None)
+    outfile = options.get_string(option_section,'outfile',default='dummy')
 
     if make_nz:
         shapes_z,density_z = read_z(shapz_path,densz_path)
         z_mids,nofz_shap = create_nz(shapes_z,nz,nbin,outfile+'shapes.asc')
         z_mids,nofz_dens = create_nz(density_z,nz,nbin,outfile+'density.asc')
     else:
-        z_mids,nofz,nz = (None,None,None)
+        z_mids,nofz,nz,nofz_shap,nofz_dens = (None,None,None,None,None)
 
     if (not coerce_pk) & (not make_nz):
         print('PKHANKEL IS DOING NOTHING !!')
         print('PkHankel can (1) coerce P(k) into hankel-transformable (cl_to_xi) format in datablock')
-        print('and/or (2) create 2x n(z) arrays (2 samples) for computing weight fns')
+        print('and/or (2) create 2x n(z) 1d-arrays (2 samples) for computing weight fns')
 
 
     # return the config for execute fn
@@ -54,10 +54,8 @@ def execute(block, config):
         k_h = block[power_section,'k_h']
         p_k = block[power_section,'p_k']
 
-        # execute main function
-        # aim for simplicity
-        # here, cutting k,P(k) & saving back to db in format for Hankel transfm
-        k_h,p_k = cut_krange(k_h,p_k, kmin=10**-2.2, kmax=10**1.2) # k-limits in h/Mpc
+        # cutting k,P(k) & saving back to db in format for Hankel transfm
+        k_h,p_k = cut_krange(k_h,p_k)#, kmin=10**-4, kmax=10**1.2) # k-limits in h/Mpc
         block[power_section,'ell'] = k_h
         block[power_section,'nbin'] = nbin
         for i in range(len(p_k)):
