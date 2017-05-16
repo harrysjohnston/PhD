@@ -30,8 +30,7 @@ def compute_Wz(z,nofz_s,nofz_d,eta,beta,Rmag,wgg=0):
     Wz_nom = (pz_s*pz_d)/(Xz2*Xprime)
     Wz_dom = sum(Wz_nom)*h
     Wz = Wz_nom/Wz_dom
-    # redshift & luminosity dep. -> eta,beta free params when fitting!!
-    # defaults; eta=-0.27, beta=1.13 (Joa+'11, all-sample-fit)
+    Wz_scaled = Wz
 
     zfactor = ((1+z)/(1+0.3))**eta # z0=0.3
     Lfactor = 10**(0.4*(-22-Rmag)*beta) # R0=-22

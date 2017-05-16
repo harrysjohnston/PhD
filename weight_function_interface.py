@@ -19,8 +19,8 @@ def setup(options):
     nbin = options.get_int(option_section,'nbin',default=50)
 
     nla = options.get_bool(option_section,'NLA',default=False) # only need bias factors if using NLA
-    bias = options.get_string(option_section,'sample_bias',default=None) # None == using HOD
-    Rmag = options.get_double(option_section,'Rmag',default=None) # if fitting luminosity scaling
+    bias = options.get_string(option_section,'sample_bias',default='dummy') # None/dummy == using HOD
+    Rmag = options.get_double(option_section,'Rmag',default=0.) # if fitting luminosity scaling
     wgg = options.get_bool(option_section,'do_wgg',default=False)
 
     wg_section = options[option_section,'wg_section'] # for weight/corrn fn outputs
@@ -46,7 +46,7 @@ def execute(block, config):
 
     # compute W(z), wg+(r)/wgg(r)
     Wz,Wz_scaled = compute_Wz(z,nofz_shap,nofz_dens,eta,beta,Rmag,wgg) # wgg switch prevents application of power-law scalings to gg
-    wgp_r = compute_wgp(Wz_scaled,wg_rz,nbin,dz)
+    wg_r = compute_wgp(Wz_scaled,wg_rz,nbin,dz)
 
     tags = ['wgp','wgg']
     if (bias!=None)&(nla):
