@@ -49,7 +49,10 @@ def execute(block, config):
     wg_r = compute_wgp(Wz_scaled,wg_rz,nbin,dz)
 
     tags = ['wgp','wgg']
-    if (bias!=None)&(nla):
+    if nla:
+        A_i =  block[IA_section,'A_%s'%bias]
+        if not wgg:
+            wg_r *= A_i
         bg = block[bias_section,'b_g_%s'%bias]
         wg_r *= bg
         if wgg:
