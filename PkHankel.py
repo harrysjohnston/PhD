@@ -54,7 +54,7 @@ def zero_pad(k_h,p_k,kmin=1e-5,kmax=1e5):
         hk_zeros = [0.]*len(ex_logk)
     newk = 10**logk
     print('PADDING OUTSIDE SCALES OF INTEREST: ')
-    my_kmin, my_kmax = np.where(newk<10**-2.2)[-1], np.where(newk>10**1.2)[0]
+    my_kmin, my_kmax = np.where(newk<10**-2.2)[0][-1], np.where(newk>10**1.2)[0][0]
 
     # pad p_k with zeros
     newpk = np.empty([p_k.shape[0],len(lk_zeros)+p_k.shape[1]+len(hk_zeros)])
