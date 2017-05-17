@@ -3,6 +3,7 @@ import numpy as np
 from PkHankel import read_z
 from PkHankel import create_nz
 from PkHankel import cut_krange
+from PkHankel import zero_pad
 
 # We have a collection of commonly used pre-defined block section names.
 # If none of the names here is relevant for your calculation you can use any
@@ -54,8 +55,10 @@ def execute(block, config):
         k_h = block[power_section,'k_h']
         p_k = block[power_section,'p_k']
 
-        # cutting k,P(k) & saving back to db in format for Hankel transfm
-        k_h,p_k = cut_krange(k_h,p_k)#, kmin=10**-4, kmax=10**1.2) # k-limits in h/Mpc
+        # take measures against possible ringing - cut k-range or zero-pad
+        k_h,p_k = zero_pad(k_h,p_k,kmin=1e-5,kmax=1e5)
+        #k_h,p_k = cut_krange(k_h,p_k)#, kmin=10**-4, kmax=10**1.2) # k-limits in h/Mpc
+
         block[power_section,'ell'] = k_h
         block[power_section,'nbin'] = nbin
         for i in range(len(p_k)):
