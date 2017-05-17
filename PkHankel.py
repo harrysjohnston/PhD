@@ -45,11 +45,11 @@ def zero_pad(k_h,p_k,kmin=1e-5,kmax=1e5):
 
     # extrapolate k-range
     if k_h.min()>kmin:
-        ex_logk = np.arange(start=np.log10(kmin),stop=np.log10(k.min()),step=mean_diff)[:-1]
+        ex_logk = np.arange(start=np.log10(kmin),stop=np.log10(k_h.min()),step=mean_diff)[:-1]
         logk = np.array(list(ex_logk)+list(logk))
         lk_zeros = [0.]*len(ex_logk)
     if k_h.max()<kmax:
-        ex_logk = np.arange(start=np.log10(k.max()),stop=np.log10(kmax),step=mean_diff)[1:]
+        ex_logk = np.arange(start=np.log10(k_h.max()),stop=np.log10(kmax),step=mean_diff)[1:]
         logk = np.array(list(logk)+list(ex_logk))
         hk_zeros = [0.]*len(ex_logk)
     newk = 10**logk
