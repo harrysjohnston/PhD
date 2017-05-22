@@ -56,8 +56,10 @@ def execute(block, config):
         bg = block[bias_section,'b_g_%s'%bias]
         wg_r *= bg
         if wgg:
-            print('COMPUTING w_gg; bias factor squared')
+            print('COMPUTING w_gg; bias factor squared, and INTEGRAL CONSTRAINT added..')
+            C = block[bias_section,'ic_%s'%bias]
             wg_r *= bg
+            wg_r += C
     block.put_double_array_1d(wg_section,'%s_r'%tags[int(wgg)],wg_r)
     block.put_double_array_1d(wg_section,'%s_r_minus'%tags[int(wgg)],-wg_r)
     block.put_double_array_1d(wg_section,'W_z',Wz)
