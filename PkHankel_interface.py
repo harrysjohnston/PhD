@@ -35,7 +35,7 @@ def setup(options):
     else:
         z_mids,nofz,nz,nofz_shap,nofz_dens = (None,None,None,None,None)
 
-    if (not coerce_pk) & (not make_nz):
+    if not coerce_pk | make_nz:
         print('PKHANKEL IS DOING NOTHING !!')
         print('PkHankel can (1) coerce P(k) into hankel-transformable (cl_to_xi) format in datablock')
         print('and/or (2) create 2x n(z) 1d-arrays (2 samples) for computing weight fns')
@@ -56,8 +56,8 @@ def execute(block, config):
         p_k = block[power_section,'p_k']
 
         # take measures against possible ringing - cut k-range or zero-pad
-        k_h,p_k = zero_pad(k_h,p_k,kmin=1e-5,kmax=1e5)
-        #k_h,p_k = cut_krange(k_h,p_k)#, kmin=10**-4, kmax=10**1.2) # k-limits in h/Mpc
+        #k_h,p_k = zero_pad(k_h,p_k,kmin=1e-20,kmax=1e20)
+        k_h,p_k = cut_krange(k_h,p_k, kmin=10**-4, kmax=10**1.2)#, kmin=10**-4, kmax=10**1.2) # k-limits in h/Mpc
 
         block[power_section,'ell'] = k_h
         block[power_section,'nbin'] = nbin
