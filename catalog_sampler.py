@@ -27,7 +27,7 @@ import astropy.stats as astat
 
 class RealCatalogue:
 
-	def __init__(self, path, DEI, psize, mc): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
+	def __init__(self, path, DEI, psize, mc, SDSS): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
 		"""""
 		read-in catalogue
 
@@ -35,16 +35,23 @@ class RealCatalogue:
 		self.path = path
 		KSBheads = ['RA_1_1','DEC_1_1','Z_TONRY','e1c','e2c','RankBCG_1','logmstar','pgm','absmag_g_1','absmag_i_1','col3']
 		DEIheads = ['RA_GAMA','DEC_GAMA','Z_TONRY','e1','e2','RankBCG','logmstar','pgm','absmag_g_1','absmag_i_1','MASK']
+		SDSSheads = ['ra','dec','z','e1','e2','sigma_gamma','rf_g-r']
 		if DEI:
 			self.headers = DEIheads
 			self.DEI = 1
+			self.SDSS = 0
+		elif SDSS:
+			self.headers = SDSSheads
+			self.DEI = 0
+			self.SDSS = 1
 		else:
 			self.headers = KSBheads
 			self.DEI = 0
+			self.SDSS = 0
 		hdulist = fits.open(path)
 		data = hdulist[1].data
 		print('SELECTING R_MAG < %s'%mc)
-		data = data[data['absmag_r_1']<mc]
+		data = data[data['%s'%(['absmag_r_1', 'M_r'][self.SDSS])]<mc]
 		self.data = data
 		del data
 		gc.collect()
@@ -89,7 +96,13 @@ class RealCatalogue:
 		self.pre_z = z
 		colour = self.data[self.headers[-3]] - self.data[self.headers[-2]]
 		total_bitmasks = self.data[self.headers[-1]]
-		logmstar = self.data[self.headers[6]]+np.log10(self.data['fluxscale'])
+		if not self.SDSS:
+			logmstar = self.data[self.headers[6]]+np.log10(self.data['fluxscale'])
+
+		if self.SDSS:
+			colour = self.data[self.headers[-1]]
+			total_bitmasks = np.zeros_like(colour)
+			logmstar = np.ones_like(colour)
 
 		if LRG:
 			g_s,r_s,i_s = self.data['dered_g'],self.data['dered_r'],self.data['dered_i']
@@ -131,9 +144,10 @@ class RealCatalogue:
 			# print('selecting LOWZ exact...!!')
 			LRGcut = LOWZcut|cut1|cut2
 
-		pgm = self.data['pgm']
-		if self.DEI:
+		if self.DEI|self.SDSS:
 			pgm = np.ones_like(pgm)
+		else:
+			pgm = self.data['pgm']
 		pgm_cut = np.array((pgm > pgm_))
 		zeroPgm_cut = np.array((pgm != 0))
 		print('pgm cut [unique]: \t', np.unique(pgm_cut))
@@ -165,12 +179,10 @@ class RealCatalogue:
 		print('lmstar cut [unique]: \t', lmstar_, np.unique(lmstar_cut))
 
 		bitmask_cut = [True]*len(total_bitmasks)
-		if self.DEI:
-			print("DEIMOS: CUTTING MASK!=0")
-			bitmask_cut = np.where(total_bitmasks==0,True,False)
-		else:
-			print("KSB: CUTTING MASK!=0")
-			bitmask_cut = np.where(total_bitmasks==0,True,False)
+
+		print("CUTTING MASK!=0...")
+		bitmask_cut = np.where(total_bitmasks==0,True,False)
+
 		if bitmask_[0] != None:
 			bitmask_ = bitmask_[0]
 			for i in range(len(bitmask_)):
@@ -235,15 +247,18 @@ class RealCatalogue:
 		RA = np.deg2rad(table[self.headers[0]])
 		DEC = np.deg2rad(table[self.headers[1]])
 		Z = table[self.headers[2]]
-		pgm = table['pgm']
-		if self.DEI:
-			pgm = np.ones_like(pgm)
+		if self.DEI|self.SDSS:
+			pgm = np.ones_like(Z)
+		else:
+			pgm = table['pgm']
 		e1 = table[self.headers[3]]/pgm
 		e2 = table[self.headers[4]]/pgm
 		# e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward ???
 		e_weight = np.where(pgm<0.1,0,pgm)
 		if self.DEI:
 			e_weight = np.where(table['flag_DEIMOS']=='0000',1,0)
+		if self.SDSS:
+			e_weight = np.where( ((abs(e1)>9.9)|(abs(e2)>9.9)) ,0,1)
 		if len(e1)>1000:
 			e1m,e2m = e1[np.array(e_weight,dtype=bool)],e2[np.array(e_weight,dtype=bool)]
 			e1m,e2m = np.mean(e1m),np.mean(e2m)
@@ -282,6 +297,8 @@ class RealCatalogue:
 			outfile_root = outfile_root_ + "_z" + str(z_cut) + "_c" + str(c_cut)
 		elif z_cut != None:
 			outfile_root = outfile_root_ + "_z" + str(z_cut)
+		elif c_cut != None:
+			outfile_root = outfile_root_ + "_c" + str(c_cut)
 		else:
 			outfile_root = outfile_root_ + "_allz"
 
@@ -521,32 +538,34 @@ class RealCatalogue:
 		GKskyFrac *= fullSky
 
 		# find masked pixel IDs
-		kidsBitmap = hp.read_map('/share/splinter/hj/PhD/KiDS_counts_N2048.fits', dtype=int)
-		bitmask_cut = [True]*len(kidsBitmap)
-		if self.DEI:
-			print("DEIMOS: CUTTING MASK!=0")
+		if not self.SDSS:
+			kidsBitmap = hp.read_map('/share/splinter/hj/PhD/KiDS_counts_N2048.fits', dtype=int)
+			bitmask_cut = [True]*len(kidsBitmap)
+
+			print("PATCHES: CUTTING MASK!=0")
 			bitmask_cut = np.where(kidsBitmap==0,True,False)
-		else:
-			print("KSB: CUTTING MASK!=0")
-			bitmask_cut = np.where(kidsBitmap==0,True,False)
-		if bitmask_[0] != None:
-			bitmask_ = bitmask_[0]
-			for i in range(len(bitmask_)):
-				# construct bitmask cut
-				bitmask_cut &= np.where(bitmask_[i] & kidsBitmap == bitmask_[i], False, True)
-		lostpixIDs = [j for j,b in enumerate(bitmask_cut) if b==False]
-		lostfromGK = np.where(GKpix[lostpixIDs]!=0,1,0) #1=pixel-lost,0=not-lost
-		lostmap = np.bincount(lostpixIDs,minlength=npix)
-		# hp.write_map(join(self.new_root,'lostpixmap.fits'),lostmap)
-		print('Lost npix, fraction of area: %s, %.3f'%(sum(lostfromGK),sum(lostfromGK)/sum(GKpix)))
-		if lostpixIDs != []:
-			thetaPhis = hp.pix2ang(nside,lostpixIDs)
-			# lost pixel coords;
-			lostpixra,lostpixdec = np.rad2deg(thetaPhis[1]),(90.-np.rad2deg(thetaPhis[0]))
+
+			if bitmask_[0] != None:
+				bitmask_ = bitmask_[0]
+				for i in range(len(bitmask_)):
+					# construct bitmask cut
+					bitmask_cut &= np.where(bitmask_[i] & kidsBitmap == bitmask_[i], False, True)
+			lostpixIDs = [j for j,b in enumerate(bitmask_cut) if b==False]
+			lostfromGK = np.where(GKpix[lostpixIDs]!=0,1,0) #1=pixel-lost,0=not-lost
+			lostmap = np.bincount(lostpixIDs,minlength=npix)
+			# hp.write_map(join(self.new_root,'lostpixmap.fits'),lostmap)
+			print('Lost npix, fraction of area: %s, %.3f'%(sum(lostfromGK),sum(lostfromGK)/sum(GKpix)))
+
+			if lostpixIDs != []:
+				thetaPhis = hp.pix2ang(nside,lostpixIDs)
+				# lost pixel coords;
+				lostpixra,lostpixdec = np.rad2deg(thetaPhis[1]),(90.-np.rad2deg(thetaPhis[0]))
+			else:
+				lostpixra,lostpixdec = (np.array([1e3]),np.array([1e3]))
+			del kidsBitmap,lostmap
+			gc.collect()
 		else:
 			lostpixra,lostpixdec = (np.array([1e3]),np.array([1e3]))
-		del kidsBitmap,lostmap
-		gc.collect()
 
 		# divide catalog.data into patches...
 		raHist = np.histogram(ra,bins=100)
@@ -1026,7 +1045,7 @@ if __name__ == "__main__":
 	parser.add_argument(
 	'-cCut',
 	type=np.float32,
-	help='red vs. blue colour threshold, between 0 - 1.4 (meaningfully, between approx 0.7 - 1.1). Defaults to None',
+	help='red vs. blue colour threshold, rest-frame g-i (typically>1.0) for KiDSxGAMA, or g-r (typ.>0.63) for SDSS Main. Defaults to None',
 	default=None)
 	parser.add_argument(
 	'-lmstarCut',
@@ -1147,6 +1166,11 @@ if __name__ == "__main__":
 	type=int,
 	default=1)
 	parser.add_argument(
+	'-SDSS',
+	help='SDSS Main sample (1), or KiDSxGAMA (0), defaults to 0',
+	type=int,
+	default=0)
+	parser.add_argument(
 	'-rmagCut',
 	help='R-band magnitude above which to exclude faint sources, defaults to 0',
 	type=np.float32,
@@ -1194,7 +1218,7 @@ if __name__ == "__main__":
 	help='(0) drop cut 6 of 6, or (1) to keep the cut')
 	args = parser.parse_args()
 
-	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.patchSize, args.rmagCut)
+	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.patchSize, args.rmagCut, args.SDSS)
 
 	if args.plotNow:
 		# reduce & save data files, returning filename-list
