@@ -32,29 +32,27 @@ def cut_krange(k_h,p_k,kmin=10**-2.2,kmax=10**1.2):
     newp_k = np.empty([len(p_k),len(newk_h)])
     for i in range(len(p_k)):
         newp_k[i] = p_k[i][kcut]
-        #newp_k[i] = np.where(kcut==True,p_k[i],0)
     print('k_h range cut to %.4f - %.4f / (h/Mpc)'%(kmin,kmax))
-#    print('approx. equiv. to %.4f - %.4f / (Mpc/h)'%(1/kmax,1/kmin))
     return (newk_h,newp_k)
 
-def zero_pad(k_h,p_k,kmin=1e-5,kmax=1e5):
+def zero_pad(k_h, p_k, zerokmin=1e-5, zerokmax=1e5, effkmin=1e-3, effkmax=1e2):
     # find mean log-step in k_h
     logk = np.log10(k_h)
     mean_diff = np.mean(np.diff(logk))
     lk_zeros = hk_zeros = []
 
     # extrapolate k-range
-    if k_h.min()>kmin:
-        ex_logk = np.arange(start=np.log10(kmin),stop=np.log10(k_h.min()),step=mean_diff)[:-1]
+    if k_h.min()>zerokmin:
+        ex_logk = np.arange(start=np.log10(zerokmin),stop=np.log10(k_h.min()),step=mean_diff)[:-1]
         logk = np.array(list(ex_logk)+list(logk))
         lk_zeros = [0.]*len(ex_logk)
-    if k_h.max()<kmax:
-        ex_logk = np.arange(start=np.log10(k_h.max()),stop=np.log10(kmax),step=mean_diff)[1:]
+    if k_h.max()<zerokmax:
+        ex_logk = np.arange(start=np.log10(k_h.max()),stop=np.log10(zerokmax),step=mean_diff)[1:]
         logk = np.array(list(logk)+list(ex_logk))
         hk_zeros = [0.]*len(ex_logk)
     newk = 10**logk
     print('PADDING OUTSIDE SCALES OF INTEREST: ')
-    my_kmin, my_kmax = np.where(newk<10**-2.2)[0][-1], np.where(newk>10**1.2)[0][0]
+    my_kmin, my_kmax = np.where(newk<effkmin)[0][-1], np.where(newk>effkmax)[0][0]
 
     # pad p_k with zeros
     newpk = np.empty([p_k.shape[0],len(lk_zeros)+p_k.shape[1]+len(hk_zeros)])
