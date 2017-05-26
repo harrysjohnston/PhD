@@ -145,7 +145,7 @@ class RealCatalogue:
 			LRGcut = LOWZcut|cut1|cut2
 
 		if self.DEI|self.SDSS:
-			pgm = np.ones_like(pgm)
+			pgm = np.ones_like(colour)
 		else:
 			pgm = self.data['pgm']
 		pgm_cut = np.array((pgm > pgm_))
@@ -223,7 +223,7 @@ class RealCatalogue:
 		# save cuts for later use
 		self.Rmags = []
 		for sample in [self.highz_R,self.highz_B,self.lowz_R,self.lowz_B]:
-			self.Rmags.append(np.mean(sample['absmag_r_1']))
+			self.Rmags.append(np.mean(sample['%s'% (['absmag_r_1', 'M_r'] [self.SDSS]) ]))
 		self.zcut = z_cut
 		self.zcut_r = z_cut_r
 		self.redcut = red_cut
@@ -594,9 +594,11 @@ class RealCatalogue:
 					count=[] # kill while-loop
 
 		raLs,raUs,decLs,decUs = map(lambda x: np.array(x),[Lowers[0],Uppers[0],Lowers[1],Uppers[1]])
+		print('raLs,raUs,decLs,decUs: ',raLs,raUs,decLs,decUs)
 		# ranges in ra/dec
 		deltaR = raUs-raLs
 		deltaD = decUs-decLs
+		print('deltaR, deltaD', deltaR, deltaD)
 		RDratio = deltaR/deltaD
 		# use ratio to determine integer nos. of 'columns/rows' of patches
 		dLen = np.array([1]*len(RDratio))
