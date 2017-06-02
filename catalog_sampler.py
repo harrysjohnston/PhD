@@ -973,8 +973,8 @@ class RandomCatalogue(RealCatalogue):
 			self.data = hdulist[1].data
 			self.columns = hdulist[1].columns.names
 		else:
-			self.data = np.loadtxt(path)
-		self.headers = [ ['RA','DEC','Z'], [(:,0),(:,1),(:,2)] ][sdss]
+			self.data = np.loadtxt(path).T
+		self.headers = [ ['RA','DEC','Z'], [0,1,2] ][sdss]
 		self.labels = [['rand_highZ','rand_lowZ'],['rand_highZ_Red','rand_highZ_Blue','rand_lowZ_Red','rand_lowZ_Blue']][densColours]
 		self.samples = []
 		self.samplecounts = []
@@ -1015,7 +1015,10 @@ class RandomCatalogue(RealCatalogue):
 			nzbincut = bincut&nzcut
 			nztune = np.where(nzbincut,True,nztune)
 
-		new_dat = self.data[nztune]
+		if self.sdss:
+			new_dat = (self.data.T[nztune]).T
+		else:
+			new_dat = self.data[nztune]
 		self.samples.append(new_dat)
 		self.samplecounts.append(len(new_dat))
 		newz = new_dat[self.headers[2]]
