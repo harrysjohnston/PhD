@@ -24,10 +24,11 @@ except ImportError:
 	print('healpy import error')
 import gc
 import astropy.stats as astat
+import jackknife3d as jk3d
 
 class RealCatalogue:
 
-	def __init__(self, path, DEI, psize, mc, SDSS): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
+	def __init__(self, path, DEI, mc, SDSS): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
 		"""""
 		read-in catalogue
 
@@ -66,8 +67,8 @@ class RealCatalogue:
 		self.ext_labels = ext_labels
 		# bodies of wcorr output file IDs
 		self.wcorrLabels = ['highZ_vs_highZ_Red', 'highZ_vs_highZ_Blue', 'lowZ_vs_lowZ_Red', 'lowZ_vs_lowZ_Blue']
-		Npatch = {3.0:96,4.0:54,9.0:24}
-		self.Npatch = Npatch[psize]
+		# Npatch = {3.0:96,4.0:54,9.0:24}
+		# self.Npatch = Npatch[psize]
 
 		# MEASURE WG+ SIGNALS
 
@@ -234,6 +235,20 @@ class RealCatalogue:
 		self.BCG_dc = BCG_dc
 		self.BCG_sc = BCG_sc
 		self.BCGargs = BCGargs
+
+		self.hzr_cut = (self.zcut&self.redcut&self.bitmaskcut&self.BCG_sc&self.lmstarcut)
+		self.hzb_cut = (self.zcut&self.bluecut&self.bitmaskcut&self.BCG_sc&self.lmstarcut)
+		self.lzr_cut = (self.zcut_r&self.redcut&self.bitmaskcut&self.BCG_sc&self.lmstarcut)
+		self.lzb_cut = (self.zcut_r&self.bluecut&self.bitmaskcut&self.BCG_sc&self.lmstarcut)
+		self.hzrU_cut = (self.zcut&self.redcut&self.BCG_sc&self.lmstarcut)
+		self.hzbU_cut = (self.zcut&self.bluecut&self.BCG_sc&self.lmstarcut)
+		self.lzrU_cut = (self.zcut_r&self.redcut&self.BCG_sc&self.lmstarcut)
+		self.lzbU_cut = (self.zcut_r&self.bluecut&self.BCG_sc&self.lmstarcut)
+		self.hzU_cut = (self.zcut&self.BCG_sc&self.lmstarcut)
+		self.lzU_cut = (self.zcut_r&self.BCG_sc&self.lmstarcut)
+		self.samplecuts = np.array([self.hzr_cut,self.hzb_cut,self.lzr_cut,self.lzb_cut,
+							self.hzrU_cut,self.hzbU_cut,self.lzrU_cut,self.lzbU_cut,
+							self.hzU_cut,self.lzU_cut])
 
 		return None
 
@@ -532,10 +547,6 @@ class RealCatalogue:
 		pixIDs = hp.ang2pix(nside,theta,phi,nest=False)
 		GKmap = np.bincount(pixIDs,minlength=npix)
 		GKpix = np.where(GKmap!=0,1,0)
-		GKskyFrac = len(GKmap[GKmap!=0])
-		nonzeropix = GKskyFrac
-		GKskyFrac /= npix
-		GKskyFrac *= fullSky
 
 		# find masked pixel IDs
 		if not self.SDSS:
@@ -715,7 +726,9 @@ class RealCatalogue:
 
 		return self.patchedData, self.patchWeights
 
-	def save_patches(self, patch, outfile_root, label, p_num):
+	def save_patches(self, patch, outfile_root, label, p_num, largePi):
+		if largePi:
+			label += '_largePi'
 		patchDir = join(outfile_root,label)
 		if not isdir(patchDir):
 			mkdir(patchDir)
@@ -895,7 +908,7 @@ class RealCatalogue:
 		# compute jackknife covariance & pearson-r corrcoeffs
 		# wgP,wgX = np.mat(wgp-Pmeans),np.mat(wgx-Xmeans)
 		# Cp,Cx = ((wgp.shape[0]-1)/wgp.shape[0])*(wgP.T*wgP),((wgX.shape[0]-1)/wgX.shape[0])*(wgX.T*wgX)
-		Cp,Cx = np.cov(wgp,rowvar=0),np.cov(wgx,rowvar=0)
+		Cp,Cx = np.cov(wgp,rowvar=0, aweights=jkweights),np.cov(wgx,rowvar=0, aweights=jkweights)
 		# print("Currently no weights applied to jackknife samples, as all are very similar...")
 
 		# UNWEIGHTED - all jk samples lose 0.52-0.56 of area, with majority close to 0.54
@@ -1173,6 +1186,16 @@ if __name__ == "__main__":
 	type=int,
 	default=0)
 	parser.add_argument(
+	'-jk3d',
+	help='slice jackknife patches in redshift (1), or not (0), defaults to 1',
+	type=int,
+	default=1)
+	parser.add_argument(
+	'-cubeZdepth',
+	help='specify target redshift increment of jackknife cubes, default=0.06',
+	type=np.float32,
+	default=0.06)
+	parser.add_argument(
 	'-rmagCut',
 	help='R-band magnitude above which to exclude faint sources, defaults to 0',
 	type=np.float32,
@@ -1220,7 +1243,7 @@ if __name__ == "__main__":
 	help='(0) drop cut 6 of 6, or (1) to keep the cut')
 	args = parser.parse_args()
 
-	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.patchSize, args.rmagCut, args.SDSS)
+	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS)
 
 	if args.plotNow:
 		# reduce & save data files, returning filename-list
@@ -1290,15 +1313,18 @@ if __name__ == "__main__":
 
 	if args.bootstrap or args.jackknife:
 		print('COMPUTING SAMPLE COVARIANCES...')
-		# patchData.shape = (10 subsamples, N patches)
-		patchData, patchWeights = catalog.patch_data(args.patchSize, args.bitmaskCut)
-		# print('MAPPING')
-		# catalog.map_test(patchData[0])
-		# print('MAPPED')
-		for i,sam in enumerate(patchData):
-			for j,p in enumerate(sam):
+
+		# jkData.shape = (10 subsamples, N patches/cubes)
+		# jkData, jkWeights = catalog.patch_data(args.patchSize, args.bitmaskCut)
+		jkData, jkWeights, error_scaling = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=0, bitmaskCut=args.bitmaskCut)
+		Njkregions = len(jkData[0])
+
+		for i,sam in enumerate(jkData):
+			p_pops = np.array([len(x) for x in sam])
+			popd_sam = sam[p_pops!=0]
+			for j,p in enumerate(popd_sam):
 				new_p,patch_z = catalog.cut_columns(p, args.H)
-				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j) # save_patches returns str(patchDir)
+				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 0) # save_patches returns str(patchDir)
 				if i>3:
 					catalog.save_swotpatches(p, catalog.labels[i], j)
 		for lab in catalog.labels[:4]:
@@ -1306,20 +1332,28 @@ if __name__ == "__main__":
 			if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
 				print('no z/colour-cut; skipping %s..'%lab)
 			else:
-				if args.bootstrap:
-					catalog.wcorr_patches(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi)
-					catalog.bootstrap_signals(pDir, patchWeights, 0)
 				if args.jackknife:
-					jkweights = catalog.jackknife_patches(pDir, patchWeights)
+					jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
 					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
-					catalog.jackknife(pDir, jkweights, 0)
-				if args.largePi:
-					if args.bootstrap:
-						catalog.bootstrap_signals(pDir, patchWeights, 1)
-					if args.jackknife:
-						jkweights = catalog.jackknife_patches(pDir, patchWeights)
-						catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
-						catalog.jackknife(pDir, jkweights, 1)
+					catalog.jackknife(pDir, jksample_weights, 0)
+				# if args.largePi:
+				# 	if args.jackknife:
+				# 		jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
+				# 		catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
+				# 		catalog.jackknife(pDir, jksample_weights, 1)
+		if args.largePi:
+			jkData, jkWeights, error_scaling = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut)
+			Njkregions = len(jkData[0])
+
+		for i,sam in enumerate(jkData):
+			for j,p in enumerate(sam):
+				new_p,patch_z = catalog.cut_columns(p, args.H)
+				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1)
+
+			if args.jackknife:
+				jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
+				catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
+				catalog.jackknife(pDir, jksample_weights, 1)
 
 	catalog.make_combos(args.densColours)
 
