@@ -58,7 +58,8 @@ def execute(block, config):
         # take measures against possible ringing - cut k-range or zero-pad
 
         k_h,p_k = cut_krange(k_h, p_k, kmin=10**-3, kmax=10**3) 
-        k_h,p_k = zero_pad(k_h, p_k, effkmin=10**-3, effkmax=10**2, zerokmin=1e-4, zerokmax=10**5.7842)# start zero-padding at effklims, and stop at zeroklims
+        # start zero-padding at effklims, and stop at zeroklims
+        k_h,p_k = zero_pad(k_h, p_k, effkmin=10**-3, effkmax=10**2, zerokmin=1e-4, zerokmax=10**5.7842)
 
         block[power_section,'ell'] = k_h
         block[power_section,'nbin'] = nbin
