@@ -961,16 +961,20 @@ class RealCatalogue:
 
 class RandomCatalogue(RealCatalogue):
 
-	def __init__(self, path, densColours):
+	def __init__(self, path, densColours, sdss):
 		"""""
 		read-in catalogue
 
 		"""""
 		self.path = path
-		hdulist = fits.open(path)
-		self.data = hdulist[1].data
-		self.columns = hdulist[1].columns.names
-		self.headers = ['RA','DEC','Z']
+		self.sdss = sdss
+		if not sdss:
+			hdulist = fits.open(path)
+			self.data = hdulist[1].data
+			self.columns = hdulist[1].columns.names
+		else:
+			self.data = np.loadtxt(path)
+		self.headers = [ ['RA','DEC','Z'], [(:,0),(:,1),(:,2)] ][sdss]
 		self.labels = [['rand_highZ','rand_lowZ'],['rand_highZ_Red','rand_highZ_Blue','rand_lowZ_Red','rand_lowZ_Blue']][densColours]
 		self.samples = []
 		self.samplecounts = []
@@ -980,10 +984,11 @@ class RandomCatalogue(RealCatalogue):
 		cut catalogue into redshift subsamples
 
 		"""""
-		assert 'RA' in self.columns, "'RA' not in columns, see column headers: "+ str(self.columns)
-		assert 'DEC' in self.columns, "'DEC' not in columns, see column headers: "+ str(self.columns)
-		assert 'Z' in self.columns, "'Z' not in columns, see column headers: "+ str(self.columns)
-		assert 'RAND_NUM' in self.columns, "'RAND_NUM' not in columns, see column headers: "+ str(self.columns)
+		if not self.sdss:
+			assert 'RA' in self.columns, "'RA' not in columns, see column headers: "+ str(self.columns)
+			assert 'DEC' in self.columns, "'DEC' not in columns, see column headers: "+ str(self.columns)
+			assert 'Z' in self.columns, "'Z' not in columns, see column headers: "+ str(self.columns)
+			assert 'RAND_NUM' in self.columns, "'RAND_NUM' not in columns, see column headers: "+ str(self.columns)
 
 		# compute shapes' n(z) & target for rands
 		nbin = 10
@@ -993,23 +998,27 @@ class RandomCatalogue(RealCatalogue):
 		sh_Nz = sh_nz/len(d_sample_Zs)
 
 		# compute rand n(z) & downsample each bin
-		rnd_z = self.data['Z']
+		rnd_z = self.data[self.headers[2]]
 		rnd_zhist = np.histogram(rnd_z,bins=nbin,range=(0.,0.5))
 		zbins = rnd_zhist[1]
 		rnd_nz = rnd_zhist[0]
 		f_redc = 11*(sh_nz/rnd_nz)
 
 		nztune = np.zeros_like(rnd_z,dtype=bool)
+		if 'RAND_NUM' not in self.headers:
+			rand_num = np.random.random(len(rnd_z))
+		else:
+			rand_num = self.data['RAND_NUM']
 		for i,nzbin in enumerate(rnd_nz):
 			bincut = (zbins[i]<rnd_z)&(rnd_z<=zbins[i+1])
-			nzcut = (f_redc[i]<self.data['RAND_NUM'])&(self.data['RAND_NUM']<=f_redc[i]*2)
+			nzcut = (f_redc[i]<rand_num)&(rand_num<=f_redc[i]*2)
 			nzbincut = bincut&nzcut
 			nztune = np.where(nzbincut,True,nztune)
 
 		new_dat = self.data[nztune]
 		self.samples.append(new_dat)
 		self.samplecounts.append(len(new_dat))
-		newz = new_dat['Z']
+		newz = new_dat[self.headers[2]]
 		new_nz = np.histogram(newz,bins=nbin,range=(0.,0.5))[0]
 		new_Nz = new_nz/len(newz)
 		print('real/random N(z) (should be ~1): ',sh_Nz/new_Nz)
@@ -1022,9 +1031,9 @@ class RandomCatalogue(RealCatalogue):
 		"""""
 
 		table = subsample
-		RA = np.deg2rad(table['RA'])
-		DEC = np.deg2rad(table['DEC'])
-		Z = table['Z']
+		RA = np.deg2rad(table[self.headers[0]])
+		DEC = np.deg2rad(table[self.headers[1]])
+		Z = table[self.headers[2]]
 		e1 = 2*np.random.random(len(table))
 		e2 = e1
 		# e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
@@ -1378,7 +1387,7 @@ if __name__ == "__main__":
 		[os.system('qsub '+ join(catalog.new_root, shell)) for shell in list_dir]
 
 	if args.Random != None:
-		catalog2 = RandomCatalogue(args.Random,args.densColours)
+		catalog2 = RandomCatalogue(args.Random, args.densColours, args.SDSS)
 		for sam_z in sample_zs:
 			catalog2.cut_data(sam_z) # generates randoms samples & counts
 
