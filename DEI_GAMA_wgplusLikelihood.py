@@ -14,14 +14,15 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
             rp,wgp = np.loadtxt(data_file,skiprows=1).T[:2]
             print('ValueError thrown for %s; skipping row 1..'%data_file)
 	if self.NLA:
-		print('fitting NLA model; discard r_p < 6 Mpc/h...!')
-		self.nla_cov_cut = sum(rp>6)
-		rp, wgp = rp[rp>6], wgp[rp>6]
+		rplim = 2 # Mpc/h
+		print('fitting NLA model; discard r_p < %s Mpc/h...!'%rplim)
+		self.nla_cov_cut = sum(rp>rplim)
+		rp, wgp = rp[rp>rplim], wgp[rp>rplim]
 	print('DISCARDING %s largest r_p bins'%self.drop_large_bins)
 	if self.drop_large_bins!=0:
 		rp, wgp = rp[:-self.drop_large_bins], wgp[:-self.drop_large_bins]
         self.data_x_range = (rp.min()*0.8, rp.max()*1.2)
-	print('RP SHAPE: %s'%rp.shape, self.drop_large_bins)
+	print('plot points: r_p*w_g+ = %s'%(rp*wgp))
         return rp, wgp
 
     def build_covariance(self):
