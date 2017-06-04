@@ -855,9 +855,25 @@ class RealCatalogue:
 		JKdir = join(patchDir,'JKsamples')
 		JKsamples = [x for x in listdir(JKdir) if ('.asc' in x)&('JKsample' in x)]
 		JKsamples.sort()
-
+		shapdens_dict = {'highZ_Red':'highZ_Red_UnMasked.asc',
+				'highZ_Blue':'highZ_Blue_UnMasked.asc',
+				'lowZ_Red':'lowZ_Red_UnMasked.asc',
+				'lowZ_Blue':'lowZ_Blue_UnMasked.asc',
+				'highZ_Red_UnMasked':'highZ_Red_UnMasked.asc',
+                                'highZ_Blue_UnMasked':'highZ_Blue_UnMasked.asc',
+                                'lowZ_Red_UnMasked':'lowZ_Red_UnMasked.asc',
+                                'lowZ_Blue_UnMasked':'lowZ_Blue_UnMasked.asc',
+				'highZ_Red_largePi':'highZ_Red_UnMasked.asc',
+                                'highZ_Blue_largePi':'highZ_Blue_UnMasked.asc',
+                                'lowZ_Red_largePi':'lowZ_Red_UnMasked.asc',
+                                'lowZ_Blue_largePi':'lowZ_Blue_UnMasked.asc',
+				'highZ_Red_UnMasked_largePi':'highZ_Red_UnMasked.asc',
+                                'highZ_Blue_UnMasked_largePi':'highZ_Blue_UnMasked.asc',
+                                'lowZ_Red_UnMasked_largePi':'lowZ_Red_UnMasked.asc',
+                                'lowZ_Blue_UnMasked_largePi':'lowZ_Blue_UnMasked.asc'}
 		if densColours:
-			dlabel = basename(normpath(patchDir))+'_UnMasked.asc'
+			#dlabel = basename(normpath(patchDir))+'_UnMasked.asc'
+			dlabel = shapdens_dict[patchDir]
 			dens_sample = join(patchDir,'..',dlabel)
 		else:
 			if 'highZ' in patchDir:
@@ -865,7 +881,8 @@ class RealCatalogue:
 			if 'lowZ' in patchDir:
 				dens_sample = join(patchDir,'..','lowZ.asc')
 			dlabel = basename(normpath(dens_sample))
-		slabel = basename(normpath(patchDir))
+		#slabel = basename(normpath(patchDir))
+		slabel = shapdens_dict[patchDir][:-13]
 		dCount = len(np.loadtxt(dens_sample))
 		print("correlating (BCG=%s) density sample with jackknife_i %s (BCG=%s) shapes (largePi=%s)..."%(self.BCGargs[0],slabel,self.BCGargs[1],largePi))
 		os.system('cp %s %s'%(dens_sample,JKdir))
@@ -890,7 +907,7 @@ class RealCatalogue:
 		    np.clip(c.imag, -1, 1, out=c.imag)
 		return c
 
-	def jackknife(self, patchDir, jkweights, largePi):
+	def jackknife(self, patchDir, jkweights, error_scaling, largePi):
 		# read-in JK signals
 		JKdir = join(patchDir,'JKsamples')
 		jkwcorrs = [x for x in listdir(JKdir) if ('Pi' not in x)&('.dat' in x)]
@@ -902,17 +919,12 @@ class RealCatalogue:
 
 		wgp,wgx = jksignals[:,:,3],jksignals[:,:,4]
 		Nobs,Nvar = wgp.shape
-		# Pmeans = np.average(wgp,axis=0,weights=jkweights)
-		# Xmeans = np.average(wgx,axis=0,weights=jkweights)
 
 		# compute jackknife covariance & pearson-r corrcoeffs
-		# wgP,wgX = np.mat(wgp-Pmeans),np.mat(wgx-Xmeans)
-		# Cp,Cx = ((wgp.shape[0]-1)/wgp.shape[0])*(wgP.T*wgP),((wgX.shape[0]-1)/wgX.shape[0])*(wgX.T*wgX)
 		Cp,Cx = np.cov(wgp,rowvar=0, aweights=jkweights),np.cov(wgx,rowvar=0, aweights=jkweights)
-		# print("Currently no weights applied to jackknife samples, as all are very similar...")
 
-		# UNWEIGHTED - all jk samples lose 0.52-0.56 of area, with majority close to 0.54
 		Cp,Cx = Cp*((Nobs-1)**2)/Nobs, Cx*((Nobs-1)**2)/Nobs # jackknife normalisation
+		Cp, Cx = Cp*(error_scaling**(-2)) , Cx*(error_scaling**(-2)) # jackknife area-scaling for lost (edge) patches
 		Cp_,Cx_ = copy.copy(Cp),copy.copy(Cx)
 		Rp,Rx = self.pearson_r(Cp),self.pearson_r(Cx)
 
@@ -923,9 +935,9 @@ class RealCatalogue:
 
 		JKstds = np.column_stack((Pstds,Xstds))
 		label = basename(normpath(patchDir))
+		if largePi&('largePi' not in label):
+			label += '_largePi'
 		JKerrs_out = join(patchDir,'..','JKerrs_%s'%label)
-		if largePi:
-			JKerrs_out = join(patchDir,'..','JKerrs_%s_largePi'%label)
 		ascii.write(JKstds, JKerrs_out, delimiter='\t', names=['#w(g+)err','#w(gx)err'])
 		cov_combos = [[Cp_,'P'],[Cx_,'X']]
 
@@ -936,13 +948,9 @@ class RealCatalogue:
 			corrName = join(toplotDir,'JKcorrcoeff_%s'%label)
 			ascii.write(Rp, corrName, delimiter='\t')
 
-			for covs in cov_combos:
-				covName = join(toplotDir,'JKcovar%s_%s'%(covs[1],label))
-				ascii.write(covs[0], covName, delimiter='\t')
-		else:
-			for covs in cov_combos:
-				covName = join(toplotDir,'JKcovar%s_%s_largePi'%(covs[1],label))
-				ascii.write(covs[0], covName, delimiter='\t')
+		for covs in cov_combos:
+			covName = join(toplotDir,'JKcovar%s_%s'%(covs[1],label))
+			ascii.write(covs[0], covName, delimiter='\t')
 		return None
 
 	def map_test(self, catalogs):
@@ -1347,12 +1355,12 @@ if __name__ == "__main__":
 				if args.jackknife:
 					jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
 					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
-					catalog.jackknife(pDir, jksample_weights, 0)
+					catalog.jackknife(pDir, jksample_weights, error_scaling, 0)
 				# if args.largePi:
 				# 	if args.jackknife:
 				# 		jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
 				# 		catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
-				# 		catalog.jackknife(pDir, jksample_weights, 1)
+				# 		catalog.jackknife(pDir, jksample_weights, error_scaling, 1)
 		if args.largePi:
 			jkData, jkWeights, error_scaling = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut)
 			Njkregions = len(jkData[0])
@@ -1365,7 +1373,7 @@ if __name__ == "__main__":
 			if args.jackknife:
 				jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
 				catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
-				catalog.jackknife(pDir, jksample_weights, 1)
+				catalog.jackknife(pDir, jksample_weights, error_scaling, 1)
 
 	catalog.make_combos(args.densColours)
 
