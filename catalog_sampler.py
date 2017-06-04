@@ -871,9 +871,10 @@ class RealCatalogue:
                                 'highZ_Blue_UnMasked_largePi':'highZ_Blue_UnMasked.asc',
                                 'lowZ_Red_UnMasked_largePi':'lowZ_Red_UnMasked.asc',
                                 'lowZ_Blue_UnMasked_largePi':'lowZ_Blue_UnMasked.asc'}
+		pdir_key = basename(normpath(patchDir))
 		if densColours:
 			#dlabel = basename(normpath(patchDir))+'_UnMasked.asc'
-			dlabel = shapdens_dict[patchDir]
+			dlabel = shapdens_dict[pdir_key]
 			dens_sample = join(patchDir,'..',dlabel)
 		else:
 			if 'highZ' in patchDir:
@@ -882,7 +883,7 @@ class RealCatalogue:
 				dens_sample = join(patchDir,'..','lowZ.asc')
 			dlabel = basename(normpath(dens_sample))
 		#slabel = basename(normpath(patchDir))
-		slabel = shapdens_dict[patchDir][:-13]
+		slabel = shapdens_dict[pdir_key][:-13]
 		dCount = len(np.loadtxt(dens_sample))
 		print("correlating (BCG=%s) density sample with jackknife_i %s (BCG=%s) shapes (largePi=%s)..."%(self.BCGargs[0],slabel,self.BCGargs[1],largePi))
 		os.system('cp %s %s'%(dens_sample,JKdir))
