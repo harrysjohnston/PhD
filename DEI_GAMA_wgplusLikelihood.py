@@ -3,6 +3,9 @@ import numpy as np
 
 class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
 
+    def __init__(self, options):
+	self.Njkregions = options["Njkregions"]
+
     def build_data(self):
         #use self.options to find the data_file and load ell, tt from it
         data_file = self.options.get_string("data_file")
@@ -23,6 +26,7 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
 		rp, wgp = rp[:-self.drop_large_bins], wgp[:-self.drop_large_bins]
         self.data_x_range = (rp.min()*0.8, rp.max()*1.2)
 	print('plot points: r_p*w_g+ = %s'%(rp*wgp))
+	self.Nrpbins = len(rp)
         return rp, wgp
 
     def build_covariance(self):
@@ -37,6 +41,13 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
 	if self.drop_large_bins!=0:
                 covmat = covmat[:-self.drop_large_bins,:-self.drop_large_bins]
         return covmat
+
+    def build_inverse_covariance(self):
+	# apply Hartlap factor
+	invcov = np.linalg.inv(self.cov)
+	Hf = (self.Njkregions-1)/(self.Njkregions-self.Nrpbins-2)
+	invcov *= Hf
+        return invcov
 
     def extract_theory_points(self, block):
         "Extract relevant theory from block and get theory at data x values"
