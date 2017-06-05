@@ -252,7 +252,7 @@ class RealCatalogue:
 
 		return None
 
-	def cut_columns(self, subsample, h):
+	def cut_columns(self, subsample, h, flipe2):
 		"""""
 		take subsample data 
 		& isolate columns for wcorr
@@ -268,7 +268,9 @@ class RealCatalogue:
 			pgm = table['pgm']
 		e1 = table[self.headers[3]]/pgm
 		e2 = table[self.headers[4]]/pgm
-		# e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward ???
+		if flipe2:
+			print('FLIPPING e2 !!!!!!')
+			e2 *= -1
 		e_weight = np.where(pgm<0.1,0,pgm)
 		if self.DEI:
 			e_weight = np.where(table['flag_DEIMOS']=='0000',1,0)
@@ -1214,6 +1216,11 @@ if __name__ == "__main__":
 	type=int,
 	default=0)
 	parser.add_argument(
+	'-flipe2',
+	help='flip the sign on e2 - DOUBLE CHECK THE CHANGE I MADE TO BJ CODE',
+	type=int,
+	default=0)
+	parser.add_argument(
 	'-jk3d',
 	help='slice jackknife patches in redshift (1), or not (0), defaults to 1',
 	type=int,
@@ -1325,7 +1332,7 @@ if __name__ == "__main__":
 	sample_zs = []
 	swot_z = []
 	for i, sample in enumerate(samples):
-		new_table,sample_z = catalog.cut_columns(sample, args.H)
+		new_table,sample_z = catalog.cut_columns(sample, args.H, args.flipe2)
 		sample_zs.append(sample_z)
 		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
 		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'),sample_z)
@@ -1351,7 +1358,7 @@ if __name__ == "__main__":
 			p_pops = np.array([len(x) for x in sam])
 			popd_sam = sam[p_pops!=0]
 			for j,p in enumerate(popd_sam):
-				new_p,patch_z = catalog.cut_columns(p, args.H)
+				new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2)
 				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 0) # save_patches returns str(patchDir)
 				if i>3:
 					catalog.save_swotpatches(p, catalog.labels[i], j)
@@ -1373,8 +1380,10 @@ if __name__ == "__main__":
 			Njkregions = len(jkData[0])
 
 			for i,sam in enumerate(jkData[:4]):
-				for j,p in enumerate(sam):
-					new_p,patch_z = catalog.cut_columns(p, args.H)
+				p_pops = np.array([len(x) for x in sam])
+				popd_sam = sam[p_pops!=0]
+				for j,p in enumerate(popd_sam):
+					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2)
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1)
 
 			for lab in catalog.labels[:4]:
@@ -1466,9 +1475,9 @@ if __name__ == "__main__":
 		[script.write('%s: \t%d, mean R_mag: %.4f\n'%(catalog.labels[i],catalog.samplecounts[i],catalog.Rmags[i])) for i in range(len(catalog.labels[:4]))]
 		[script.write('%s: \t%d\n'%(catalog.labels[i+4],catalog.samplecounts[i+4])) for i in range(len(catalog.labels[4:]))]
 		[script.write('%s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
-	os.system('cp %s %s'%(join(catalog.new_root,'C-lineArgs_SampleProps.txt'),join(catalog.new_root,'to_plot')))
+	os.system('cp %s %s'%(join(catalog.new_root,'C-lineArgs_SampleProps.txt'),join(catalog.new_root,'to_plot/')))
 	np.savetxt(join(catalog.new_root,'Rmags.txt'),catalog.Rmags,header='mean absmag_r; hzr,hzb,lzr,lzb')
-	os.system('cp %s %s'%(join(catalog.new_root,'Rmags.txt'),join(catalog.new_root,'to_plot')))
+	os.system('cp %s %s'%(join(catalog.new_root,'Rmags.txt'),join(catalog.new_root,'to_plot/')))
 
 
 
