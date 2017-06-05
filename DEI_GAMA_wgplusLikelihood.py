@@ -4,12 +4,32 @@ import numpy as np
 class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
 
     def __init__(self, options):
+	self.options=options
+        self.data_x, self.data_y = self.build_data()
 	if options.has_value("Njkregions"):
 	    self.Njkregions = options["Njkregions"]
+	    self.testsample = 0
 	else:
-	    print('No number of subregions in options for Hartlap factor!!\n
-			better be doing TEST SAMPLER!!')
+	    print('No number of subregions in options for Hartlap factor!!',
+			'\nbetter be doing TEST SAMPLER!!')
 	    self.testsample = 1
+        if self.constant_covariance:
+            self.cov = self.build_covariance()
+            self.inv_cov = self.build_inverse_covariance()
+        self.kind = self.options.get_string("kind", "cubic")
+
+        #Allow over-riding where the inputs come from in 
+        #the options section
+        if options.has_value("x_section"):
+            self.x_section = options['x_section']
+        if options.has_value("y_section"):
+            self.y_section = options['y_section']
+        if options.has_value("x_name"):
+            self.x_name = options['x_name']
+        if options.has_value("y_name"):
+            self.y_name = options['y_name']
+        if options.has_value("like_name"):
+            self.like_name = options['like_name']
 
     def build_data(self):
         #use self.options to find the data_file and load ell, tt from it
