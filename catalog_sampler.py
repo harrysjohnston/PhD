@@ -101,7 +101,8 @@ class RealCatalogue:
 			logmstar = self.data[self.headers[6]]+np.log10(self.data['fluxscale'])
 
 		if self.SDSS:
-			colour = self.data[self.headers[-1]]
+			colour1 = self.data[self.headers[-1]]
+			colour = np.where(np.isnan(colour1), self.data['obs_u-r'], colour1)
 			total_bitmasks = np.zeros_like(colour)
 			logmstar = np.ones_like(colour)
 
@@ -156,6 +157,8 @@ class RealCatalogue:
 		# define colour, redshift, bitmask & BCG cuts
 		if colour_ != None:
 			red_cut = np.array((colour > colour_)) # larger (B-V) <-> 'redder' colour
+			if self.SDSS:
+				red_cut = np.where(np.isnan(colour1), colour>1.75, red_cut) # where no rf_g-r colour, use obs_u-r instead
 			blue_cut = ~red_cut
 			print('c cut [unique]: \t', colour_, np.unique(red_cut))
 		else:
