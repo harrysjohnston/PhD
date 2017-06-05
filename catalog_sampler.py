@@ -41,11 +41,11 @@ class RealCatalogue:
 			self.headers = DEIheads
 			self.DEI = 1
 			self.SDSS = 0
-		elif SDSS:
+		if SDSS:
 			self.headers = SDSSheads
 			self.DEI = 0
 			self.SDSS = 1
-		else:
+		if not DEI | SDSS:
 			self.headers = KSBheads
 			self.DEI = 0
 			self.SDSS = 0
@@ -1011,7 +1011,7 @@ class RandomCatalogue(RealCatalogue):
 		rnd_zhist = np.histogram(rnd_z,bins=nbin,range=(0.,0.5))
 		zbins = rnd_zhist[1]
 		rnd_nz = rnd_zhist[0]
-		f_redc = 11*(sh_nz/rnd_nz)
+		f_redc = np.nan_to_num(11*(sh_nz/rnd_nz))
 
 		nztune = np.zeros_like(rnd_z,dtype=bool)
 		if 'RAND_NUM' not in self.headers:
@@ -1025,12 +1025,16 @@ class RandomCatalogue(RealCatalogue):
 			nztune = np.where(nzbincut,True,nztune)
 
 		if self.sdss:
-			new_dat = (self.data.T[nztune]).T
+			new_dat = self.data.T[nztune]
 		else:
 			new_dat = self.data[nztune]
+		print('downsampled randoms shape: ', new_dat.shape)
 		self.samples.append(new_dat)
 		self.samplecounts.append(len(new_dat))
-		newz = new_dat[self.headers[2]]
+		if self.sdss:
+			newz = new_dat.T[self.headers[2]]
+		else:
+			newz = new_dat[self.headers[2]]
 		new_nz = np.histogram(newz,bins=nbin,range=(0.,0.5))[0]
 		new_Nz = new_nz/len(newz)
 		print('real/random N(z) (should be ~1): ',sh_Nz/new_Nz)
@@ -1043,9 +1047,12 @@ class RandomCatalogue(RealCatalogue):
 		"""""
 
 		table = subsample
-		RA = np.deg2rad(table[self.headers[0]])
-		DEC = np.deg2rad(table[self.headers[1]])
-		Z = table[self.headers[2]]
+		tableT = table.copy()
+		if self.sdss:
+			tableT = table.T
+		RA = np.deg2rad(tableT[self.headers[0]])
+		DEC = np.deg2rad(tableT[self.headers[1]])
+		Z = tableT[self.headers[2]]
 		e1 = 2*np.random.random(len(table))
 		e2 = e1
 		# e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
@@ -1352,29 +1359,32 @@ if __name__ == "__main__":
 			pDir = join(catalog.new_root,lab)
 			if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
 				print('no z/colour-cut; skipping %s..'%lab)
-			else:
-				if args.jackknife:
-					jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
-					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
-					catalog.jackknife(pDir, jksample_weights, error_scaling, 0)
-				# if args.largePi:
-				# 	if args.jackknife:
-				# 		jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
-				# 		catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
-				# 		catalog.jackknife(pDir, jksample_weights, error_scaling, 1)
+			elif args.jackknife:
+				jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
+				catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
+				catalog.jackknife(pDir, jksample_weights, error_scaling, 0)
+			# if args.largePi:
+			# 	if args.jackknife:
+			# 		jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
+			# 		catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
+			# 		catalog.jackknife(pDir, jksample_weights, error_scaling, 1)
 		if args.largePi:
 			jkData, jkWeights, error_scaling = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut)
 			Njkregions = len(jkData[0])
 
-		for i,sam in enumerate(jkData):
-			for j,p in enumerate(sam):
-				new_p,patch_z = catalog.cut_columns(p, args.H)
-				pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1)
+			for i,sam in enumerate(jkData[:4]):
+				for j,p in enumerate(sam):
+					new_p,patch_z = catalog.cut_columns(p, args.H)
+					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1)
 
-			if args.jackknife:
-				jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
-				catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
-				catalog.jackknife(pDir, jksample_weights, error_scaling, 1)
+			for lab in catalog.labels[:4]:
+				pDir = join(catalog.new_root,lab)
+				if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
+					print('no z/colour-cut; skipping %s..'%lab)
+				elif args.jackknife:
+					jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
+					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
+					catalog.jackknife(pDir, jksample_weights, error_scaling, 1)
 
 	catalog.make_combos(args.densColours)
 
@@ -1437,7 +1447,7 @@ if __name__ == "__main__":
 		if args.plot:
 			with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
 				script.write(
-				'\npython /share/splinter/hj/PhD/catalog_sampler.py %s %s -patchSize %s -plotNow 1 -chiSqu 1 -bootstrap %s -jackknife %s'%(args.Catalog,catalog.new_root,args.patchSize,args.bootstrap,args.jackknife)
+				'\npython /share/splinter/hj/PhD/catalog_sampler.py %s %s -patchSize %s -plotNow 1 -chiSqu 1 -bootstrap %s -jackknife %s -SDSS %s'%(args.Catalog,catalog.new_root,args.patchSize,args.bootstrap,args.jackknife,args.SDSS)
 				)
 				script.write('\n')
 
