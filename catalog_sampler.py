@@ -1067,9 +1067,18 @@ class RandomCatalogue(RealCatalogue):
 		new_table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
 		return new_table
 
+class MyArgumentParser(argparse.ArgumentParser):
+    def convert_arg_line_to_args(self, arg_line):
+	print(arg_line)
+	if arg_line.startswith('#'):
+		print('##',arg_line)
+		return ''
+	else:
+        	return arg_line.split()
+
 if __name__ == "__main__":
 	# Command-line args...
-	parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
+	parser = MyArgumentParser(fromfile_prefix_chars='@')
 	parser.add_argument(
 	'Catalog',
 	help='full path of REAL catalogue to be sampled into ascii table(s)')
@@ -1088,12 +1097,12 @@ if __name__ == "__main__":
 	parser.add_argument(
 	'-zCut',
 	type=np.float32,
-	help='lowZ vs. highZ redshift threshold, between 0 - 0.5. Defaults to 0.22, set to 0 for no redshift cut',
+	help='lowZ vs. highZ redshift threshold, between 0 - 0.5. Defaults to None',
 	default=None)
 	parser.add_argument(
 	'-cCut',
 	type=np.float32,
-	help='red vs. blue colour threshold, rest-frame g-i (typically>1.0) for KiDSxGAMA, or g-r (typ.>0.63) for SDSS Main. Defaults to None',
+	help='red vs. blue colour threshold, rest-frame g-i (>1.0) for KiDSxGAMA, or rf_g-r (>0.63) || obs_u-r (>1.75)  for SDSS Main. Defaults to None',
 	default=None)
 	parser.add_argument(
 	'-lmstarCut',
@@ -1185,8 +1194,8 @@ if __name__ == "__main__":
 	'-bootstrap',
 	type=int,
 	choices=[0,1],
-	help='perform bootstrap error determination (1) or not (0), defaults to 1',
-	default=1)
+	help='perform bootstrap error determination (1) or not (0), defaults to 0',
+	default=0)
 	parser.add_argument(
 	'-jackknife',
 	type=int,
@@ -1240,9 +1249,9 @@ if __name__ == "__main__":
 	default=0)
 	parser.add_argument(
 	'-densColours',
-	help='use redshift&colour-cut samples as position samples for correlations (1), or just redshift-cut samples (0), defaults to 0',
+	help='use redshift&colour-cut samples as position samples for correlations (1), or just redshift-cut samples (0), defaults to 1',
 	type=int,
-	default=0)
+	default=1)
 	parser.add_argument(
 	'-LRG1',
 	type=int,
@@ -1390,7 +1399,7 @@ if __name__ == "__main__":
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1)
 
 			for lab in catalog.labels[:4]:
-				pDir = join(catalog.new_root,lab)
+				pDir = join(catalog.new_root,lab+'_largePi')
 				if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
 					print('no z/colour-cut; skipping %s..'%lab)
 				elif args.jackknife:
