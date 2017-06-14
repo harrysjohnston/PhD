@@ -1,6 +1,7 @@
 from __future__ import print_function,division
 import numpy as np
 from astropy.io import fits,ascii
+from scipy.interpolate import interp1d
 
 def read_z(shapes,dens):
     shap_z = np.loadtxt(shapes)
@@ -35,8 +36,10 @@ def cut_krange(k_h,p_k,kmin=10**-2.2,kmax=10**1.2):
     print('k_h range cut to %.4f - %.4f / (h/Mpc)'%(kmin,kmax))
     return (newk_h,newp_k)
 
-def zero_pad(k_h, p_k, zerokmin=1e-5, zerokmax=1e5, effkmin=1e-3, effkmax=1e2):
+def zero_pad(k_h, p_k, zerokmin=1e-5, zerokmax=1e5, effkmin=1e-3, effkmax=1e2, linear=0):
     # find mean log-step in k_h
+    lk_edge, hk_edge = k_h[:3], k_h[-3:]
+    l_kpk_edge, h_kpk_edge = lk_edge*p_k[:,:3], hk_edge*p_k[:,-3:]
     logk = np.log10(k_h)
     mean_diff = np.mean(np.diff(logk))
     lk_zeros = hk_zeros = []
@@ -44,24 +47,50 @@ def zero_pad(k_h, p_k, zerokmin=1e-5, zerokmax=1e5, effkmin=1e-3, effkmax=1e2):
     # extrapolate k-range
     if k_h.min()>zerokmin:
         ex_logk = np.arange(start=np.log10(zerokmin),stop=np.log10(k_h.min()),step=mean_diff)[:-1]
+	l_ex_logk = ex_logk.copy()
         logk = np.array(list(ex_logk)+list(logk))
         lk_zeros = [0.]*len(ex_logk)
     if k_h.max()<zerokmax:
         ex_logk = np.arange(start=np.log10(k_h.max()),stop=np.log10(zerokmax),step=mean_diff)[1:]
+	h_ex_logk = ex_logk.copy()
         logk = np.array(list(logk)+list(ex_logk))
         hk_zeros = [0.]*len(ex_logk)
     newk = 10**logk
     print('PADDING OUTSIDE SCALES OF INTEREST: ')
-    my_kmin, my_kmax = np.where(newk<effkmin)[0][-1], np.where(newk>effkmax)[0][0]
 
     # pad p_k with zeros
-    newpk = np.empty([p_k.shape[0],len(lk_zeros)+p_k.shape[1]+len(hk_zeros)])
-    for i in range(len(p_k)):
-        newpk[i] = np.array(lk_zeros+list(p_k[i])+hk_zeros)
-        newpk[i][:my_kmin] = np.zeros_like(newpk[i][:my_kmin])
-        newpk[i][my_kmax:] = np.zeros_like(newpk[i][my_kmax:])
+    if not linear:
+    	my_kmin, my_kmax = np.where(newk<effkmin)[0][-1], np.where(newk>effkmax)[0][0]
+    	newpk = np.empty([p_k.shape[0],len(lk_zeros)+p_k.shape[1]+len(hk_zeros)])
+    	for i in range(len(p_k)):
+    	    newpk[i] = np.array(lk_zeros+list(p_k[i])+hk_zeros)
+    	    newpk[i][:my_kmin] = np.zeros_like(newpk[i][:my_kmin])
+    	    newpk[i][my_kmax:] = np.zeros_like(newpk[i][my_kmax:])
+
+    else:
+    	newpk = np.empty([p_k.shape[0],len(l_ex_logk)+p_k.shape[1]+len(h_ex_logk)])
+	for i in range(len(p_k)):
+		logm = np.log10(l_kpk_edge[i,-1]/l_kpk_edge[i,0]) / np.log10(lk_edge[-1]/lk_edge[0])
+		logc = np.log10(l_kpk_edge[i][0]) - logm*np.log10(lk_edge[0])
+		log_interp = logm*(l_ex_logk) + logc
+		lk_interp = log_interp.copy()
+		logm = np.log10(h_kpk_edge[i,-1]/h_kpk_edge[i,0]) / np.log10(hk_edge[-1]/hk_edge[0])
+                logc = np.log10(h_kpk_edge[i][0]) - logm*np.log10(hk_edge[0])
+                log_interp = logm*(h_ex_logk) + logc
+		hk_interp = log_interp.copy()
+		newpk[i] = np.array(list(10**lk_interp) + list(k_h*p_k[i]) + list(10**hk_interp))
+		newpk[i] = newpk[i]/newk
 
     return newk, newpk
+
+def interpolate(ups_ks, hod_ks, hod_pk):
+	# given new densely sampled k, interpolate P(k) & return k, newP(k)
+	pk_cubic_interp = interp1d(hod_ks, hod_pk, kind=3)
+	pk_cubic = pk_cubic_interp(ups_ks)
+
+	return ups_ks, pk_cubic
+
+
 
 
 
