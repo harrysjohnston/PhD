@@ -4,6 +4,7 @@ from PkHankel import read_z
 from PkHankel import create_nz
 from PkHankel import cut_krange
 from PkHankel import zero_pad
+from PkHankel import interpolate
 
 # We have a collection of commonly used pre-defined block section names.
 # If none of the names here is relevant for your calculation you can use any
@@ -57,9 +58,16 @@ def execute(block, config):
 
         # take measures against possible ringing - cut k-range or zero-pad
 
+	# pre-padding cut
         k_h,p_k = cut_krange(k_h, p_k, kmin=10**-3, kmax=10**3) 
-        # start zero-padding at effklims, and stop at zeroklims
-        k_h,p_k = zero_pad(k_h, p_k, effkmin=10**-3, effkmax=10**2, zerokmin=1e-4, zerokmax=10**5.7842)
+	# start padding at effklims, and stop at zeroklims
+        k_h,p_k = zero_pad(k_h, p_k, effkmin=10**-3, effkmax=10**2, zerokmin=1e-4, zerokmax=1e4, linear=1) # zerokmax=10**5.7842 to pad about kPk mean when 1h-amp=0.21
+	if len(k_h)<500:
+		# interpolate to increase k-sampling
+		upsampled_k = np.logspace(np.log10(2e-4), np.log10(9e3), 1e3)
+		k_h,p_k = interpolate(upsampled_k, k_h, p_k)
+	# post-padding trim
+        k_h,p_k = cut_krange(k_h, p_k, kmin=10**-3, kmax=10**3) 
 
         block[power_section,'ell'] = k_h
         block[power_section,'nbin'] = nbin
