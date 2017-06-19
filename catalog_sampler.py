@@ -10,7 +10,8 @@ import os
 import argparse
 import csv
 from astropy import cosmology
-from astropy.cosmology import Planck13
+from astropy.cosmology import FlatLambdaCDM as FLCDM
+MICEcosmo = FLCDM(Om0=0.25, H0=70, Ob0=0.044)
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -35,7 +36,7 @@ class RealCatalogue:
 		"""""
 		self.path = path
 		KSBheads = ['RA_1_1','DEC_1_1','Z_TONRY','e1c','e2c','RankBCG_1','logmstar','pgm','absmag_g_1','absmag_i_1','col3']
-		DEIheads = ['RA_GAMA','DEC_GAMA','Z_TONRY','e1','e2','RankBCG','logmstar','pgm','absmag_g_1','absmag_i_1','MASK']
+		DEIheads = ['RA_GAMA','DEC_GAMA','Z_TONRY','e1','e2','RankBCG','logmstar','pgm','absmag_g','absmag_i','MASK']
 		SDSSheads = ['ra','dec','z','e1','e2','sigma_gamma','rf_g-r']
 		if DEI:
 			self.headers = DEIheads
@@ -52,7 +53,7 @@ class RealCatalogue:
 		hdulist = fits.open(path)
 		data = hdulist[1].data
 		print('SELECTING R_MAG < %s'%mc)
-		data = data[data['%s'%(['absmag_r_1', 'M_r'][self.SDSS])]<mc]
+		data = data[data['%s'%(['absmag_r', 'M_r'][self.SDSS])]<mc]
 		self.data = data
 		del data
 		gc.collect()
@@ -78,8 +79,8 @@ class RealCatalogue:
 		PGM, & into subsamples
 
 		"""""
-		for head in self.headers:
-			assert head in self.columns, "'%s' not in columns, see headers: %s"%(head,self.columns)
+		#for head in self.headers:
+		#	assert head in self.columns, "'%s' not in columns, see headers: %s"%(head,self.columns)
 
 		if z_!=None:
 			self.zstr = '%.f'%z_
@@ -96,8 +97,12 @@ class RealCatalogue:
 		z = self.data[self.headers[2]]
 		self.pre_z = z
 		colour = self.data[self.headers[-3]] - self.data[self.headers[-2]]
+		if DEI & ('gminusi' in self.data.columns.names):
+			print('LATEST GAMA; colour = "gminusi"')
+			colour = self.data['gminusi']
 		total_bitmasks = self.data[self.headers[-1]]
 		if not self.SDSS:
+#			colour = self.data[self.headers[-3]] - self.data[self.headers[-2]]
 			logmstar = self.data[self.headers[6]]+np.log10(self.data['fluxscale'])
 
 		if self.SDSS:
@@ -197,6 +202,10 @@ class RealCatalogue:
 		bitmask_cut = np.array(bitmask_cut)
 		print('bitmask cut [unique]: \t', np.unique(bitmask_cut))
 
+#		try:
+#			BCGcut = np.where(self.data[self.headers[5]]==1,True,False)
+#		except KeyError:
+#			BCGcut = np.ones_like(bitmask_cut)
 		BCGcut = np.where(self.data[self.headers[5]]==1,True,False)
 		BCG_dc = [True]*len(self.data)
 		BCG_sc = BCG_dc
@@ -227,7 +236,7 @@ class RealCatalogue:
 		# save cuts for later use
 		self.Rmags = []
 		for sample in [self.highz_R,self.highz_B,self.lowz_R,self.lowz_B]:
-			self.Rmags.append(np.mean(sample['%s'% (['absmag_r_1', 'M_r'] [self.SDSS]) ]))
+			self.Rmags.append(np.mean(sample['%s'% (['absmag_r', 'M_r'] [self.SDSS]) ]))
 		self.zcut = z_cut
 		self.zcut_r = z_cut_r
 		self.redcut = red_cut
@@ -298,7 +307,7 @@ class RealCatalogue:
 		if 'chi_comov_TONRY' in table.columns.names:
 			comov = table['chi_comov_TONRY']
 		else:
-			comov = Planck13.comoving_distance(Z)
+			comov = MICEcosmo.comoving_distance(Z)
 		comov *= h
 		new_table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
 
@@ -837,7 +846,7 @@ class RealCatalogue:
 		# resample patches & save JK samples
 		patches = [x for x in listdir(patchDir) if ('patch' in x)&('_' in x)]
 		patch_cats = np.array([np.loadtxt(join(patchDir,i)) for i in patches])
-		patch_cats = np.array([i for i in patch_cats if (i.shape!=(0,))&(len(i.shape)!=1)])
+		patch_cats = np.array([i for i in patch_cats if (i.shape!=(0,))&(len(i.shape)!=1)&(len(i)>100)])
 		JKdir = join(patchDir,'JKsamples')
 		if not isdir(JKdir):
 			mkdir(JKdir)
@@ -922,6 +931,7 @@ class RealCatalogue:
 			jkwcorrs = [x for x in listdir(JKdir) if ('Pi' in x)&('.dat' in x)]
 		jkwcorrs.sort()
 		jksignals = np.array([np.loadtxt(join(JKdir,i)) for i in jkwcorrs])
+		print(patchDir, ' N surviving JK regions: ', len(jksignals), '....!!!!') 
 
 		wgp,wgx = jksignals[:,:,3],jksignals[:,:,4]
 		Nobs,Nvar = wgp.shape
@@ -1062,7 +1072,7 @@ class RandomCatalogue(RealCatalogue):
 		e2 = e1
 		# e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
 		e_weight = np.ones_like(e1)
-		comov = Planck13.comoving_distance(Z)
+		comov = MICEcosmo.comoving_distance(Z)
 		comov *= h
 		new_table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
 		return new_table
