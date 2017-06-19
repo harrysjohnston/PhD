@@ -144,7 +144,7 @@ class resampleTools:
 
 		redg,dedg,zedg = map(lambda x: np.array(x), [redg,dedg,zedg])
 		radiff, decdiff, zdiff = (np.diff(i) for i in [redg,dedg,zedg])
-		print('ra | dec | z sides: %.2f | %.2f | %.2f'%(radiff.min(),decdiff.min(),zdiff.min()))
+		print('ra | dec | z sides: %.2f | %.2f | %.3f'%(radiff.min(),decdiff.min(),zdiff.min()))
 
 		patch_areas = radiff.min()*decdiff.min()
 
