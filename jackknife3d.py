@@ -189,10 +189,12 @@ class resampleTools:
 			r,d = patch_idx[i] # indices patch-edges
 			patch_edges = (edges[0][r], edges[0][r+1], edges[1][d], edges[1][d+1])
 			lilbins = (np.linspace(patch_edges[0], patch_edges[1], lilbin_division+1), np.linspace(patch_edges[2], patch_edges[3], lilbin_division+1))
+                        fine_bins = (np.linspace(patch_edges[0], patch_edges[1], 11), np.linspace(patch_edges[2], patch_edges[3], 11))
 			patch_hist2d = np.histogramdd(coords[:,:2], bins=lilbins)
+			fine_hist2d = np.histogramdd(coords[:,:2], bins=fine_bins)
 
 			occupn_frac = np.sum(patch_hist2d[0]!=0) / area
-			pweight = np.sum(patch_hist2d[0]>50) / area
+			pweight = np.sum(fine_hist2d[0]>50) / 100.
 			occ_fracs[i] = occupn_frac
 			pwei[i] = pweight**2
 			occupied_area += pweight*area
