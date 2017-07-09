@@ -35,6 +35,7 @@ class DEI_GAMA_wggLikelihood(GaussianLikelihood):
         #use self.options to find the data_file and load ell, tt from it
         data_file = self.options.get_string("data_file")
 	self.NLA = self.options.get_bool("NLA")
+	self.drop_large_bins = self.options.get_int("drop_large_bins", default=0)
         try:
             rp,wgp = np.loadtxt(data_file).T[:2]
         except ValueError:
@@ -45,6 +46,9 @@ class DEI_GAMA_wggLikelihood(GaussianLikelihood):
                 print('fitting NLA model; discard r_p < %s Mpc/h...!'%rplim)
 		self.nla_cov_cut = sum(rp>rplim)
                 rp, wgp = rp[rp>rplim], wgp[rp>rplim]
+	print('DISCARDING %s largest r_p bins'%self.drop_large_bins)
+        if self.drop_large_bins!=0:
+                rp, wgp = rp[:-self.drop_large_bins], wgp[:-self.drop_large_bins]
         self.data_x_range = (rp.min()*0.8, rp.max()*1.2)
         print('plot points: r_p = %s'%(rp))
         self.Nrpbins = len(rp)
@@ -59,6 +63,8 @@ class DEI_GAMA_wggLikelihood(GaussianLikelihood):
             print('ValueError thrown for %s; skipping row 1..'%cov_file)
 	if self.NLA:
 		covmat = covmat[-self.nla_cov_cut:,-self.nla_cov_cut:]
+	if self.drop_large_bins!=0:
+                covmat = covmat[:-self.drop_large_bins,:-self.drop_large_bins]
         return covmat
 
     def build_inverse_covariance(self):
