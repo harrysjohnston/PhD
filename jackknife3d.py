@@ -25,6 +25,9 @@ def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_z
 	# filter patches straddling survey-edges
 	patch_cuts, patch_weights, error_scaling = resampler.filter_patches(patches, patch_cuts, patch_weights, patch_idx, edges,lilbin_division=4,occupn_threshold=0.9)
 
+	# create function to trim randoms down to real JK footprint
+	random_cutter = resampler.find_patch_edges(patch_cuts)
+
 	# apply sample cuts to patch-cuts
 	sample_patch_cuts = []
 	for s_cut in resampler.sample_cuts:
@@ -55,16 +58,12 @@ def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_z
 	print('\nN cubes: ', len(cubeData[0]),
 			'\nmin | max cube weights: %.4f | %.4f'%(cube_weights.min(), cube_weights.max()))
 
-	# for sample in cubeData:
-	# 	for cube in sample:
-	# 		print(len(cube))
-
-	return cubeData, cube_weights, error_scaling
+	return cubeData, cube_weights, error_scaling, random_cutter
 
 class resampleTools:
 	def __init__(self, fitsdata, patchside, do_sdss, do_3d, sample_cuts, cube_zdepth=0.06, largePi=0):
 		self.cols = [ ['RA_GAMA', 'DEC_GAMA', 'Z_TONRY'], ['ra', 'dec', 'z'] ] [do_sdss]
-		self.ranges = [ [ (i, j, -3., 3., 0., 0.5) for i,j in [ (129.,141.), (174.,186.), (211.5,223.5) ] ], None ] [do_sdss]
+		self.ranges = [ [ (i, j, -3., 3., 0., 0.6) for i,j in [ (129.,141.), (174.,186.), (211.5,223.5) ] ], None ] [do_sdss]
 		self.data = fitsdata
 		self.do_sdss = do_sdss
 		self.do_3d = do_3d
@@ -128,16 +127,16 @@ class resampleTools:
 		lpix_ra, lpix_dec = lostpix_coords
 
 		print('defining cubes..')
-		ra_num, dec_num, z_num = 360//self.ra_side +1, 180//self.dec_side +1, 0.5//self.z_side +1
+		ra_num, dec_num, z_num = 360//self.ra_side +1, 180//self.dec_side +1, 0.6//self.z_side +1
 		if self.largePi:
-			z_num = 0.5//0.1 +1
-		redg,dedg,zedg = np.linspace(0,360,ra_num), np.linspace(-90,90,dec_num), np.linspace(0,0.5,z_num)
+			z_num = 0.6//0.1 +1
+		redg,dedg,zedg = np.linspace(0,360,ra_num), np.linspace(-90,90,dec_num), np.linspace(0,0.6,z_num)
 		if self.ranges!=None:
 			print('GAMA equatorial: jackknifing specified ranges...')
 			redg = []
 			dec_num = 6.//self.dec_side +1
 			dedg = np.linspace(-3., 3., dec_num)
-			zedg = list(np.linspace(0., 0.5, z_num))
+			zedg = list(np.linspace(0., 0.6, z_num))
 			for edges in self.ranges:
 				ra_num = (edges[1] - edges[0])//self.ra_side + 1
 				redg += list(np.linspace(edges[0], edges[1], ra_num))
@@ -155,7 +154,7 @@ class resampleTools:
 		patch_cuts = np.empty([patch_idx.shape[0], len(gal_coords)])
 		pix_cuts = np.empty([patch_idx.shape[0], len(lpix_ra)])
 		for c, (i,j) in enumerate(patch_idx):
-			edges = redg[i], redg[i+1], dedg[j], dedg[j+1], 0., 0.5
+			edges = redg[i], redg[i+1], dedg[j], dedg[j+1], 0., 0.6
 			cut = betwixt(edges) # returns function cut(), which takes ra,dec,z and returns boolean array
 			patch_cuts[c] = cut(ra,dec,z)
 			pix_cuts[c] = cut(lpix_ra, lpix_dec, np.ones_like(lpix_ra)*0.1)
@@ -178,36 +177,44 @@ class resampleTools:
 	def filter_patches(self, patches, patch_cuts, patch_weights, patch_idx, edges, lilbin_division=4, occupn_threshold=0.8):
 		print('filtering survey-edges..')
 		occ_fracs = np.empty(len(patches))
+		pwei = np.empty(len(patches))
 		occupied_area = 0
 		retained_occ_area = 0
 		area = lilbin_division**2 # = 16 (default) in arbitrary units
 		norm_area = area*len(patches)
 
 		for i, patch in enumerate(patches):
+			# subdivide each patch for occupations
 			coords = np.column_stack((patch[self.cols[0]], patch[self.cols[1]], patch[self.cols[2]]))
 			r,d = patch_idx[i] # indices patch-edges
 			patch_edges = (edges[0][r], edges[0][r+1], edges[1][d], edges[1][d+1])
 			lilbins = (np.linspace(patch_edges[0], patch_edges[1], lilbin_division+1), np.linspace(patch_edges[2], patch_edges[3], lilbin_division+1))
+                        fine_bins = (np.linspace(patch_edges[0], patch_edges[1], 11), np.linspace(patch_edges[2], patch_edges[3], 11))
 			patch_hist2d = np.histogramdd(coords[:,:2], bins=lilbins)
+                        fine_hist2d = np.histogramdd(coords[:,:2], bins=fine_bins)
+
 			occupn_frac = np.sum(patch_hist2d[0]!=0) / area
-			occ_fracs[i] = occupn_frac
-			occupied_area += occupn_frac*area
-			if occupn_frac>occupn_threshold:
-				retained_occ_area += occupn_frac*area
+                        pweight = np.sum(fine_hist2d[0]!=0) / 100.
+                        occ_fracs[i] = occupn_frac
+                        pwei[i] = pweight**2
+                        occupied_area += pweight*area
+                        if occupn_frac>occupn_threshold:
+                                retained_occ_area += pweight*area
 
 		if self.do_sdss:
 			patch_filter = occ_fracs>=occupn_threshold
+			
 		else:
 			patch_filter = np.ones_like(occ_fracs, dtype=bool)
 
-		highfracs = occ_fracs[patch_filter]
+		highfracs = (pwei**0.5)[patch_filter]
 		discarded_fraction = sum(patch_filter)/len(patch_filter)
 		print('occupation threshold (SDSS): ', occupn_threshold,
 			'\ntotal (populated) patches: ', len(patch_filter),
 			'\ndiscarded edge-patches (SDSS): ', sum(~patch_filter),
 			'\nremaining: ', sum(patch_filter),
 			'\nmin | max | mean | (step) in patch occupations: %.4f | %.4f | %.4f | (%.4f)'%(highfracs.min(), highfracs.max(), np.mean(highfracs), 1/area),
-			"\npopulated | retained | delta areas, norm'd by patch-area total: %.4f | %.4f | %.4f"%(occupied_area/norm_area, retained_occ_area/norm_area, (occupied_area-retained_occ_area)/norm_area))
+			)
 
 		filtered_area_ratio = retained_occ_area/occupied_area
 		scale_factor = filtered_area_ratio**-0.5
@@ -219,6 +226,9 @@ class resampleTools:
 
 		patch_cuts = patch_cuts[patch_filter]
 		patch_weights = patch_weights[patch_filter]
+		if self.do_sdss:
+			patch_weights = pwei[patch_filter]
+			print('SDSS patch weights from occupations:\n', patch_weights)
 		return np.array(patch_cuts, dtype=bool), patch_weights, scale_factor
 
 	def make_sample_patchcuts(self, patch_cuts, sample_cut):
@@ -233,11 +243,14 @@ class resampleTools:
 		print('slicing patches into cubes..')
 		cubes = []
 		cube_weights = []
+		if self.do_sdss:
+			zedges = zedges[zedges <= 0.25]
 		for i, patch in enumerate(patches):
 			patch_z = patch[self.cols[2]]
 			zcuts = [ (patch_z>=zedges[j]) & (patch_z<=zedges[j+1]) for j in range(len(zedges)-1) ]
-			cubes.append(np.array([patch[k] for k in zcuts]))
-			cube_weights.append(np.array([patch_weights for k in range(len(zcuts))]))
+			for zcut in zcuts:
+                                cubes.append(patch[zcut])
+                                cube_weights.append(patch_weights[i])
 
 		cubes = np.array(cubes)
 		cube_weights = np.array(cube_weights)
@@ -246,6 +259,18 @@ class resampleTools:
 
 		return cubes, cube_weights
 
+	def find_patch_edges(self, patch_cuts):
+		random_cutter = []
+		for i, patch_cut in enumerate(patch_cuts):
+			ra, dec, z = self.data[self.cols[0]], self.data[self.cols[1]], self.data[self.cols[2]]
+			ra, dec, z = ra[patch_cut], dec[patch_cut], z[patch_cut]
+			p_cut = betwixt((ra.min(), ra.max(), dec.min(), dec.max(), z.min(), z.max()))
+			random_cutter.append(p_cut)
+
+		random_cutter = np.array(random_cutter)
+
+		return random_cutter
+
 # sdss = 0
 
 # cat = fits.open( ['./DEI_GAMAv20.fits', './RMandelbaum_catalogs/lss.14full0.rfgr.removegals.fits'] [sdss] )[1].data
@@ -253,7 +278,7 @@ class resampleTools:
 # ra,dec,z = (cat['%s'%i] for i in cols)
 # coords = np.column_stack((ra,dec,z))
 
-# ranges = [ [ (i, j, -3., 3., 0., 0.5) for i,j in [ (129.,141.), (174.,186.), (211.5,223.5) ] ], None ] [sdss]
+# ranges = [ [ (i, j, -3., 3., 0., 0.6) for i,j in [ (129.,141.), (174.,186.), (211.5,223.5) ] ], None ] [sdss]
 # cubes, cube_idx, bins = define_cubes(coords, 3., 3., 0.06, ranges=ranges) # if making cubes smaller, then lower lilbin_division(integer) also - cube filter very sensitive to this!
 # cubes = filter_cubes(cubes, cube_idx, bins, cols=cols, lilbin_division=4, occupn_threshold=0.9)
 
