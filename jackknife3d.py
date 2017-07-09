@@ -191,6 +191,7 @@ class resampleTools:
 			lilbins = (np.linspace(patch_edges[0], patch_edges[1], lilbin_division+1), np.linspace(patch_edges[2], patch_edges[3], lilbin_division+1))
                         fine_bins = (np.linspace(patch_edges[0], patch_edges[1], 11), np.linspace(patch_edges[2], patch_edges[3], 11))
 			patch_hist2d = np.histogramdd(coords[:,:2], bins=lilbins)
+<<<<<<< HEAD
                         fine_hist2d = np.histogramdd(coords[:,:2], bins=fine_bins)
 
 			occupn_frac = np.sum(patch_hist2d[0]!=0) / area
@@ -200,6 +201,17 @@ class resampleTools:
                         occupied_area += pweight*area
                         if occupn_frac>occupn_threshold:
                                 retained_occ_area += pweight*area
+=======
+			fine_hist2d = np.histogramdd(coords[:,:2], bins=fine_bins)
+
+			occupn_frac = np.sum(patch_hist2d[0]!=0) / area
+			pweight = np.sum(fine_hist2d[0]>50) / 100.
+			occ_fracs[i] = occupn_frac
+			pwei[i] = pweight**2
+			occupied_area += pweight*area
+			if occupn_frac>occupn_threshold:
+				retained_occ_area += pweight*area
+>>>>>>> f62af7f62de76cb50b83991b4da4edda49eacc5b
 
 		if self.do_sdss:
 			patch_filter = occ_fracs>=occupn_threshold
@@ -249,11 +261,18 @@ class resampleTools:
 			patch_z = patch[self.cols[2]]
 			zcuts = [ (patch_z>=zedges[j]) & (patch_z<=zedges[j+1]) for j in range(len(zedges)-1) ]
 			for zcut in zcuts:
+<<<<<<< HEAD
                                 cubes.append(patch[zcut])
                                 cube_weights.append(patch_weights[i])
+=======
+				cubes.append(patch[zcut])
+				cube_weights.append(patch_weights[i])
+>>>>>>> f62af7f62de76cb50b83991b4da4edda49eacc5b
 
 		cubes = np.array(cubes)
 		cube_weights = np.array(cube_weights)
+		print('c :', cubes.shape)
+		print('cw :', cube_weights.shape)
 		cubes = cubes.flatten()
 		cube_weights = cube_weights.flatten()
 
