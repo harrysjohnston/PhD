@@ -9,7 +9,7 @@ def betwixt((re1,re2,de1,de2,ze1,ze2)):
 		return (ra>=re1)&(ra<=re2)&(dec>=de1)&(dec<=de2)&(z>=ze1)&(z<=ze2)
 	return make_cut
 
-def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_zdepth=0.06, largePi=0, bitmaskCut=None):
+def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_zdepth=0.06, largePi=0, bitmaskCut=None, occ_thresh=0.99):
 	resampler = resampleTools(fitsdata, patchside, do_sdss, do_3d, sample_cuts, cube_zdepth=cube_zdepth, largePi=largePi)
 
 	# identify masked pixel coordinates
@@ -23,7 +23,7 @@ def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_z
 	patches = resampler.make_patches(fitsdata, patch_cuts)
 
 	# filter patches straddling survey-edges
-	patch_cuts, patch_weights, error_scaling = resampler.filter_patches(patches, patch_cuts, patch_weights, patch_idx, edges,lilbin_division=4,occupn_threshold=0.9)
+	patch_cuts, patch_weights, error_scaling = resampler.filter_patches(patches, patch_cuts, patch_weights, patch_idx, edges,lilbin_division=4,occupn_threshold=occ_thresh)
 
 	# create function to trim randoms down to real JK footprint
 	random_cutter = resampler.find_patch_edges(patch_cuts)
@@ -42,10 +42,13 @@ def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_z
 		patchData.append(sample_patches)
 
 	if do_3d:
-		# slice patches in z, creating jackknife cubes
+		# slice patches in z, creating jackknife cubes & random cube-cuts
 		cubeData = []
-		for spatches in patchData:
-			cubes, cube_weights = resampler.make_cubes(spatches, patch_weights, edges[2])
+		for i, spatches in enumerate(patchData):
+			if i==0:
+				cubes, cube_weights, random_cutter = resampler.make_cubes(spatches, patch_weights, edges[2], random_cutter=random_cutter)
+			else:
+				cubes, cube_weights = resampler.make_cubes(spatches, patch_weights, edges[2])
 			cubeData.append(cubes)
 	else:
 		patchData = np.array(patchData)
@@ -54,6 +57,9 @@ def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_z
 		del patchData, patch_weights
 
 	cubeData = np.array(cubeData)
+#	empty_cut = np.ones(len(cubeData), dtype=bool)
+#	# rough cut against partially empty patches/cubes
+#	for i, cube
 
 	print('\nN cubes: ', len(cubeData[0]),
 			'\nmin | max cube weights: %.4f | %.4f'%(cube_weights.min(), cube_weights.max()))
@@ -88,6 +94,8 @@ class resampleTools:
 			GKpix = np.where(GKmap!=0,1,0)
 			# kidsBitmap = hp.read_map('/share/splinter/hj/PhD/KiDS_counts_N2048.fits', dtype=int)
 			kidsBitmap = hp.read_map('./KiDS_counts_N2048.fits', dtype=int)
+			#lostpixIDs = np.where(kidsBitmap==0, 0, 1)
+			#lostpixIDs = np.arange(len(kidsBitmap))[lostpixIDs]
 			bitmask_cut = [True]*len(kidsBitmap)
 
 			print("PATCHES: CUTTING MASK!=0")
@@ -140,8 +148,11 @@ class resampleTools:
 			for edges in self.ranges:
 				ra_num = (edges[1] - edges[0])//self.ra_side + 1
 				redg += list(np.linspace(edges[0], edges[1], ra_num))
-
+		
 		redg,dedg,zedg = map(lambda x: np.array(x), [redg,dedg,zedg])
+		if self.do_sdss:
+			print('SDSS: forcing cube z-edges to 0., 0.125, 0.25')
+			zedg = np.linspace(0., 0.5, 5)
 		radiff, decdiff, zdiff = (np.diff(i) for i in [redg,dedg,zedg])
 		print('ra | dec | z sides: %.2f | %.2f | %.3f'%(radiff.min(),decdiff.min(),zdiff.min()))
 
@@ -174,7 +185,7 @@ class resampleTools:
 		patches = np.array([fits_cat[np.array(i,dtype=bool)] for i in patch_cuts]) # array of populated patches, where each is a fits-table
 		return patches
 
-	def filter_patches(self, patches, patch_cuts, patch_weights, patch_idx, edges, lilbin_division=4, occupn_threshold=0.8):
+	def filter_patches(self, patches, patch_cuts, patch_weights, patch_idx, edges, lilbin_division=4, occupn_threshold=0.99):
 		print('filtering survey-edges..')
 		occ_fracs = np.empty(len(patches))
 		pwei = np.empty(len(patches))
@@ -200,15 +211,6 @@ class resampleTools:
                         occupied_area += pweight*area
                         if occupn_frac>occupn_threshold:
                                 retained_occ_area += pweight*area
-			fine_hist2d = np.histogramdd(coords[:,:2], bins=fine_bins)
-
-			occupn_frac = np.sum(patch_hist2d[0]!=0) / area
-			pweight = np.sum(fine_hist2d[0]>50) / 100.
-			occ_fracs[i] = occupn_frac
-			pwei[i] = pweight**2
-			occupied_area += pweight*area
-			if occupn_frac>occupn_threshold:
-				retained_occ_area += pweight*area
 
 		if self.do_sdss:
 			patch_filter = occ_fracs>=occupn_threshold
@@ -244,33 +246,39 @@ class resampleTools:
 		# apply sample cuts ONE AT A TIME to patch cuts
 		new_patch_cuts = np.empty_like(patch_cuts)
 		for i in range(len(patch_cuts)):
-			new_patch_cuts[i] = patch_cuts[i]&sample_cut
+			new_patch_cuts[i] = patch_cuts[i] & sample_cut
 		return new_patch_cuts
 
-	def make_cubes(self, patches, patch_weights, zedges):
+	def make_cubes(self, patches, patch_weights, zedges, random_cutter=None):
 		# slice patches in redshift, creating jackknife cubes
 		print('slicing patches into cubes..')
 		cubes = []
 		cube_weights = []
+		new_random_cutter = []
 		if self.do_sdss:
 			zedges = zedges[zedges <= 0.25]
 		for i, patch in enumerate(patches):
 			patch_z = patch[self.cols[2]]
 			zcuts = [ (patch_z>=zedges[j]) & (patch_z<=zedges[j+1]) for j in range(len(zedges)-1) ]
-			for zcut in zcuts:
-                                cubes.append(patch[zcut])
-                                cube_weights.append(patch_weights[i])
-				cubes.append(patch[zcut])
-				cube_weights.append(patch_weights[i])
+			for k, zcut in enumerate(zcuts):
+                                cubes.append( patch[zcut] )
+                                cube_weights.append( patch_weights[i] )
+				if random_cutter!=None:
+					# make cut() function for random cubing - need to discard cubes
+					cube_cut = betwixt((-np.inf, np.inf, -np.inf, np.inf, zedges[k], zedges[k+1]))
+					new_random_cutter.append( (random_cutter[i], cube_cut) )
 
 		cubes = np.array(cubes)
 		cube_weights = np.array(cube_weights)
-		print('c :', cubes.shape)
-		print('cw :', cube_weights.shape)
 		cubes = cubes.flatten()
 		cube_weights = cube_weights.flatten()
 
-		return cubes, cube_weights
+		new_random_cutter = np.array(new_random_cutter)
+
+		if random_cutter!=None:
+			return cubes, cube_weights, new_random_cutter
+		else:
+			return cubes, cube_weights
 
 	def find_patch_edges(self, patch_cuts):
 		random_cutter = []
