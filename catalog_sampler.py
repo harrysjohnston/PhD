@@ -31,7 +31,7 @@ ds_jkfunc = ds.make_jks
 
 class RealCatalogue:
 
-	def __init__(self, path, DEI, mc, SDSS): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
+	def __init__(self, path, DEI, mc, SDSS, cols=None): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
 		"""""
 		read-in catalogue
 
@@ -51,6 +51,16 @@ class RealCatalogue:
 			self.headers = dict( zip( GAMAheads, ['RA_1_1', 'DEC_1_1', 'Z_TONRY', 'e1c', 'e2c', 'RankBCG_1', 'logmstar', 'pgm', 'absmag_g_1', 'absmag_i_1', 'col3'] ) )
 			self.DEI = 0
 			self.SDSS = 0
+
+		if cols!=None:
+			if DEI:
+				self.headers = dict( zip( GAMAheads, cols ) )
+			if SDSS:
+				self.headers = dict( zip( SDSSheads, cols ) )
+			print('specifying column headers:')
+			for k in (GAMAheads, SDSSheads)[SDSS]:
+				print('%s: %s'%(k, self.headers[k]))
+
 		hdulist = fits.open(path)
 		data = hdulist[1].data
 		print('SELECTING R_MAG < %s'%mc)
@@ -289,7 +299,7 @@ class RealCatalogue:
 			#print('FLIPPING e2 !!!!!!')
 			e2 *= -1
 		e_weight = np.where(pgm<0.1,0,pgm)
-		if self.DEI:
+		if self.DEI & (Kneighbour!=0.):
 			e_weight = np.where(table['flag_DEIMOS']=='0000',1,0)
 			neighbour_separation = table['Closest_neighbour']
 			pair_radii = table['IsoRadius'] + table['Neighbour_IsoRadius']
@@ -1115,11 +1125,13 @@ if __name__ == "__main__":
 	# Command-line args...
 	parser = MyArgumentParser(fromfile_prefix_chars='@')
 	parser.add_argument(
-	'Catalog',
+	'-Catalog',
+	default='MUST_GIVE_CATALOG_PATH',
 	help='full path of REAL catalogue to be sampled into ascii table(s)')
 	parser.add_argument(
-	'Path',
-	help='full path of destination directory for subsample ascii catalogues, where further directories will be created and appended with "_z_<z_cut>_c_<colour_cut>" if applicable. ***If using -plotNow, give full path to wcorr output directory***')
+	'-Path',
+	default='/share/splinter/hj/PhD/',
+	help='full path of destination directory for subsample ascii catalogues, where further directories will be created and appended with "_z_<z_cut>_c_<colour_cut>" if applicable. Default= PhD directory on splinter share. ***If using -plotNow, give full path to wcorr output directory***')
 	parser.add_argument(
 	'-Random',
 	help="optional; path to RANDOM catalogue to be correspondingly sampled",
@@ -1339,9 +1351,21 @@ if __name__ == "__main__":
 	choices=[0,1],
 	default=1,
 	help='(0) drop cut 6 of 6, or (1) to keep the cut')
+	parser.add_argument(
+	'-cols',
+	nargs='*',
+	type=str,
+	default=None,
+	help='specify column headers for GAMA: (ra dec z e1 e2 RankBCG logmstar pgm absmag_g absmag_i mask), or SDSS: (ra dec z e1 e2 sigma_gamma rf_g-r), in order. Default=None; default column headers')
 	args = parser.parse_args()
 
-	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS)
+	if args.Catalog.startswith('MUST'):
+		print(args.Catalog.split('_'))
+		sys.exit()
+
+	print('READING CATALOG: %s'%args.Catalog)
+
+	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS, cols=args.cols)
 
 	if args.plotNow:
 		# reduce & save data files, returning filename-list
@@ -1568,7 +1592,7 @@ if __name__ == "__main__":
 		if args.plot:
 			with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
 				script.write(
-				'\npython /share/splinter/hj/PhD/catalog_sampler.py %s %s -patchSize %s -plotNow 1 -chiSqu 1 -bootstrap %s -jackknife %s -SDSS %s'%(args.Catalog,catalog.new_root,args.patchSize,args.bootstrap,args.jackknife,args.SDSS)
+				'\npython /share/splinter/hj/PhD/catalog_sampler.py -Catalog %s -Path %s -patchSize %s -plotNow 1 -chiSqu 0 -bootstrap %s -jackknife %s -SDSS %s'%(args.Catalog,catalog.new_root,args.patchSize,args.bootstrap,args.jackknife,args.SDSS)
 				)
 				script.write('\n')
 
