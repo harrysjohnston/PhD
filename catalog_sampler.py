@@ -63,13 +63,17 @@ class RealCatalogue:
 
 		hdulist = fits.open(path)
 		data = hdulist[1].data
+
 		print('SELECTING R_MAG < %s'%mc)
 		data = data[data['%s'%(['absmag_r', 'M_r'][self.SDSS])]<mc]
-		print('cutting z < 3.5e-3 (~10 Mpc/h) - randoms cannot extend this near')
-		data = data[ data[self.headers['z']] > 3.5e-3 ]
+
+		print('cutting z < %s - (%s) randoms cannot extend this near' % ((0.01, 'GAMA'), (3.5e-3, 'SDSS'))[SDSS] )
+		data = data[ data[self.headers['z']] > (0.01, 3.5e-3)[SDSS] ]
+
 		self.data = data
 		del data
 		gc.collect()
+
 		self.columns = hdulist[1].columns.names
 		# ascii (.asc) file IDs
 		self.labels = ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue',
@@ -92,9 +96,6 @@ class RealCatalogue:
 		PGM, & into subsamples
 
 		"""""
-		#for head in self.headers:
-		#	assert head in self.columns, "'%s' not in columns, see headers: %s"%(head,self.columns)
-
 		if z_!=None:
 			self.zstr = '%.f'%z_
 		else:
@@ -205,7 +206,8 @@ class RealCatalogue:
 		bitmask_cut = [True]*len(total_bitmasks)
 
 		print("CUTTING MASK!=0...")
-		bitmask_cut = np.where(total_bitmasks==0,True,False)
+		allowed_bits = lambda x: (x==0) | (x==16) | (x==32) | (x==48) # no masking | secondary | tertiary halos | both
+		bitmask_cut = np.where(allowed_bits(total_bitmasks), True, False)
 
 		if bitmask_ != None:
 			bitmask_ = bitmask_[0]
@@ -362,9 +364,14 @@ class RealCatalogue:
 		save samples in SWOT format (ra[deg],dec[deg],z)
 
 		"""""
-		RA = subsample[self.headers['ra']]
-		DEC = subsample[self.headers['dec']]
-		Z = subsample[self.headers['z']]
+		try:
+			RA = subsample[self.headers['ra']]
+			DEC = subsample[self.headers['dec']]
+			Z = subsample[self.headers['z']]
+		except IndexError:
+			RA = subsample.T[0]
+			DEC = subsample.T[1]
+			Z = subsample.T[2]
 		newtable = np.column_stack((RA,DEC,Z))
 
 		ascii.write(newtable, join(self.new_root, 'swot_%s.asc'%label), names=['# ra[deg]', 'dec[deg]', 'z'], delimiter='\t')
@@ -568,198 +575,6 @@ class RealCatalogue:
 
 		return None
 
-	def patch_data(self, patchSize, *bitmask_):
-		# find survey area
-		nside = 2048
-		fullSky = 41252.96 # square degrees
-		npix = hp.nside2npix(nside)
-		pixar = hp.nside2pixarea(nside,degrees=True)
-		ra = self.data[self.headers['ra']]
-		dec = self.data[self.headers['dec']]
-		theta = np.deg2rad(90.-dec)
-		phi = np.deg2rad(ra)
-		pixIDs = hp.ang2pix(nside,theta,phi,nest=False)
-		GKmap = np.bincount(pixIDs,minlength=npix)
-		GKpix = np.where(GKmap!=0,1,0)
-
-		# find masked pixel IDs
-		if not self.SDSS:
-			kidsBitmap = hp.read_map('/share/splinter/hj/PhD/KiDS_counts_N2048.fits', dtype=int)
-			bitmask_cut = [True]*len(kidsBitmap)
-
-			print("PATCHES: CUTTING MASK!=0")
-			bitmask_cut = np.where(kidsBitmap==0,True,False)
-
-			if bitmask_[0] != None:
-				bitmask_ = bitmask_[0]
-				for i in range(len(bitmask_)):
-					# construct bitmask cut
-					bitmask_cut &= np.where(bitmask_[i] & kidsBitmap == bitmask_[i], False, True)
-			lostpixIDs = [j for j,b in enumerate(bitmask_cut) if b==False]
-			lostfromGK = np.where(GKpix[lostpixIDs]!=0,1,0) #1=pixel-lost,0=not-lost
-			lostmap = np.bincount(lostpixIDs,minlength=npix)
-			# hp.write_map(join(self.new_root,'lostpixmap.fits'),lostmap)
-			print('Lost npix, fraction of area: %s, %.3f'%(sum(lostfromGK),sum(lostfromGK)/sum(GKpix)))
-
-			if lostpixIDs != []:
-				thetaPhis = hp.pix2ang(nside,lostpixIDs)
-				# lost pixel coords;
-				lostpixra,lostpixdec = np.rad2deg(thetaPhis[1]),(90.-np.rad2deg(thetaPhis[0]))
-			else:
-				lostpixra,lostpixdec = (np.array([1e3]),np.array([1e3]))
-			del kidsBitmap,lostmap
-			gc.collect()
-		else:
-			lostpixra,lostpixdec = (np.array([1e3]),np.array([1e3]))
-
-		# divide catalog.data into patches...
-		raHist = np.histogram(ra,bins=100)
-		decHist = np.histogram(dec,bins=100)
-		raCounts, raEdges = raHist
-		decCounts, decEdges = decHist
-		Counts, Edges = [raCounts, decCounts], [raEdges, decEdges]
-		Lowers = [[],[]]
-		Uppers = [[],[]]
-		# find mins/maxs in ra/dec of surveyed areas
-		for i, count in enumerate(Counts):
-			while len(count)!=0:
-				nonz = np.nonzero(count)[0] # index of 1st populated bin
-				Lowers[i].append(Edges[i][nonz[0]]) # corresponding min coord
-				if 0 in count:
-					leadz = list(count).index(0) # index of 1st empty bin
-					Uppers[i].append(Edges[i][leadz]) # corresp. max coord
-					# shorten counts/edges, & repeat...
-					count = count[leadz:]
-					Edges[i] = Edges[i][leadz:]
-					nonz = np.nonzero(count)[0]
-					count = count[nonz[0]:]
-					Edges[i] = Edges[i][nonz[0]:]
-				else: # ...until absolute maxs in ra/dec
-					Uppers[i].append(Edges[i][-1])
-					count=[] # kill while-loop
-
-		raLs,raUs,decLs,decUs = map(lambda x: np.array(x),[Lowers[0],Uppers[0],Lowers[1],Uppers[1]])
-		print('raLs,raUs,decLs,decUs: ',raLs,raUs,decLs,decUs)
-		# ranges in ra/dec
-		deltaR = raUs-raLs
-		deltaD = decUs-decLs
-		print('deltaR, deltaD', deltaR, deltaD)
-		RDratio = deltaR/deltaD
-		# use ratio to determine integer nos. of 'columns/rows' of patches
-		dLen = np.array([1]*len(RDratio))
-		rLen = dLen*np.round(RDratio)
-		rPatchside = deltaR/rLen
-		dPatchside = deltaD/dLen
-		patchAr = rPatchside*dPatchside
-
-		while any(abs(patchAr-patchSize)>0.5):
-			initDiff = abs(patchAr-patchSize)
-			dLen += 1
-			rLen = dLen*np.round(RDratio)
-			rPatchside = deltaR/rLen
-			dPatchside = deltaD/dLen
-			patchAr = rPatchside*dPatchside
-			print('try patchArs :',patchAr)
-			newDiff = abs(patchAr-patchSize)
-			if newDiff[0]>initDiff[0]:
-				print('MISSED PATCH-AREA TARGET, reverting to closest..')
-				dLen -= 1
-				rLen = dLen*np.round(RDratio)
-				rPatchside = deltaR/rLen
-				dPatchside = deltaD/dLen
-				patchAr = rPatchside*dPatchside
-				print('patchArs :',patchAr)
-				break
-		[print('region %s: %.2f deg^2'%(j+1,patchAr[j])) for j in range(len(patchAr))] 
-		print('ra sides (#,deg): ',rLen,rPatchside)
-		print('dec sides (#,deg): ',dLen,dPatchside)
-		patch_Ars = np.array([[i]*(dLen[j])*(rLen[j]) for j,i in enumerate(patchAr)]).flatten()
-
-		# contsruct patch edges = 'ra/decPatches'
-		raLims = np.column_stack((raLs,raUs))
-		decLims = np.column_stack((decLs,decUs))
-
-		raPatches = [np.linspace(raLims[i][0],raLims[i][1],num=rLen[i]+1) for i in range(len(raLims))]
-		decPatches = [np.linspace(decLims[i][0],decLims[i][1],num=dLen[i]+1) for i in range(len(decLims))]
-		raPatches,decPatches = map(lambda x: np.array(x),[raPatches,decPatches])
-
-		# create column/row cuts from patch edges
-		raCuts = []
-		decCuts = []
-		pixraCuts = []
-		pixdecCuts = []
-		for j in range(len(raPatches)):
-			raCuts.append(np.array(
-				[np.where((ra>=raPatches[j][i])&(ra<=raPatches[j][i+1]),True,False) for i in range(len(raPatches[j])-1)]
-				)
-			)
-			# and define from lostpixra
-			pixraCuts.append(np.array(
-				[np.where((lostpixra>=raPatches[j][i])&(lostpixra<=raPatches[j][i+1]),True,False) for i in range(len(raPatches[j])-1)]
-				)
-			)
-		for j in range(len(decPatches)):
-			decCuts.append(np.array(
-				[np.where((dec>=decPatches[j][i])&(dec<=decPatches[j][i+1]),True,False) for i in range(len(decPatches[j])-1)]
-				)
-			)
-			# and define from lostpixdec
-			pixdecCuts.append(np.array(
-				[np.where((lostpixdec>=decPatches[j][i])&(lostpixdec<=decPatches[j][i+1]),True,False) for i in range(len(decPatches[j])-1)]
-				)
-			)
-
-		raCuts,decCuts,pixraCuts,pixdecCuts = map(lambda x: np.array(x),[raCuts,decCuts,pixraCuts,pixdecCuts])
-		raCuts,decCuts,pixraCuts,pixdecCuts = map(lambda x: x.reshape(-1,x.shape[-1]),[raCuts,decCuts,pixraCuts,pixdecCuts]) # flatten 3 cut-arrays (from 3 survey regions) into 1
-
-		# combine into patch-cuts
-		patchCuts = []
-		pixpatchCuts = []
-		for j in decCuts:
-			[patchCuts.append(i&j) for i in raCuts]
-		for j in pixdecCuts:
-			[pixpatchCuts.append(i&j) for i in pixraCuts]
-		patchCuts = np.array(patchCuts)
-		pixpatchCuts = np.array(pixpatchCuts)
-		print('pixpatchCuts shape (patches,pixels): (%s, %s)'%pixpatchCuts.shape)
-		assert patchCuts.shape[0] == raCuts.shape[0]*decCuts.shape[0],'patch-cuts broken'
-
-		# combine patch & z/colour cuts, coerce into ndarrays for slicing
-		highzR_pcuts = [(self.zcut&self.redcut&self.bitmaskcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
-		highzB_pcuts = [(self.zcut&self.bluecut&self.bitmaskcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
-		lowzR_pcuts = [(self.zcut_r&self.redcut&self.bitmaskcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
-		lowzB_pcuts = [(self.zcut_r&self.bluecut&self.bitmaskcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
-
-		highzR_UnM_pcuts = [(self.zcut&self.redcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
-		highzB_UnM_pcuts = [(self.zcut&self.bluecut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
-		lowzR_UnM_pcuts = [(self.zcut_r&self.redcut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
-		lowzB_UnM_pcuts = [(self.zcut_r&self.bluecut&self.BCG_sc&self.lmstarcut&pc) for pc in patchCuts]
-
-		highz_pcuts = [(self.zcut&self.BCG_dc&self.lmstarcut&pc) for pc in patchCuts]
-		lowz_pcuts = [(self.zcut_r&self.BCG_dc&self.lmstarcut&pc) for pc in patchCuts]
-
-		# all lists of patch-cuts -> arrays
-		highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts, highzR_UnM_pcuts,highzB_UnM_pcuts,lowzR_UnM_pcuts,lowzB_UnM_pcuts, highz_pcuts,lowz_pcuts = map(lambda x: np.array(x),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts, highzR_UnM_pcuts,highzB_UnM_pcuts,lowzR_UnM_pcuts,lowzB_UnM_pcuts, highz_pcuts,lowz_pcuts])
-
-		# cut data into 10xpatch-arrays, w/ each element is a fits-table
-		hizR_patches,hizB_patches,lozR_patches,lozB_patches, hizR_UnM_patches,hizB_UnM_patches,lozR_UnM_patches,lozB_UnM_patches, hiz_patches,loz_patches = map(lambda x: np.array([self.data[pc] for pc in x]),[highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts, highzR_UnM_pcuts,highzB_UnM_pcuts,lowzR_UnM_pcuts,lowzB_UnM_pcuts, highz_pcuts,lowz_pcuts])
-
-		del highzR_pcuts,highzB_pcuts,lowzR_pcuts,lowzB_pcuts,highzR_UnM_pcuts,highzB_UnM_pcuts,lowzR_UnM_pcuts,lowzB_UnM_pcuts,highz_pcuts,lowz_pcuts
-		gc.collect()
-
-		self.patchedData = np.array([hizR_patches,hizB_patches,lozR_patches,lozB_patches, hizR_UnM_patches,hizB_UnM_patches,lozR_UnM_patches,lozB_UnM_patches, hiz_patches,loz_patches])
-
-		# count lost pixels within each patch for weighting
-		npixLost = np.array([np.count_nonzero(i) for i in pixpatchCuts])
-		pArLost = npixLost*pixar
-		weights = 1-(pArLost/patch_Ars)
-		print('patch weights (check none << 0) :\n',weights)
-		weights = np.where(weights>0,weights,0)
-		self.patchWeights = weights
-		# print('patch weights: ',self.patchWeights)
-
-		return self.patchedData, self.patchWeights
-
 	def save_patches(self, patch, outfile_root, label, p_num, largePi):
 		if largePi:
 			label += '_largePi'
@@ -957,10 +772,10 @@ class RealCatalogue:
 			jkwcorrs = [x for x in listdir(JKdir) if ('Pi' in x)&('.dat' in x)]
 		jkwcorrs.sort()
 		jksignals = np.array([np.loadtxt(join(JKdir,i)) for i in jkwcorrs])
-		print(patchDir, ' N surviving JK regions: ', len(jksignals), '....!!!!') 
+		print('=======================\t', patchDir.split('/')[-2:], ' N surviving JK regions: ', len(jksignals), '....!!!!') 
 
-		wgp,wgx = jksignals[:,:,3],jksignals[:,:,4]
-		Nobs,Nvar = wgp.shape
+		wgp, wgx = jksignals[:,:,3], jksignals[:,:,4]
+		Nobs, Nvar = wgp.shape
 
 		# compute jackknife covariance & pearson-r corrcoeffs
 		Cp,Cx = np.cov(wgp,rowvar=0, aweights=jkweights),np.cov(wgx,rowvar=0, aweights=jkweights)
@@ -1018,95 +833,85 @@ class RandomCatalogue(RealCatalogue):
 		"""""
 		self.path = path
 		self.sdss = sdss
-		if not sdss:
-			hdulist = fits.open(path)
-			self.data = hdulist[1].data
-			self.columns = hdulist[1].columns.names
-		else:
-			self.data = np.loadtxt(path).T
-		self.headers = dict( zip( ['ra', 'dec', 'z'], [ ['RA','DEC','Z'], [0,1,2] ][sdss] ) )
+		hdulist = fits.open(path)
+		self.data = hdulist[1].data
+		self.columns = hdulist[1].columns.names
+		self.headers = dict( zip( ['ra', 'dec', 'z'], [ ['RA','DEC','Z'], ['ra','dec','z'] ][sdss] ) )
 		self.labels = [['rand_highZ','rand_lowZ'],['rand_highZ_Red','rand_highZ_Blue','rand_lowZ_Red','rand_lowZ_Blue']][densColours]
 		self.samples = []
 		self.samplecounts = []
 
-	def cut_data(self, d_sample_Zs):
-		"""""
-		cut catalogue into redshift subsamples
+#	def cut_data(self, d_sample_Zs):
+#		"""""
+#		cut catalogue into redshift subsamples
+#
+#		"""""
+#		if not self.sdss:
+#			assert 'RA' in self.columns, "'RA' not in columns, see column headers: "+ str(self.columns)
+#			assert 'DEC' in self.columns, "'DEC' not in columns, see column headers: "+ str(self.columns)
+#			assert 'Z' in self.columns, "'Z' not in columns, see column headers: "+ str(self.columns)
+#			assert 'RAND_NUM' in self.columns, "'RAND_NUM' not in columns, see column headers: "+ str(self.columns)
+#
+#		# compute shapes' n(z) & target for rands
+#		nbin = 12
+#		print('# z-bins for RANDOM downsampling = %s'%nbin)
+#		sh_zhist = np.histogram(d_sample_Zs,bins=nbin,range=(0.,0.6))
+#		sh_nz = sh_zhist[0]
+#		sh_Nz = sh_nz/len(d_sample_Zs)
+#
+#		# compute rand n(z) & downsample each bin
+#		rnd_z = self.data[self.headers['z']]
+#		rnd_zhist = np.histogram(rnd_z,bins=nbin,range=(0.,0.6))
+#		zbins = rnd_zhist[1]
+#		rnd_nz = rnd_zhist[0]
+#		f_redc = np.nan_to_num(11*(sh_nz/rnd_nz))
+#
+#		nztune = np.zeros_like(rnd_z,dtype=bool)
+#		if 'RAND_NUM' not in self.headers:
+#			rand_num = np.random.random(len(rnd_z))
+#		else:
+#			rand_num = self.data['RAND_NUM']
+#		for i,nzbin in enumerate(rnd_nz):
+#			bincut = (zbins[i]<rnd_z)&(rnd_z<=zbins[i+1])
+#			nzcut = (f_redc[i]<rand_num)&(rand_num<=f_redc[i]*2)
+#			nzbincut = bincut&nzcut
+#			nztune = np.where(nzbincut,True,nztune)
+#
+#		# apply downsampling
+#		if self.sdss:
+#			new_dat = self.data.T[nztune]
+#		else:
+#			new_dat = self.data[nztune]
+#
+#		if self.sdss:
+#			newz = new_dat.T[self.headers['z']]
+#		else:
+#			newz = new_dat[self.headers['z']]
+#
+#		# trim edges of z-distn
+#		zmin, zmax = d_sample_Zs.min(), d_sample_Zs.max()
+#		ztrim = (newz >= zmin) & (newz <= zmax)
+#		new_dat, newz = new_dat[ztrim], newz[ztrim]
+#
+#		print('downsampled randoms shape: ', new_dat.shape)
+#		new_nz = np.histogram(newz,bins=nbin,range=(0.,0.6))[0]
+#		new_Nz = new_nz/len(newz)
+#		print('real/random N(z) (should be ~1): ',sh_Nz/new_Nz)
+#
+#		self.samples.append(new_dat)
+#		self.samplecounts.append(len(new_dat))
 
-		"""""
-		if not self.sdss:
-			assert 'RA' in self.columns, "'RA' not in columns, see column headers: "+ str(self.columns)
-			assert 'DEC' in self.columns, "'DEC' not in columns, see column headers: "+ str(self.columns)
-			assert 'Z' in self.columns, "'Z' not in columns, see column headers: "+ str(self.columns)
-			assert 'RAND_NUM' in self.columns, "'RAND_NUM' not in columns, see column headers: "+ str(self.columns)
-
-		# compute shapes' n(z) & target for rands
-		nbin = 12
-		print('# z-bins for RANDOM downsampling = %s'%nbin)
-		sh_zhist = np.histogram(d_sample_Zs,bins=nbin,range=(0.,0.6))
-		sh_nz = sh_zhist[0]
-		sh_Nz = sh_nz/len(d_sample_Zs)
-
-		# compute rand n(z) & downsample each bin
-		rnd_z = self.data[self.headers['z']]
-		rnd_zhist = np.histogram(rnd_z,bins=nbin,range=(0.,0.6))
-		zbins = rnd_zhist[1]
-		rnd_nz = rnd_zhist[0]
-		f_redc = np.nan_to_num(11*(sh_nz/rnd_nz))
-
-		nztune = np.zeros_like(rnd_z,dtype=bool)
-		if 'RAND_NUM' not in self.headers:
-			rand_num = np.random.random(len(rnd_z))
-		else:
-			rand_num = self.data['RAND_NUM']
-		for i,nzbin in enumerate(rnd_nz):
-			bincut = (zbins[i]<rnd_z)&(rnd_z<=zbins[i+1])
-			nzcut = (f_redc[i]<rand_num)&(rand_num<=f_redc[i]*2)
-			nzbincut = bincut&nzcut
-			nztune = np.where(nzbincut,True,nztune)
-
-		# apply downsampling
-		if self.sdss:
-			new_dat = self.data.T[nztune]
-		else:
-			new_dat = self.data[nztune]
-
-		if self.sdss:
-			newz = new_dat.T[self.headers['z']]
-		else:
-			newz = new_dat[self.headers['z']]
-
-		# trim edges of z-distn
-		zmin, zmax = d_sample_Zs.min(), d_sample_Zs.max()
-		ztrim = (newz >= zmin) & (newz <= zmax)
-		new_dat, newz = new_dat[ztrim], newz[ztrim]
-
-		print('downsampled randoms shape: ', new_dat.shape)
-		new_nz = np.histogram(newz,bins=nbin,range=(0.,0.6))[0]
-		new_Nz = new_nz/len(newz)
-		print('real/random N(z) (should be ~1): ',sh_Nz/new_Nz)
-
-		self.samples.append(new_dat)
-		self.samplecounts.append(len(new_dat))
-
-	def cut_columns(self, subsample, h): 
+	def cut_columns(self, table, h): 
 		"""""
 		take subsample data 
 		& isolate columns for wcorr
 
 		"""""
 
-		table = subsample
-		tableT = table.copy()
-		if self.sdss:
-			tableT = table.T
-		RA = np.deg2rad(tableT[self.headers['ra']])
-		DEC = np.deg2rad(tableT[self.headers['dec']])
-		Z = tableT[self.headers['z']]
-		e1 = 2*np.random.random(len(table))
-		e2 = e1
-		# e2 *= -1 # for RA increasing leftward, c.f. x-axis increasing rightward
-		e_weight = np.ones_like(e1)
+		RA = np.deg2rad(table.T[0])
+		DEC = np.deg2rad(table.T[1])
+		Z = table.T[2]
+		e1 = e2 = e_weight = np.ones_like(Z)
 		comov = MICEcosmo.comoving_distance(Z)
 		comov *= h
 		new_table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
@@ -1363,7 +1168,7 @@ if __name__ == "__main__":
 		print(args.Catalog.split('_'))
 		sys.exit()
 
-	print('READING CATALOG: %s'%args.Catalog)
+	print('=======================\tREADING CATALOG: %s'%args.Catalog)
 
 	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS, cols=args.cols)
 
@@ -1412,6 +1217,7 @@ if __name__ == "__main__":
 	samples = [catalog.highz_R,catalog.highz_B,catalog.lowz_R,catalog.lowz_B, 
 				catalog.highz_R_UnM,catalog.highz_B_UnM,catalog.lowz_R_UnM,catalog.lowz_B_UnM, 
 				catalog.highz,catalog.lowz]
+	
 	cuts = 'z-cut: %s\t colour-cut (g-i): %s'%(args.zCut,args.cCut)
 	outfile_root = join(args.Path,'Wcorr')
 
@@ -1427,12 +1233,16 @@ if __name__ == "__main__":
 		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'),sample_z)
 		if i>3:
 			swot_z.append(catalog.save_swotfiles(sample,catalog.labels[i]))
-	print('SAVING TO DIRECTORY: %s'%catalog.new_root)
+	print('=======================\tSAVING TO DIRECTORY: %s'%catalog.new_root)
 	if args.densColours:
+		samz_keys = ['z2_r', 'z2_b', 'z1_r', 'z1_b']
 		sample_zs = sample_zs[4:-2]
+		samz_dict = dict(zip(samz_keys, sample_zs))
 		swot_z = swot_z[:-2]
 	else:
+		samz_keys = ['z2', 'z1']
 		sample_zs = sample_zs[8:]
+		samz_dict = dict(zip(samz_keys, sample_zs))
 		swot_z = swot_z[-2:]
 
 	if args.bootstrap or args.jackknife:
@@ -1444,14 +1254,14 @@ if __name__ == "__main__":
 			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=0, bitmaskCut=args.bitmaskCut, occ_thresh=args.occ_thresh)
 			print('jkData: ', jkData.shape)
 			print('jkWeights: ', jkWeights.shape, '\n', jkWeights)
-			print('error_scaling: ', error_scaling)
+			print('=======================\t=======================\terror_scaling: ', error_scaling)
 
 			# read & downsample randoms, for JK trimming
 			jkrandoms = ds.read_randoms(args.Random)[:, :3]
 			zlabel = ('Z_TONRY', 'z')[args.SDSS]
 			sample_z = catalog.data[zlabel]
 			print('INITIAL jackknife random downsampling..')
-			jkrandoms = ds.downsample(jkrandoms, sample_z, 16, 20) # 9 bins, target 15x real density
+			jkrandoms = ds.downsample(jkrandoms, sample_z, 16, 20) # 16 bins, target 20x real density
 			jkrandoms = jkrandoms[ (jkrandoms.T[2] >= sample_z.min()) & (jkrandoms.T[2] <= sample_z.max()) ]
 			ra, dec, z = jkrandoms.T
 
@@ -1555,8 +1365,27 @@ if __name__ == "__main__":
 
 	if args.Random != None:
 		catalog2 = RandomCatalogue(args.Random, args.densColours, args.SDSS)
-		for sam_z in sample_zs:
-			catalog2.cut_data(sam_z) # generates randoms samples & counts
+		randoms_3col = np.column_stack(( catalog2.data[catalog2.headers['ra']], catalog2.data[catalog2.headers['dec']], catalog2.data[catalog2.headers['z']] ))
+
+		if args.SDSS:
+			r_ccut = args.cCut
+			if r_ccut == None:
+				r_ccut = -20.
+			r_redcut = np.array(catalog2.data['color'] > r_ccut) # RED
+			r_ccuts = dict(zip(samz_keys[:2], [r_redcut, ~r_redcut]))
+
+		for samz_k in samz_keys:
+			sam_z = samz_dict[samz_k]
+
+			if args.SDSS & ('z1' not in samz_k):
+				r_3cols = randoms_3col[ r_ccuts[samz_k] ]
+			else:
+				r_3cols = randoms_3col.copy()
+
+			nbins = (3, 1)[args.SDSS] # currenty favoured: GAMA=1 (or 3?), SDSS=1(if can split red/blue)
+			ds_randoms = ds.downsample(r_3cols, sam_z, nbin=nbins, target_nz=10)
+			catalog2.samples.append( ds_randoms )
+			catalog2.samplecounts.append( len(ds_randoms) )
 
 		[print('# objects %s: \t'%catalog2.labels[i],v) for i,v in enumerate(catalog2.samplecounts)]
 
