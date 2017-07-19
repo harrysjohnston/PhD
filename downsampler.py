@@ -157,22 +157,25 @@ def unit_check(cat, give_back='degrees', tag=''):
 def downsample(randoms, sample_z, nbin=12, target_nz=11):
         # downsample artificial randoms to match mocks' N(z)
 	if all(sample_z < 1.):
-		print('patches in REDSHIFT..')
-		assert all(randoms.T[2] < 1.), 'RANDOMS vs. PATCHES z/chi mismatched! Patches in REDSHIFT'
+		print('reals in REDSHIFT..')
+		assert all(randoms.T[2] < 1.), 'RANDOMS vs. REALS z/chi mismatched! Patches in REDSHIFT'
 		hist_range = (0., 0.6)
 	else:
-		print('patches in COMOVING DIST..')
-		assert (not all(randoms.T[2] < 1.)), 'RANDOMS vs. PATCHES z/chi mismatched! Patches in COMOVING'
+		print('reals in COMOVING DIST..')
+		assert (not all(randoms.T[2] < 1.)), 'RANDOMS vs. REALS z/chi mismatched! Patches in COMOVING'
 		hist_range = (0., 1580)
+	hist_range = (sample_z.min(), sample_z.max())
         real_nz = np.histogram(sample_z, bins=nbin, range=hist_range)[0]
         real_Nz = real_nz/len(sample_z)
 	print('real z.shape: ', sample_z.shape, '\nreal n(z): ', real_nz)
 
 	# trim edges of z-distn
-	print('trimming random-z edges to reals..')
         random_z = randoms[:,2]
-	zmin, zmax = sample_z.min(), sample_z.max()
+	zmin, zmax = sample_z.min(), sample_z.max() 
+	print('sample z minmax: %s, %s'%(sample_z.min(), sample_z.max()))
+	print('random z minmax: %s, %s'%(random_z.min(), random_z.max()))
 	ztrim = (random_z >= zmin) & (random_z <= zmax)
+	print('trimming random-z edges to reals..')
 	new_randoms, random_z = randoms[ztrim], random_z[ztrim]
 
         rand_num = np.random.random(size=len(random_z))
@@ -376,7 +379,7 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 		# downsample randoms to patches
 		patches_z = np.concatenate(patches, axis=0).T[2]
 		print('downsampling patched randoms before JK sampling..')
-		ds_randoms = downsample(copy_randoms, patches_z, nbin=16, target_nz=10)
+		ds_randoms = downsample(copy_randoms, patches_z, nbin=3, target_nz=10)
 		print('ds_randoms.shape: ', ds_randoms.shape)
 
 		names = ascii.read(join(pdir, ldir[0])).keys()
