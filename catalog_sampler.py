@@ -681,11 +681,15 @@ class RealCatalogue:
 		# resample patches & save JK samples
 		patches = [x for x in listdir(patchDir) if ('patch' in x)&('_' in x)]
 		patch_cats = np.array([np.loadtxt(join(patchDir,i)) for i in patches])
-		patch_cats = np.array([i for i in patch_cats if (i.shape!=(0,))&(len(i.shape)!=1)&(len(i)>100)])
+		#patch_cut = np.array([(i.shape!=(0,))&(len(i.shape)!=1)&(len(i)>=100) for i in patch_cats])
+
+		#patch_cats = patch_cats[patch_cut]
+		#jkweights = patchWeights[patch_cut]
+		jkweights = patchWeights.copy()
+
 		JKdir = join(patchDir,'JKsamples')
 		if not isdir(JKdir):
 			mkdir(JKdir)
-		jkweights = np.empty([len(patch_cats)])
 		for i,pc in enumerate(patch_cats):
 			del_one = np.delete(patch_cats,i,axis=0)
 			new_cat = np.concatenate(del_one)
@@ -693,9 +697,6 @@ class RealCatalogue:
 			ascii.write(new_cat, cat_name, delimiter='\t', names=['# ra[rad]', 'dec[rad]', 'chi[Mpc/h]', 'e1', 'e2', 'e_weight'])
 			del_one_weights = np.delete(patchWeights,i)
 			jkweights[i] = np.mean(del_one_weights)
-		self.jkweights = jkweights
-		# print('CHECK THIS jackknife sample weights:\n',self.jkweights) 
-		# JK SAMPLE WEIGHTS DIFFER ON ORDER <=0.01 FOR PSIZE 9, 4...
 
 		return jkweights
 
@@ -772,7 +773,7 @@ class RealCatalogue:
 			jkwcorrs = [x for x in listdir(JKdir) if ('Pi' in x)&('.dat' in x)]
 		jkwcorrs.sort()
 		jksignals = np.array([np.loadtxt(join(JKdir,i)) for i in jkwcorrs])
-		print('=======================\t', patchDir.split('/')[-2:], ' N surviving JK regions: ', len(jksignals), '....!!!!') 
+		print('=======================\t', '/: '.join(patchDir.split('/')[-2:]), ' N surviving JK regions: ', len(jksignals), '....!!!!') 
 
 		wgp, wgx = jksignals[:,:,3], jksignals[:,:,4]
 		Nobs, Nvar = wgp.shape
@@ -1249,7 +1250,7 @@ if __name__ == "__main__":
 		print('COMPUTING SAMPLE COVARIANCES...')
 		if not args.largePiOnly:
 
-			# jkData.shape = (10 subsamples, N patches/cubes)
+			# jkData.shape = (10 subsamples, N patches/cubes) ----- jkWeights are actually cube weights until passed through jackknife_patches (delete-one) function !!
 			# random_cutter = N_patch array of functions, each to be applied to (ra, dec, z) of randoms
 			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=0, bitmaskCut=args.bitmaskCut, occ_thresh=args.occ_thresh)
 			print('jkData: ', jkData.shape)
@@ -1258,12 +1259,17 @@ if __name__ == "__main__":
 
 			# read & downsample randoms, for JK trimming
 			jkrandoms = ds.read_randoms(args.Random)[:, :3]
+
+			if args.SDSS:
+				rand_colour = fits.open(args.Random)[1].data['color']
+				jkrandoms = np.column_stack(( jkrandoms, rand_colour ))
+
 			zlabel = ('Z_TONRY', 'z')[args.SDSS]
 			sample_z = catalog.data[zlabel]
 			print('INITIAL jackknife random downsampling..')
-			jkrandoms = ds.downsample(jkrandoms, sample_z, 16, 20) # 16 bins, target 20x real density
+			jkrandoms = ds.downsample(jkrandoms, sample_z, 1, 20) # 1 bin, target 20x real density
 			jkrandoms = jkrandoms[ (jkrandoms.T[2] >= sample_z.min()) & (jkrandoms.T[2] <= sample_z.max()) ]
-			ra, dec, z = jkrandoms.T
+			ra, dec, z = jkrandoms.T[:3]
 
 			# merge random patch & redshift cuts
 			random_cut_bool = np.ones([len(random_cutter), len(jkrandoms)])
@@ -1271,45 +1277,41 @@ if __name__ == "__main__":
 				# edge_cuts: 0 = patch-cut, 1 = z-cut
 				random_cut_bool[i] = edge_cut[0](ra, dec, z) & edge_cut[1](ra, dec, z)
 			
-		#	# apply random_cutter, defining random patches/cubes for concatenation
-		#	jkRandoms = []
-		#	for i, edge_cut in enumerate(random_cutter):
-		#		# edge_cuts: 0 = patch-cut, 1 = z-cut
-		#		random_cut = edge_cut[0](ra, dec, z) & edge_cut[1](ra, dec, z)
-		#		jkRandoms.append( jkrandoms[ random_cut ] )
-		#		#jkRandoms.append( jkrandoms[ edge_cut(ra, dec, z) ] )
-		#	jkRandoms = np.array(jkRandoms)
-		#	jkRandoms = np.concatenate(jkRandoms, axis=0)
-		#	print('downsampled jkRandoms.shape: ', jkRandoms.shape)
-			
 			Njkregions = len(jkData[0])
 
-			empty_patch_cuts = []
+			skinny_patch_cuts = []
 			for i,sam in enumerate(jkData):
+				# filter empty patches
+				skinny_patch_cut = np.array( [ ( x.shape!=(0,) ) & ( len(x)>=100 ) for x in sam ], dtype=bool )
+				skinny_patch_cuts.append(skinny_patch_cut)
+				if (i<4) | (i>=8):
+					popd_sam = sam[ skinny_patch_cut ]
+				elif 4<=i<8:
+					popd_sam = sam[ skinny_patch_cuts[i-4] ]
+					swot_sam = sam[ skinny_patch_cut ]
+					for j,p in enumerate(swot_sam):
+						catalog.save_swotpatches(p, catalog.labels[i], j)
+
 				print('saving sample patches..')
-				p_pops = np.array([len(x) for x in sam])
-				empty_patch_cut = p_pops!=0
-				popd_sam = sam[empty_patch_cut]
-				empty_patch_cuts.append(empty_patch_cut)
 				if args.flipe2:
 					print('FLIPPING e2...!')	
 				for j,p in enumerate(popd_sam):
 					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour)
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 0) # save_patches returns str(patchDir) with largePi if arg=1
-					if 3<i<8: # unmasked samples ; gen jk samples & swot patches
-						catalog.save_swotpatches(p, catalog.labels[i], j)
 			
 			# make jackknife randoms (&reals) for norm (&swot)
 			print('making jackknife samples..') 				# MUST feed this fn randoms & random_cutter (.shape=(Ncubes, Nrandoms)) , or will BREAK!!
-			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=empty_patch_cuts, randoms=jkrandoms, radians=1, save_jks=1, jk_randoms=1, patch_str='patch', paths='all', largePi=0)
-			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=empty_patch_cuts, randoms=jkrandoms, radians=0, save_jks=1, jk_randoms=1, patch_str='patch', paths='swot-all', largePi=0)
+			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=1, jk_randoms=1, patch_str='patch', paths='all', largePi=0, sdss=args.SDSS)
+			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=0, save_jks=1, jk_randoms=1, patch_str='patch', paths='swot-all', largePi=0, sdss=args.SDSS)
 			
-			for lab in catalog.labels[:4]:
+			for i, lab in enumerate(catalog.labels[:4]):
 				pDir = join(catalog.new_root,lab)
 				if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
 					print('no z/colour-cut; skipping %s..'%lab)
 				elif args.jackknife:
-					jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
+					jkWeights_pop = jkWeights[ skinny_patch_cuts[i] ]
+					print('===================\treduced jkWeights: ', jkWeights_pop.shape)
+					jksample_weights = catalog.jackknife_patches(pDir, jkWeights_pop)
 					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
 					catalog.jackknife(pDir, jksample_weights, error_scaling, 0)
 
@@ -1317,12 +1319,16 @@ if __name__ == "__main__":
 			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut)
 			Njkregions = len(jkData[0])
 
-			empty_patch_cuts = []
+			skinny_patch_cuts = []
 			for i,sam in enumerate(jkData[:8]):
-				p_pops = np.array([len(x) for x in sam])
-				empty_patch_cut = p_pops!=0
-				popd_sam = sam[empty_patch_cut]
-				empty_patch_cuts.append(empty_patch_cut)
+
+				skinny_patch_cut = np.array( [ ( x.shape!=(0,) ) & ( len(x)>=100 ) for x in sam ], dtype=bool )
+				skinny_patch_cuts.append(skinny_patch_cut)
+				if i<4:
+					popd_sam = sam[ skinny_patch_cut ]
+				else:
+					popd_sam = sam[ skinny_patch_cuts[i-4] ]
+
 				for j,p in enumerate(popd_sam):
 					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour)
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1) # pDir includes _largePi
@@ -1330,14 +1336,16 @@ if __name__ == "__main__":
 					jks_w = catalog.jackknife_patches(pDir, jkWeights) # need this function call for WEIGHTS
 
 			# no swot-files for largePi - can't set lower Pi-limit
-			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=empty_patch_cuts, randoms=jkrandoms, radians=1, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=1)
+			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=1, sdss=args.SDSS)
 
-			for lab in catalog.labels[:4]:
+			for i, lab in enumerate(catalog.labels[:4]):
 				pDir = join(catalog.new_root,lab+'_largePi')
 				if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
 					print('no z/colour-cut; skipping %s..'%lab)
 				elif args.jackknife:
-					jksample_weights = catalog.jackknife_patches(pDir, jkWeights)
+					jkWeights_pop = jkWeights[ skinny_patch_cuts[i] ]
+					print('===================\treduced jkWeights: ', jkWeights_pop.shape)
+					jksample_weights = catalog.jackknife_patches(pDir, jkWeights_pop)
 					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
 					catalog.jackknife(pDir, jksample_weights, error_scaling, 1)
 

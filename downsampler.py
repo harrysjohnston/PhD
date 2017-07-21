@@ -241,29 +241,29 @@ def para_jk_save(jkdir, patches, save_jks, jk_randoms, randoms, units, names, ra
 		jkrands = unit_check(jkrands, give_back=units, tag='rand_JKsample%s'%(str(j).zfill(3)))
 
 		# match N columns with reals
-		if jkrands.shape[1] != len(rand_names):
-			Nmissing_cols = len(rand_names) - jkrands.shape[1]
+		Nmissing_cols = len(rand_names) - jkrands.shape[1]
+		if Nmissing_cols>0:
 			dummy_columns = np.ones([jkrands.shape[0], Nmissing_cols])
 			jkrands = np.column_stack((jkrands, dummy_columns))
+		elif Nmissing_cols<0:
+			jkrands = jkrands[:, :len(rand_names)]
 
 		ascii.write(jkrands, jk_rand_str, names=rand_names, delimiter='\t')
 
-def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians=0, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=0):
+def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians=0, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=0, sdss=0):
+	# empty_patches is boolean array of length uncut-Npatches
+	# True where all skinny-patch cuts are met
+	# index 0-3: shapes, 4-7: densities, 8-9: all-colour densities
 	patch_str = patch_str.split('*')
 	units = ['degrees', 'radians'][radians]
-	pathdict = {'all': ['highZ_Blue_UnMasked', 'highZ_Red_UnMasked', 'lowZ_Blue_UnMasked', 'lowZ_Red_UnMasked'],
-		    'swot-all': ['swot_highZ_Blue_UnMasked', 'swot_highZ_Red_UnMasked', 'swot_lowZ_Blue_UnMasked', 'swot_lowZ_Red_UnMasked'],
+	pathdict = {'all': ['highZ_Red_UnMasked', 'highZ_Blue_UnMasked', 'lowZ_Red_UnMasked', 'lowZ_Blue_UnMasked'],
+		    'swot-all': ['swot_highZ_Red_UnMasked', 'swot_highZ_Blue_UnMasked', 'swot_lowZ_Red_UnMasked', 'swot_lowZ_Blue_UnMasked'],
 		     'shapes': ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue']}
 
 	samples = pathdict[paths]
-	if paths == 'swot-all':
-		empty_patches = np.array(empty_patches[4:8])
-	else:
-		empty_patches = np.array(empty_patches[:4])
-
-	print('reading from: %s' % (['', '(____largePi)'][largePi]) )
-	[print(sample) for sample in samples]
 	for s, sample in enumerate(samples):
+		print('reading from: %s' % (['', '(____largePi)'][largePi]) )
+		print(sample)
 
 		pdir = join(wdir, sample)
 		if largePi:
@@ -272,33 +272,16 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 			print('no directory %s - skipping..'%pdir)
 			continue
 
-		if randoms == None:
-			try:
-				if sample.endswith('UnMasked'):
-					randpath = sample[:-9] + '.asc'
-				else:
-					randpath = sample + '.asc'
-				if randpath.startswith('swot'):
-					randpath = randpath[5:]
-				randpath = 'rand_'+randpath
-				randpath = join(wdir, randpath)
-				copy_randoms = np.loadtxt(randpath)
-				rand_names = ascii.read(randpath).keys()
-				rand_names[0] = '# ' + rand_names[0]
-			except IOError:
-				print('RANDOMS missing - check z/colour cuts, or run without jackknife..!')
-				continue
-		else:
-			copy_randoms = randoms.copy()
-			if (paths!='swot-all') & (all(copy_randoms.T[2] <= 1.)) & ('swot' not in sample):
-				print('converting random redshifts to comoving distances [Mpc/h]..')
-				copy_randoms[:,2] = MICEcosmo.comoving_distance(copy_randoms.T[2]) * 0.7 # * h
+		copy_randoms = randoms.copy()
+		if (paths!='swot-all') & (all(copy_randoms.T[2] <= 1.)) & ('swot' not in sample):
+			print('converting random redshifts to comoving distances [Mpc/h]..')
+			copy_randoms[:,2] = MICEcosmo.comoving_distance(copy_randoms.T[2]) * 0.7 # * h
 			
 		jkdir = join(pdir, 'JKsamples')
 		if not isdir(jkdir):
 			mkdir(jkdir)
 
-		# create patch array with patches.shape = ( sample_i, Npatches/cubes_i )
+		# read patches
 		ldir = [i for i in listdir(pdir) if all([ps in i for ps in patch_str])]
 		if len(ldir)==0:
 			print('invalid patch_str for locating patch.asc files - give str patterns punctuated by *s')
@@ -306,80 +289,36 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 		patches = np.array([np.loadtxt(join(pdir, li)) for li in ldir])
 		print('N unmasked patches: %s'%patches.shape[0])
 
-		# discard partially empty patches/cubes
-		if paths=='all':
-			# empty patch cut comes from shapes for wg+
-			s_ldir = [i for i in listdir(pdir[:-9]) if all([ps in i for ps in patch_str])]
-			shape_patches = np.array([np.loadtxt(join(pdir[:-9], sl)) for sl in s_ldir])
-			pop_patch_cut = np.array([(patch.shape!=(0,)) & (len(patch.shape)!=1) & (len(patch)>=100) for patch in shape_patches])
-			print('N shapes patches: %s/%s' % (sum(pop_patch_cut), len(pop_patch_cut)))
-			print('UnMasked patches cut-out accordingly..')
-		if paths=='swot-all':
-			# and from densities for swot - clustering only
-			pop_patch_cut = np.array([(patch.shape!=(0,)) & (len(patch.shape)!=1) & (len(patch)>=100) for patch in patches])
-			print('SWOT: standard patch cut applied, %s/%s remaining..' % (sum(pop_patch_cut), len(pop_patch_cut)))
+		# if SDSS, cut randoms by colour
+		if sdss:
+			redcut = copy_randoms.T[-1] > 0.63
+			colour = np.array( [~redcut, redcut][int('Red' in sample)], dtype=bool )
+			random_cutter_ = np.array( [np.array(rc, dtype=bool) & colour for rc in random_cutter], dtype=bool )
+		else:
+			random_cutter_ = np.array(random_cutter, dtype=bool)
 
-		# combine random cube-cuts with empty-cube cuts
-		random_cutter_ = np.array(random_cutter, dtype=bool)
-		ep_cut = np.array(empty_patches[s])
-		random_cutter_ = random_cutter_[ep_cut] # sample-cuts remove empty patches
-		new_random_cutter = np.ones_like(random_cutter_, dtype=bool)
-		AndOr = np.ones(len(new_random_cutter))
-		for i, goodpatch in enumerate(pop_patch_cut):
-			if goodpatch:
-				new_random_cutter[i] = random_cutter_[i] # True in the cube
-			else:
-				new_random_cutter[i] = ~random_cutter_[i] # True outside the cube
-				AndOr[i] = 0
-		print('(AndOr) random cubes: ', int(sum(AndOr)), '/', len(AndOr))
-		random_cube_cutter = np.zeros(new_random_cutter.shape[1], dtype=bool) # False e/w; gains True cubes by OR
-		random_cube_filter = np.ones(new_random_cutter.shape[1], dtype=bool) # True e/w; loses False cubes by AND
-		for cond, rand_cubecut in enumerate(new_random_cutter):
-			if AndOr[cond]:
-				random_cube_cutter |= np.array(rand_cubecut, dtype=bool)
-			else:
-				random_cube_filter &= np.array(rand_cubecut, dtype=bool)
+		if paths=='all':
+			ep_cut = np.array(empty_patches[s])
+			print('N shapes patches: %s'%np.sum(ep_cut))
+		elif paths=='swot-all':
+			ep_cut = np.array(empty_patches[s+4])
+			print('N swot patches: %s'%np.sum(ep_cut))
+
+		# apply skinny-patch cut to random-cubes
+		random_cutter_ = random_cutter_[ep_cut]
 
 		# apply filtered cube-cuts to randoms & patches (cubes)
-		combined_random_cutter = random_cube_cutter & random_cube_filter # combined cut has ONLY good cubes, with empty cubes cut out
+		combined_random_cutter = np.zeros(len(copy_randoms), dtype=bool)
+		for random_cube in random_cutter_:
+			combined_random_cutter |= np.array(random_cube, dtype=bool)
 		copy_randoms = copy_randoms[combined_random_cutter]
 		print('combined_random_cutter: ', sum(combined_random_cutter), '/', len(combined_random_cutter))
-		patches = patches[pop_patch_cut]
-
-#############		#############		#############		#############		#############		#############		#############		
-
-#		discarded_patches = patches[~pop_patch_cut]
-#		dpatch_lims = []
-#		for i, dp in enumerate(discarded_patches):
-#			dpatch_lims.append( np.array( [ (x.min(), x.max()) for x in dp.T[:3] ] ).flatten() )
-#		dpatch_lims = np.array(dpatch_lims)
-#
-#		# match units of limits and randoms
-#		if (not all(ds_randoms.T[:2].flatten() <= 2*np.pi)) & all(dpatch_lims.T[:4].flatten() <= 2*np.pi):
-#			dpatch_lims.T[:4] *= (180./np.pi)
-#		if all(ds_randoms.T[:2].flatten() <= 2*np.pi) & (not all(dpatch_lims.T[:4].flatten() <= 2*np.pi)):
-#			dpatch_lims.T[:4] *= (np.pi/180.)
-#
-#		disc_patch_cut = np.ones(len(ds_randoms), dtype=bool)
-#		for lims in dpatch_lims:
-#			# extend cube-volumes by 1% to catch all stray randoms
-#			for i, lim in enumerate(lims):
-#				if i%2 == 0:
-#					lims[i] *= (1, 0.995, 1.005)[int(np.sign(lim))]
-#				else:
-#					lims[i] *= (1, 1.005, 0.995)[int(np.sign(lim))]
-#			cut = betwixt( tuple(lims) )
-#			disc_patch_cut &= ~cut( ds_randoms.T[0], ds_randoms.T[1], ds_randoms.T[2] )
-#
-#		# apply cuts to patches & randoms
-#		ds_randoms = ds_randoms[disc_patch_cut]
-
-#############		#############		#############		#############		#############		#############		#############		
+		#patches = patches[pop_patch_cut]
 
 		# downsample randoms to patches
 		patches_z = np.concatenate(patches, axis=0).T[2]
 		print('downsampling patched randoms before JK sampling..')
-		ds_randoms = downsample(copy_randoms, patches_z, nbin=3, target_nz=10)
+		ds_randoms = downsample(copy_randoms, patches_z, nbin=(3, 1)[sdss], target_nz=10)
 		print('ds_randoms.shape: ', ds_randoms.shape)
 
 		names = ascii.read(join(pdir, ldir[0])).keys()

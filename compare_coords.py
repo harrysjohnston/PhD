@@ -14,6 +14,7 @@ def read_ncats(*paths):
 		print(path)
 		cat = np.loadtxt(path)
 		catalog_array.append(cat)
+	print('SDSS ?')
 
 	return dict(zip(paths, np.array(catalog_array)))
 
@@ -42,11 +43,12 @@ def plot3dhist(sdss=0, legend=1, binning=100, **cats):
 		lab = basename( normpath(k) )
 		h_x, e_x, p = ax[x].hist(cats[k].T[x], bins=bins, stacked=True, normed=True, color=cmap[i], histtype='step', lw=2, alpha=0.7, label=lab)
 		ax[x].set_ylim( h_x.min(), h_x.max()*1.1 )
+	ax[x].grid(which='both', ls='-', alpha=0.2)
 
     if legend:
 	h = [ ml.Line2D( [], [], ls='-', lw=2, c=cmap[i], label=basename( normpath(k) ) ) for i, k in  enumerate(keys) ]
 	if sdss:
-	    ax[0].legend(handles=h, loc='upper left', fontsize=8, ncol=len(keys)//2)
+	    ax[1].legend(handles=h, loc='upper center', fontsize=8, ncol=len(keys)//2)
 	else:
 	    ax[1].legend(handles=h, loc='lower center', fontsize=8, ncol=len(keys)//2)
 	
@@ -84,6 +86,8 @@ def plot3dims(sdss=0, legend=1, **cats):
 
     if legend:
 	h = [ ml.Line2D( [], [], ls='-', lw=2, c=cmap[i], label=basename( normpath(k) ) ) for i, k in  enumerate(keys) ]
-	if not sdss:
+	if sdss:
+	    ax[0].legend(handles=h, loc='lower right', fontsize=8, ncol=len(keys)//2)
+	else:
 	    ax[0].legend(handles=h, loc='lower left', fontsize=8, ncol=len(keys)//2)
     

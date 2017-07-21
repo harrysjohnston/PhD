@@ -16,11 +16,14 @@ def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_z
 	# lostpix_coords = resampler.find_lostpixels(bitmaskCut)
 	# lostpix_coords = (np.array([1e3]),np.array([1e3]))
 
-	# read pixel coordinates & weights
-	pixel_coords = resampler.read_pixel_weights(mask_path=mask_path)
+	if not do_sdss:
+		# read pixel coordinates & weights
+		pixel_coords = resampler.read_pixel_weights(mask_path=mask_path)
+	else:
+		pixel_coords = None
 
 	# define patches & their degree of masking
-	patch_cuts, patch_weights, patch_idx, edges = resampler.define_edgecuts(pixel_coords)
+	patch_cuts, patch_weights, patch_idx, edges = resampler.define_edgecuts(pixel_coords=pixel_coords)
 
 	# apply patch cuts to data
 	patches = resampler.make_patches(fitsdata, patch_cuts)
@@ -139,13 +142,13 @@ class resampleTools:
 		pixel_coords = np.column_stack(( ra, dec, z, mask_map ))
 		return pixel_coords
 
-	def define_edgecuts(self, pixel_coords): # pixel_coords with .shape = (npix, 4-cols[ra,dec,z(dummy), pixel-weight])
+	def define_edgecuts(self, pixel_coords=None): # if gama, pixel_coords has 4 cols = (ra, dec, z(dummy), weight) and npix-rows
 		# given desired patch/box-sizes, divide sky into patches
 		# return sets of patch-cuts for application to catalogs, with weights due to lost pixels
 
 		gal_coords = np.column_stack((self.data[self.cols[0]], self.data[self.cols[1]], self.data[self.cols[2]]))
 		ra, dec, z = gal_coords.T
-		# lpix_ra, lpix_dec = lostpix_coords
+		gama = not self.do_sdss
 
 		print('defining cubes..')
 		ra_num, dec_num, z_num = 360//self.ra_side +1, 180//self.dec_side +1, 0.6//self.z_side +1
@@ -169,35 +172,30 @@ class resampleTools:
 		radiff, decdiff, zdiff = (np.diff(i) for i in [redg,dedg,zedg])
 		print('ra | dec | z sides: %.2f | %.2f | %.3f'%(radiff.min(),decdiff.min(),zdiff.min()))
 
-		# patch_areas = radiff.min()*decdiff.min()
-
 		# identify populated patches
 		print('patching sky..')
 		hist2d_c, hist2d_e = np.histogramdd(gal_coords[:,:2], bins=[redg,dedg])
 		patch_idx = np.array(np.where(hist2d_c!=0)).T
 
 		patch_cuts = np.empty( [patch_idx.shape[0], len(gal_coords)] )
-		# pix_cuts = np.empty([patch_idx.shape[0], len(lpix_ra)])
-		patch_pixel_weights = np.zeros( [patch_idx.shape[0], len(pixel_coords)] )
-		patch_pixel_count = np.empty( patch_idx.shape[0] )
+		if gama:
+			patch_pixel_weights = np.zeros( [patch_idx.shape[0], len(pixel_coords)] )
+			patch_pixel_count = np.empty( patch_idx.shape[0] )
 		for c, (i,j) in enumerate(patch_idx):
 			edges = redg[i], redg[i+1], dedg[j], dedg[j+1], 0., 0.6
 			cut = betwixt(edges) # returns function cut(), which takes ra,dec,z and returns boolean array
 			patch_cuts[c] = cut(ra,dec,z)
-		#	pix_cuts[c] = cut(lpix_ra, lpix_dec, np.ones_like(lpix_ra)*0.1)
-			patch_pixel_weights[c] += np.where( cut(*pixel_coords.T[:3]), pixel_coords.T[3], 0 )
-			patch_pixel_count[c] = np.sum( cut(*pixel_coords.T[:3]) )
+			if gama:
+				patch_pixel_weights[c] += np.where( cut(*pixel_coords.T[:3]), pixel_coords.T[3], 0 )
+				patch_pixel_count[c] = np.sum( cut(*pixel_coords.T[:3]) )
 
-		patch_weights = np.zeros( len(patch_pixel_weights) )
-		for i in range(len(patch_weights)):
-			patch_weights[i] = np.sum(patch_pixel_weights[i]) / np.float32( patch_pixel_count[i] )
+		if gama:
+			patch_weights = np.zeros( len(patch_pixel_weights) )
+			for i in range(len(patch_weights)):
+				patch_weights[i] = np.sum(patch_pixel_weights[i]) / np.float32( patch_pixel_count[i] )
+		else:
+			patch_weights = np.ones( patch_idx.shape[0] )
 		print('===============\t CHECK THIS \t================\npatch weights:\n',patch_weights)
-
-#		npixLost = np.array([np.count_nonzero(i) for i in pix_cuts])
-#		pixar = hp.nside2pixarea(2048,degrees=True)
-#		pixperpatch = patch_areas/pixar
-#		patch_weights = 1-(npixLost/pixperpatch)
-#		patch_weights = np.where(patch_weights>0,patch_weights,0)
 
 		edges = (redg,dedg,zedg)
 		return patch_cuts, patch_weights, patch_idx, edges
