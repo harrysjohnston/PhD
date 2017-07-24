@@ -18,7 +18,7 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
             self.inv_cov = self.build_inverse_covariance()
         self.kind = self.options.get_string("kind", "cubic")
 
-        #Allow over-riding where the inputs come from in 
+        # Allow over-riding where the inputs come from in 
         #the options section
         if options.has_value("x_section"):
             self.x_section = options['x_section']
@@ -32,7 +32,7 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
             self.like_name = options['like_name']
 
     def build_data(self):
-        #use self.options to find the data_file and load ell, tt from it
+        # use self.options to find the data_file and load r_p and wg+
         data_file = self.options.get_string("data_file")
         self.NLA = self.options.get_bool("NLA")
 	self.drop_large_bins = self.options.get_int("drop_large_bins", default=0)
@@ -41,6 +41,8 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
         except ValueError:
             rp,wgp = np.loadtxt(data_file,skiprows=1).T[:2]
             print('ValueError thrown for %s; skipping row 1..'%data_file)
+
+	# limit x-range of data for fitting
 	if self.NLA:
 		rplim = 2 # Mpc/h
 		print('fitting NLA model; discard r_p < %s Mpc/h...!'%rplim)
@@ -49,6 +51,8 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
 	print('DISCARDING %s largest r_p bins'%self.drop_large_bins)
 	if self.drop_large_bins!=0:
 		rp, wgp = rp[:-self.drop_large_bins], wgp[:-self.drop_large_bins]
+
+	# define relevant x-range for theory curve
         self.data_x_range = (rp.min()*0.8, rp.max()*1.2)
 	print('plot points: r_p*w_g+ = %s'%(rp*wgp))
 	self.Nrpbins = len(rp)
@@ -61,7 +65,9 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood):
         except ValueError:
             covmat = np.loadtxt(cov_file,skiprows=1)
             print('ValueError thrown for %s; skipping row 1..'%cov_file)
-	if self.NLA:
+
+	# clip covariance into range for fitting
+	if self.NLA: 
 		covmat = covmat[-self.nla_cov_cut:,-self.nla_cov_cut:]
 	if self.drop_large_bins!=0:
                 covmat = covmat[:-self.drop_large_bins,:-self.drop_large_bins]
