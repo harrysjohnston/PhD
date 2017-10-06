@@ -107,7 +107,7 @@ class resampleTools:
 			print("PATCHES: CUTTING MASK!=0")
 			bitmask_cut = np.where(kidsBitmap==0,True,False)
 
-			if bitmask_[0] != None:
+			if type(bitmask_[0]) != type(None):
 				bitmask_ = bitmask_[0]
 				for i in range(len(bitmask_)):
 					# construct specific bitmask cut
@@ -155,7 +155,7 @@ class resampleTools:
 		if self.largePi:
 			z_num = 0.6//0.1 +1
 		redg,dedg,zedg = np.linspace(0,360,ra_num), np.linspace(-90,90,dec_num), np.linspace(0,0.6,z_num)
-		if self.ranges!=None:
+		if type(self.ranges)!=type(None):
 			print('GAMA equatorial: jackknifing specified ranges...')
 			redg = []
 			dec_num = 6.//self.dec_side +1
@@ -227,7 +227,7 @@ class resampleTools:
 			occupn_frac = np.sum(patch_hist2d[0]!=0) / area
                         pweight = np.sum(fine_hist2d[0]!=0) / 100.
                         occ_fracs[i] = occupn_frac
-                        pwei[i] = pweight**2
+                        pwei[i] = pweight#**2
                         occupied_area += pweight*area
                         if occupn_frac>occupn_threshold:
                                 retained_occ_area += pweight*area
@@ -283,7 +283,7 @@ class resampleTools:
 			for k, zcut in enumerate(zcuts):
                                 cubes.append( patch[zcut] )
                                 cube_weights.append( patch_weights[i] )
-				if random_cutter!=None:
+				if type(random_cutter)!=type(None):
 					# make cut() function for random cubing - need to discard cubes
 					cube_cut = betwixt((-np.inf, np.inf, -np.inf, np.inf, zedges[k], zedges[k+1]))
 					new_random_cutter.append( (random_cutter[i], cube_cut) )
@@ -295,7 +295,7 @@ class resampleTools:
 
 		new_random_cutter = np.array(new_random_cutter)
 
-		if random_cutter!=None:
+		if type(random_cutter)!=type(None):
 			return cubes, cube_weights, new_random_cutter
 		else:
 			return cubes, cube_weights
