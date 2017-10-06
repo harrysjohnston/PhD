@@ -6,6 +6,7 @@ from os import listdir, mkdir
 from os.path import basename, normpath, join, dirname, isdir
 import argparse
 from joblib import Parallel, delayed
+import gc
 import multiprocessing
 from astropy.cosmology import FlatLambdaCDM as FLCDM
 MICEcosmo = FLCDM(Om0=0.25, H0=70, Ob0=0.044)
@@ -222,6 +223,8 @@ def para_jk_save(jkdir, patches, save_jks, jk_randoms, randoms, units, names, ra
 		jksample = unit_check(jksample, give_back=units, tag='JKsample%s'%(str(j).zfill(3)))
 
 		ascii.write(jksample, jksample_str, names=names, delimiter='\t')
+		del jksample
+		gc.collect()
 
 	if jk_randoms:
 		# find limits of patch
@@ -249,6 +252,8 @@ def para_jk_save(jkdir, patches, save_jks, jk_randoms, randoms, units, names, ra
 			jkrands = jkrands[:, :len(rand_names)]
 
 		ascii.write(jkrands, jk_rand_str, names=rand_names, delimiter='\t')
+		del jkrands
+		gc.collect()
 
 def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians=0, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=0, sdss=0):
 	# empty_patches is boolean array of length uncut-Npatches
@@ -325,6 +330,7 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 		names[:2] = [['# ra[deg]', 'dec[deg]'], ['# ra[rad]', 'dec[rad]']] [radians]
 		rand_names = names # redundant??
 
+		gc.collect()
 		if save_jks | jk_randoms:
 			num_cores = multiprocessing.cpu_count()
 			Parallel(n_jobs=num_cores)(delayed(para_jk_save)(jkdir, patches, save_jks, jk_randoms, ds_randoms, units, names, rand_names, j) for j in range(len(patches)) )
