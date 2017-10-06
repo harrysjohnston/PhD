@@ -1,29 +1,29 @@
 from __future__ import print_function,division
 import numpy as np
 from astropy.io import fits,ascii
-from scipy.interpolate import interp1d
+from scipy.interpolate import PchipInterpolator as interp1d
 
 def read_z(shapes,dens):
     shap_z = np.loadtxt(shapes)
     dens_z = np.loadtxt(dens)
     return shap_z,dens_z
 
-def create_nz(gal_z,nz,nbin,outfile):
-    # Note: this is written specifically for zrange=[0,0.5]
-    # AND would need editing for:  nz != nbin 
-    z_hist = np.histogram(gal_z,bins=nz,range=(0.,0.5))
+def create_nz(gal_z, nz, nbin, z_range):
+    # nz gives n(z) resolution, and nbin gives number of tomographic bins - required for Cl's
+    # for my IA analysis nbin doesn't actually do anything, since my weight function only wants
+    # a 1d array; just set nz fine enough for nice redshift interpolation of Pks
+    zmin, zmax = z_range.min(), z_range.max()
+    z_hist = np.histogram(gal_z, bins=nz, range=(zmin, zmax))
     n_of_z = z_hist[0]
     x = z_hist[1]
     z_mids = x[1:]-(x[1]-x[0])/2
     nz_table = np.empty([nz,nbin+1])
     nz_table[:,0] = z_mids
-    bin_ranges = np.linspace(0,0.5,num=nbin+1)
+    bin_ranges = np.linspace(zmin, zmax, num=nbin+1)
     for i in range(nbin):
         nz_table[:,i+1] = np.where(
-            (bin_ranges[i]<=z_mids)&(z_mids<bin_ranges[i+1]),n_of_z,0)
-    if outfile!=None:
-        ascii.write(nz_table,outfile,names=['#z_mid']+['#bin_%s'%(i+1) for i in range(nbin)],delimiter='\t')
-    return z_mids,n_of_z
+            (bin_ranges[i]<=z_mids)&(z_mids<bin_ranges[i+1]),n_of_z,0 )
+    return z_mids, n_of_z
 
 def cut_krange(k_h,p_k,kmin=10**-2.2,kmax=10**1.2):
     # limit range in k, prior to FFT (Hankel transfm), to avoid ringing
@@ -85,7 +85,7 @@ def zero_pad(k_h, p_k, zerokmin=1e-5, zerokmax=1e5, effkmin=1e-3, effkmax=1e2, l
 
 def interpolate(ups_ks, hod_ks, hod_pk):
 	# given new densely sampled k, interpolate P(k) & return k, newP(k)
-	pk_cubic_interp = interp1d(hod_ks, hod_pk, kind=3)
+	pk_cubic_interp = interp1d(hod_ks, hod_pk, axis=1)#, kind=3)
 	pk_cubic = pk_cubic_interp(ups_ks)
 
 	return ups_ks, pk_cubic

@@ -4,11 +4,11 @@ from astropy.cosmology import Planck13
 import scipy.integrate as scint
 import operator
 
-def fivept_stencil(func,x,h):
+def fivept_stencil(func, x, h):
     # returns f'(x), via 5pt stencil, for grid-spacing h
     return (-func(x+2*h)+8*func(x+h)-8*func(x-h)+func(x-2*h))/(12*h)
 
-def compute_Wz(z,nofz_s,nofz_d,eta,beta,Rmag,wgg=0):
+def compute_Wz(z, nofz_s, nofz_d, eta, beta, Rmag, wgg=0):
     # Wz = [p^2 / X^2*X'] / int[p^2 / X^2*X' dz]
 
     # compute p(z) = unconditional pdf
@@ -33,7 +33,7 @@ def compute_Wz(z,nofz_s,nofz_d,eta,beta,Rmag,wgg=0):
     Wz_scaled = Wz
 
     zfactor = ((1+z)/(1+0.3))**eta # z0=0.3
-    Lfactor = 10**(0.4*(-22-Rmag)*beta) # R0=-22
+    Lfactor = 10**(-0.4 * (Rmag) * beta) # R0 = -22 coded in data pipeline
     if not wgg:
         Wz_scaled *= zfactor*Lfactor
     return Wz,Wz_scaled
