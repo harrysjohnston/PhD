@@ -31,12 +31,13 @@ ds_jkfunc = ds.make_jks
 
 class RealCatalogue:
 
-	def __init__(self, path, DEI, mc, SDSS, cols=None): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
+	def __init__(self, path, DEI, mc, SDSS, cols=None, largePi=0): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
 		"""""
 		read-in catalogue
 
 		"""""
 		self.path = path
+		self.largePi = largePi
 		GAMAheads = ['ra', 'dec', 'z', 'e1', 'e2', 'RankBCG', 'logmstar', 'pgm', 'absmag_g', 'absmag_i', 'mask']
 		SDSSheads = ['ra', 'dec', 'z', 'e1', 'e2', 'sigma_gamma', 'rf_g-r']
 		if DEI:					################# GET RID OF PGM #################
@@ -179,7 +180,7 @@ class RealCatalogue:
 		if colour_ != None:
 			red_cut = np.array((colour > colour_)) # larger (B-V) <-> 'redder' colour
 			if self.SDSS:
-				red_cut = np.where(np.isnan(colour1), colour>1.75, red_cut) # where no rf_g-r colour, use obs_u-r instead
+				red_cut = np.where(np.isnan(colour1), colour>2.1, red_cut) # where no rf_g-r colour, use obs_u-r instead
 			blue_cut = ~red_cut
 			print('c cut [unique]: \t', colour_, np.unique(red_cut))
 		else:
@@ -253,7 +254,8 @@ class RealCatalogue:
 		# save cuts for later use
 		self.Rmags = []
 		for sample in [self.highz_R,self.highz_B,self.lowz_R,self.lowz_B]:
-			self.Rmags.append(np.mean(sample['%s'% (['absmag_r', 'M_r'] [self.SDSS]) ]))
+            # save mean diff to pivot magnitude
+			self.Rmags.append(np.mean(sample[ '%s'% ['absmag_r', 'M_r'] [self.SDSS] ] + 22. ))
 		self.zcut = z_cut
 		self.zcut_r = z_cut_r
 		self.redcut = red_cut
@@ -281,9 +283,9 @@ class RealCatalogue:
 
 		return None
 
-	def cut_columns(self, subsample, h, flipe2, Kneighbour):
+	def cut_columns(self, subsample, h, flipe2, Kneighbour, R0cut):
 		"""""
-		take subsample data 
+		take subsample data
 		& isolate columns for wcorr
 
 		"""""
@@ -295,24 +297,41 @@ class RealCatalogue:
 			pgm = np.ones_like(Z)
 		else:
 			pgm = table['pgm']
+		e_weight = np.where(pgm<0.1,0,pgm)
 		e1 = table[self.headers['e1']]/pgm
 		e2 = table[self.headers['e2']]/pgm
+
 		if flipe2:
 			#print('FLIPPING e2 !!!!!!')
 			e2 *= -1
-		e_weight = np.where(pgm<0.1,0,pgm)
-		if self.DEI & (Kneighbour!=0.):
-			e_weight = np.where(table['flag_DEIMOS']=='0000',1,0)
-			neighbour_separation = table['Closest_neighbour']
-			pair_radii = table['IsoRadius'] + table['Neighbour_IsoRadius']
-			e_weight *= np.where(neighbour_separation > Kneighbour*pair_radii, 1, 0)
+
+		if self.DEI:
+			flag_cols = [i for i in table.columns.names if i.startswith('flag_DEIMOS')]
+			e_weight = np.ones_like(e1)
+			for fc in flag_cols:
+				e_weight *= np.where(table[fc]=='0000', 1, 0)
+
+			if Kneighbour != 0.:
+				neighbour_separation = table['Closest_neighbour']
+				pair_radii = table['IsoRadius'] + table['Neighbour_IsoRadius']
+				e_weight *= np.where(neighbour_separation > Kneighbour*pair_radii, 1, 0)
+
+			if R0cut != None:
+				assert len(R0cut) == 2, "give upper and lower limit for R0_r"
+				#print('R0 range: %s - %s' % (R0cut[0], R0cut[1]) )
+				#R0cols = [i for i in table.columns.names if 'R0' in i]
+				#R0 = [table[i] for i in R0cols]
+				#for R in R0:
+				R = table['R0_r']
+				#print(np.sum(np.where( (R>R0cut[0]) & (R<R0cut[1]), 1, 0)))
+				e_weight *= np.where( (R>R0cut[0]) & (R<R0cut[1]), 1, 0) # gtr or lt?? what is cut?? cut in both for band-diffs??
+
 		if self.SDSS:
-			e_weight = np.where( ((abs(e1)>9.9)|(abs(e2)>9.9)) ,0,1)
-		if len(e1)>1000:
-			e1m,e2m = e1[np.array(e_weight,dtype=bool)],e2[np.array(e_weight,dtype=bool)]
-			e1m,e2m = np.mean(e1m),np.mean(e2m)
-			e1 -= e1m
-			e2 -= e2m
+			e_weight = np.where( ((abs(e1)>9.9)|(abs(e2)>9.9)), 0, 1)
+		#e1m,e2m = e1[np.array(e_weight,dtype=bool)], e2[np.array(e_weight,dtype=bool)]
+		#e1m,e2m = np.mean(e1m), np.mean(e2m)
+		#e1 -= e1m
+		#e2 -= e2m
 
 		e1,e2,e_weight = map(lambda x: np.nan_to_num(x), [e1,e2,e_weight])
 
@@ -695,7 +714,7 @@ class RealCatalogue:
 			new_cat = np.concatenate(del_one)
 			cat_name = join(JKdir,'JKsample%s.asc'%(str(i).zfill(3)))
 			ascii.write(new_cat, cat_name, delimiter='\t', names=['# ra[rad]', 'dec[rad]', 'chi[Mpc/h]', 'e1', 'e2', 'e_weight'])
-			del_one_weights = np.delete(patchWeights,i)
+			del_one_weights = np.delete(patchWeights, i)
 			jkweights[i] = np.mean(del_one_weights)
 
 		return jkweights
@@ -744,12 +763,18 @@ class RealCatalogue:
 			realcorr, randcorr = np.loadtxt(real_out), np.loadtxt(rand_out)
 			realcorr[:, 3:5] -= randcorr[:, 3:5]
 			np.savetxt(real_out, realcorr)
+
 		#	if 20<i<23:
 		#		os.system('cp %s /share/splinter/hj/PhD/TEST_randsub'%rand_out)
-			os.system('rm %s'%rand_out)
-			os.system('rm %s_d'%join(JKdir, jk))
-			os.system('rm %s'%join(JKdir, randjk))
-			
+
+			# clean up - if needing to analyse JKs, comment out below and use arg 'makejk_only'
+			os.system('rm %s'%rand_out) # random wcorr
+			os.system('rm %s_d'%join(JKdir, jk)) # copied density JK sample
+			os.system('rm %s'%dpath) # density JK sample
+			os.system('rm %s'%join(JKdir, jk)) # shapes JK sample
+			os.system('rm %s'%join(JKdir, randjk)) # copied random JK sample
+			os.system('rm %s'%rdpath) # random sample
+
 		return None
 
 	def pearson_r(self,covar_matrix):
@@ -1158,11 +1183,21 @@ if __name__ == "__main__":
 	default=1,
 	help='(0) drop cut 6 of 6, or (1) to keep the cut')
 	parser.add_argument(
+	'-makejk_only',
+	type=int,
+	default=0,
+	help='use existing jk correlations to construct covariances (1), or take new correlations (0), default=0')
+	parser.add_argument(
 	'-cols',
 	nargs='*',
 	type=str,
 	default=None,
 	help='specify column headers for GAMA: (ra dec z e1 e2 RankBCG logmstar pgm absmag_g absmag_i mask), or SDSS: (ra dec z e1 e2 sigma_gamma rf_g-r), in order. Default=None; default column headers')
+	parser.add_argument(
+	'-R0cut',
+	nargs=2,
+	type=np.float32,
+	help='define resolution (r-band) window for non-zero correlation weighting, default=None=all')
 	args = parser.parse_args()
 
 	if args.Catalog.startswith('MUST'):
@@ -1171,7 +1206,7 @@ if __name__ == "__main__":
 
 	print('=======================\tREADING CATALOG: %s'%args.Catalog)
 
-	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS, cols=args.cols)
+	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS, cols=args.cols, largePi=args.largePi)
 
 	if args.plotNow:
 		# reduce & save data files, returning filename-list
@@ -1228,7 +1263,7 @@ if __name__ == "__main__":
 	for i, sample in enumerate(samples):
 		if args.flipe2:
 			print('FLIPPING e2...!')
-		new_table,sample_z = catalog.cut_columns(sample, args.H, args.flipe2, args.Kneighbour)
+		new_table,sample_z = catalog.cut_columns(sample, args.H, args.flipe2, args.Kneighbour, args.R0cut)
 		sample_zs.append(sample_z)
 		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
 		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'),sample_z)
@@ -1296,23 +1331,35 @@ if __name__ == "__main__":
 				if args.flipe2:
 					print('FLIPPING e2...!')	
 				for j,p in enumerate(popd_sam):
-					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour)
+					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut)
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 0) # save_patches returns str(patchDir) with largePi if arg=1
-			
+			del jkData, popd_sam
+			gc.collect()
+
 			# make jackknife randoms (&reals) for norm (&swot)
 			print('making jackknife samples..') 				# MUST feed this fn randoms & random_cutter (.shape=(Ncubes, Nrandoms)) , or will BREAK!!
+			gc.collect()
 			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=1, jk_randoms=1, patch_str='patch', paths='all', largePi=0, sdss=args.SDSS)
+			gc.collect()
 			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=0, save_jks=1, jk_randoms=1, patch_str='patch', paths='swot-all', largePi=0, sdss=args.SDSS)
 			
 			for i, lab in enumerate(catalog.labels[:4]):
 				pDir = join(catalog.new_root,lab)
 				if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
 					print('no z/colour-cut; skipping %s..'%lab)
+#########################################################################################################
+				elif lab == 'highZ_Red':
+					print('skipping highZ_Red')
+######################################################################################################### GET RID OF THIS
 				elif args.jackknife:
 					jkWeights_pop = jkWeights[ skinny_patch_cuts[i] ]
-					print('===================\treduced jkWeights: ', jkWeights_pop.shape)
+					print('===================\t %s reduced jkWeights: '%lab, jkWeights_pop.shape)
 					jksample_weights = catalog.jackknife_patches(pDir, jkWeights_pop)
-					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
+					if args.makejk_only:
+						print('====================\t====================\t SKIPPING JACKKNIFE CORRELATIONS ====================\t====================\t')
+					else:
+						catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
+					#catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
 					catalog.jackknife(pDir, jksample_weights, error_scaling, 0)
 
 		if args.largePi:
@@ -1330,7 +1377,7 @@ if __name__ == "__main__":
 					popd_sam = sam[ skinny_patch_cuts[i-4] ]
 
 				for j,p in enumerate(popd_sam):
-					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour)
+					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut)
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1) # pDir includes _largePi
 				if 3<i<8: # unmasked samples ; gen jk samples
 					jks_w = catalog.jackknife_patches(pDir, jkWeights) # need this function call for WEIGHTS
@@ -1449,7 +1496,9 @@ if __name__ == "__main__":
 		[script.write('%s: \t%d\n'%(catalog.labels[i+4],catalog.samplecounts[i+4])) for i in range(len(catalog.labels[4:]))]
 		[script.write('%s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
 #	os.system('cp %s %s'%( join(catalog.new_root, 'C-lineArgs_SampleProps.txt'), join(catalog.new_root, 'to_plot/') ) )
-	np.savetxt(join(catalog.new_root,'Rmags.txt'),catalog.Rmags,header='mean absmag_r; hzr,hzb,lzr,lzb')
+	#np.savetxt(join(catalog.new_root,'Rmags.txt'),catalog.Rmags,header='mean absmag_r; hzr,hzb,lzr,lzb')
+	np.savetxt(join(catalog.new_root, 'R-band_pivot_deltas.txt'), np.array(catalog.Rmags), header='mean differences between sample & pivot R-band abs mag \n'+'\t'.join(catalog.labels[:4]), delimiter='\t')
+	np.savetxt(join(catalog.new_root, 'SamplePopulations.txt'), np.column_stack((np.array(catalog.samplecounts[:4]), np.array(catalog.samplecounts[4:8]))), header='populaitons of shapes (density) samples \n'+'\t'.join(catalog.labels[:4]), delimiter='\t')
 #	os.system('cp %s %s'%( join(catalog.new_root, 'Rmags.txt'), join(catalog.new_root, 'to_plot/') ) )
 
 
