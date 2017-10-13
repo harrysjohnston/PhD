@@ -266,6 +266,7 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 		     'shapes': ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue']}
 
 	samples = pathdict[paths]
+	if sdss: samples = samples[:2]
 	for s, sample in enumerate(samples):
 		print('reading from: %s' % (['', '(____largePi)'][largePi]) )
 		print(sample)
