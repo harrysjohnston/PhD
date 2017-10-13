@@ -38,10 +38,10 @@ class RealCatalogue:
 		"""""
 		self.path = path
 		self.largePi = largePi
-		GAMAheads = ['ra', 'dec', 'z', 'e1', 'e2', 'RankBCG', 'logmstar', 'pgm', 'absmag_g', 'absmag_i', 'mask']
+		GAMAheads = ['ra', 'dec', 'z', 'e1', 'e2', 'RankBCG', 'logmstar', 'pgm', 'absmag_g', 'absmag_r', 'mask']
 		SDSSheads = ['ra', 'dec', 'z', 'e1', 'e2', 'sigma_gamma', 'rf_g-r']
 		if DEI:					################# GET RID OF PGM #################
-			self.headers = dict( zip( GAMAheads, ['RA_GAMA', 'DEC_GAMA', 'Z_TONRY', 'e1', 'e2', 'RankBCG', 'logmstar', 'pgm', 'absmag_g', 'absmag_i', 'MASK'] ) )
+			self.headers = dict( zip( GAMAheads, ['RA_GAMA', 'DEC_GAMA', 'Z_TONRY', 'e1', 'e2', 'RankBCG', 'logmstar', 'pgm', 'absmag_g', 'absmag_r', 'MASK'] ) )
 			self.DEI = 1
 			self.SDSS = 0
 		if SDSS:
@@ -49,7 +49,7 @@ class RealCatalogue:
 			self.DEI = 0
 			self.SDSS = 1
 		if not DEI | SDSS:
-			self.headers = dict( zip( GAMAheads, ['RA_1_1', 'DEC_1_1', 'Z_TONRY', 'e1c', 'e2c', 'RankBCG_1', 'logmstar', 'pgm', 'absmag_g_1', 'absmag_i_1', 'col3'] ) )
+			self.headers = dict( zip( GAMAheads, ['RA_1_1', 'DEC_1_1', 'Z_TONRY', 'e1c', 'e2c', 'RankBCG_1', 'logmstar', 'pgm', 'absmag_g_1', 'absmag_r_1', 'col3'] ) )
 			self.DEI = 0
 			self.SDSS = 0
 
@@ -68,8 +68,8 @@ class RealCatalogue:
 		print('SELECTING R_MAG < %s'%mc)
 		data = data[data['%s'%(['absmag_r', 'M_r'][self.SDSS])]<mc]
 
-		print('cutting z < %s - (%s) randoms cannot extend this near' % ((0.01, 'GAMA'), (3.5e-3, 'SDSS'))[SDSS] )
-		data = data[ data[self.headers['z']] > (0.01, 3.5e-3)[SDSS] ]
+		print('cutting z < 0.02 randoms cannot extend this near')
+		data = data[ data[self.headers['z']] > 0.02 ]
 
 		self.data = data
 		del data
@@ -112,10 +112,10 @@ class RealCatalogue:
 		z = self.data[self.headers['z']]
 		self.pre_z = z
 		if self.DEI:
-			colour = self.data[self.headers['absmag_g']] - self.data[self.headers['absmag_i']]
-			if ('gminusi' in self.data.columns.names):
-				print('LATEST GAMA; colour = "gminusi"')
-				colour = self.data['gminusi']
+			colour = self.data[self.headers['absmag_g']] - self.data[self.headers['absmag_r']]
+			#if ('gminusi' in self.data.columns.names):
+				#print('LATEST GAMA; colour = "gminusi"')
+				#colour = self.data['gminusi']
 		if not self.SDSS:
 			total_bitmasks = self.data[self.headers['mask']]
 			logmstar = self.data[self.headers['logmstar']]+np.log10(self.data['fluxscale'])
@@ -180,7 +180,7 @@ class RealCatalogue:
 		if colour_ != None:
 			red_cut = np.array((colour > colour_)) # larger (B-V) <-> 'redder' colour
 			if self.SDSS:
-				red_cut = np.where(np.isnan(colour1), colour>2.1, red_cut) # where no rf_g-r colour, use obs_u-r instead
+				red_cut = np.where(np.isnan(colour1), False, red_cut) # where no rf_g-r colour, DISCARD obs frame galaxies
 			blue_cut = ~red_cut
 			print('c cut [unique]: \t', colour_, np.unique(red_cut))
 		else:
@@ -283,7 +283,7 @@ class RealCatalogue:
 
 		return None
 
-	def cut_columns(self, subsample, h, flipe2, Kneighbour, R0cut):
+	def cut_columns(self, subsample, h, flipe2, Kneighbour, R0cut, shapes=0):
 		"""""
 		take subsample data
 		& isolate columns for wcorr
@@ -307,14 +307,14 @@ class RealCatalogue:
 
 		if self.DEI:
 			flag_cols = [i for i in table.columns.names if i.startswith('flag_DEIMOS')]
-			e_weight = np.ones_like(e1)
+			shape_cut = np.ones_like(e1)
 			for fc in flag_cols:
-				e_weight *= np.where(table[fc]=='0000', 1, 0)
+				shape_cut *= np.where(table[fc]=='0000', 1, 0)
 
 			if Kneighbour != 0.:
 				neighbour_separation = table['Closest_neighbour']
 				pair_radii = table['IsoRadius'] + table['Neighbour_IsoRadius']
-				e_weight *= np.where(neighbour_separation > Kneighbour*pair_radii, 1, 0)
+				shape_cut *= np.where(neighbour_separation > Kneighbour*pair_radii, 1, 0)
 
 			if R0cut != None:
 				assert len(R0cut) == 2, "give upper and lower limit for R0_r"
@@ -324,16 +324,16 @@ class RealCatalogue:
 				#for R in R0:
 				R = table['R0_r']
 				#print(np.sum(np.where( (R>R0cut[0]) & (R<R0cut[1]), 1, 0)))
-				e_weight *= np.where( (R>R0cut[0]) & (R<R0cut[1]), 1, 0) # gtr or lt?? what is cut?? cut in both for band-diffs??
+				shape_cut *= np.where( (R>R0cut[0]) & (R<R0cut[1]), 1, 0) # gtr or lt?? what is cut?? cut in both for band-diffs??
 
 		if self.SDSS:
-			e_weight = np.where( ((abs(e1)>9.9)|(abs(e2)>9.9)), 0, 1)
-		#e1m,e2m = e1[np.array(e_weight,dtype=bool)], e2[np.array(e_weight,dtype=bool)]
-		#e1m,e2m = np.mean(e1m), np.mean(e2m)
-		#e1 -= e1m
-		#e2 -= e2m
+			shape_cut = np.where( ((abs(e1)>9.9)|(abs(e2)>9.9)), 0, 1)
 
-		e1,e2,e_weight = map(lambda x: np.nan_to_num(x), [e1,e2,e_weight])
+		e1,e2 = map(lambda x: np.nan_to_num(x), [e1,e2])
+
+		# do not cut unmasked samples
+		if not shapes: shape_cut = np.ones_like(shape_cut)
+		shape_cut = np.array(shape_cut, dtype=bool)
 
 		# random re-shuffle test - density-shape corr should now ~ 0
 		# e12 = list(zip(e1,e2))
@@ -348,7 +348,7 @@ class RealCatalogue:
 		else:
 			comov = MICEcosmo.comoving_distance(Z)
 		comov *= h
-		new_table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))
+		new_table = np.column_stack((RA,DEC,comov,e1,e2,e_weight))[shape_cut]
 
 		self.samplecounts.append(len(new_table))
 
@@ -1192,7 +1192,7 @@ if __name__ == "__main__":
 	nargs='*',
 	type=str,
 	default=None,
-	help='specify column headers for GAMA: (ra dec z e1 e2 RankBCG logmstar pgm absmag_g absmag_i mask), or SDSS: (ra dec z e1 e2 sigma_gamma rf_g-r), in order. Default=None; default column headers')
+	help='specify column headers for GAMA: (ra dec z e1 e2 RankBCG logmstar pgm absmag_g absmag_r mask), or SDSS: (ra dec z e1 e2 sigma_gamma rf_g-r), in order. Default=None; default column headers')
 	parser.add_argument(
 	'-R0cut',
 	nargs=2,
@@ -1261,9 +1261,11 @@ if __name__ == "__main__":
 	sample_zs = []
 	swot_z = []
 	for i, sample in enumerate(samples):
-		if args.flipe2:
-			print('FLIPPING e2...!')
-		new_table,sample_z = catalog.cut_columns(sample, args.H, args.flipe2, args.Kneighbour, args.R0cut)
+		if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
+		if args.flipe2: print('FLIPPING e2...!')
+		if i<4: shapes=1
+		else: shapes=0
+		new_table,sample_z = catalog.cut_columns(sample, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes)
 		sample_zs.append(sample_z)
 		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
 		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'),sample_z)
@@ -1310,8 +1312,10 @@ if __name__ == "__main__":
 			random_cut_bool = np.ones([len(random_cutter), len(jkrandoms)])
 			for i, edge_cut in enumerate(random_cutter):
 				# edge_cuts: 0 = patch-cut, 1 = z-cut
-				random_cut_bool[i] = edge_cut[0](ra, dec, z) & edge_cut[1](ra, dec, z)
-			
+				if args.jk3d:
+					random_cut_bool[i] = edge_cut[0](ra, dec, z) & edge_cut[1](ra, dec, z)
+				else:
+					random_cut_bool[i] = edge_cut(ra, dec, z)
 			Njkregions = len(jkData[0])
 
 			skinny_patch_cuts = []
@@ -1321,17 +1325,19 @@ if __name__ == "__main__":
 				skinny_patch_cuts.append(skinny_patch_cut)
 				if (i<4) | (i>=8):
 					popd_sam = sam[ skinny_patch_cut ]
-				elif 4<=i<8:
-					popd_sam = sam[ skinny_patch_cuts[i-4] ]
-					swot_sam = sam[ skinny_patch_cut ]
+				elif 4<=i<8: # if unmasked sample
+					popd_sam = sam[ skinny_patch_cuts[i-4] ] # match patch cuts to shapes for IA
+					swot_sam = sam[ skinny_patch_cut ] # and save all for clustering
 					for j,p in enumerate(swot_sam):
+						if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
 						catalog.save_swotpatches(p, catalog.labels[i], j)
 
 				print('saving sample patches..')
-				if args.flipe2:
-					print('FLIPPING e2...!')	
 				for j,p in enumerate(popd_sam):
-					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut)
+					if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
+					if i<4: shapes=1
+					else: shapes=0
+					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes)
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 0) # save_patches returns str(patchDir) with largePi if arg=1
 			del jkData, popd_sam
 			gc.collect()
@@ -1348,8 +1354,8 @@ if __name__ == "__main__":
 				if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
 					print('no z/colour-cut; skipping %s..'%lab)
 #########################################################################################################
-				elif lab == 'highZ_Red':
-					print('skipping highZ_Red')
+				#elif lab == 'highZ_Red':
+					#print('skipping highZ_Red')
 ######################################################################################################### GET RID OF THIS
 				elif args.jackknife:
 					jkWeights_pop = jkWeights[ skinny_patch_cuts[i] ]
@@ -1377,9 +1383,13 @@ if __name__ == "__main__":
 					popd_sam = sam[ skinny_patch_cuts[i-4] ]
 
 				for j,p in enumerate(popd_sam):
-					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut)
+					if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
+					if i<4: shapes=1
+					else: shapes=0
+					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes)
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1) # pDir includes _largePi
 				if 3<i<8: # unmasked samples ; gen jk samples
+					if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
 					jks_w = catalog.jackknife_patches(pDir, jkWeights) # need this function call for WEIGHTS
 
 			# no swot-files for largePi - can't set lower Pi-limit
@@ -1497,8 +1507,8 @@ if __name__ == "__main__":
 		[script.write('%s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
 #	os.system('cp %s %s'%( join(catalog.new_root, 'C-lineArgs_SampleProps.txt'), join(catalog.new_root, 'to_plot/') ) )
 	#np.savetxt(join(catalog.new_root,'Rmags.txt'),catalog.Rmags,header='mean absmag_r; hzr,hzb,lzr,lzb')
-	np.savetxt(join(catalog.new_root, 'R-band_pivot_deltas.txt'), np.array(catalog.Rmags), header='mean differences between sample & pivot R-band abs mag \n'+'\t'.join(catalog.labels[:4]), delimiter='\t')
-	np.savetxt(join(catalog.new_root, 'SamplePopulations.txt'), np.column_stack((np.array(catalog.samplecounts[:4]), np.array(catalog.samplecounts[4:8]))), header='populaitons of shapes (density) samples \n'+'\t'.join(catalog.labels[:4]), delimiter='\t')
+	np.savetxt(join(catalog.new_root, 'R-band_pivot_deltas.txt'), np.array(catalog.Rmags), header='mean differences between sample & pivot R-band abs mag\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t')
+	np.savetxt(join(catalog.new_root, 'SamplePopulations.txt'), np.column_stack((np.array(catalog.samplecounts[:4]), np.array(catalog.samplecounts[4:8]))), header='populations of shapes (density) samples\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t')
 #	os.system('cp %s %s'%( join(catalog.new_root, 'Rmags.txt'), join(catalog.new_root, 'to_plot/') ) )
 
 
