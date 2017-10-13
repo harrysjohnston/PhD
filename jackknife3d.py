@@ -9,7 +9,7 @@ def betwixt((re1,re2,de1,de2,ze1,ze2)):
 		return (ra>=re1)&(ra<=re2)&(dec>=de1)&(dec<=de2)&(z>=ze1)&(z<=ze2)
 	return make_cut
 
-def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_zdepth=0.06, largePi=0, bitmaskCut=None, occ_thresh=0.99, mask_path='/share/splinter/hj/PhD/pixel_weights.fits'):
+def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_zdepth=0.06, largePi=0, bitmaskCut=None, occ_thresh=0.5, mask_path='/share/splinter/hj/PhD/pixel_weights.fits'):
 	resampler = resampleTools(fitsdata, patchside, do_sdss, do_3d, sample_cuts, cube_zdepth=cube_zdepth, largePi=largePi)
 
 	# identify masked pixel coordinates
@@ -29,7 +29,7 @@ def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_z
 	patches = resampler.make_patches(fitsdata, patch_cuts)
 
 	# filter patches straddling survey-edges
-	patch_cuts, patch_weights, error_scaling = resampler.filter_patches(patches, patch_cuts, patch_weights, patch_idx, edges,lilbin_division=4,occupn_threshold=occ_thresh)
+	patch_cuts, patch_weights, error_scaling = resampler.filter_patches(patches, patch_cuts, patch_weights, patch_idx, edges,occupn_threshold=occ_thresh)
 
 	# create function to trim randoms down to real JK footprint
 	random_cutter = resampler.find_patch_edges(patch_cuts)
@@ -205,46 +205,37 @@ class resampleTools:
 		patches = np.array([fits_cat[np.array(i,dtype=bool)] for i in patch_cuts]) # array of populated patches, where each is a fits-table
 		return patches
 
-	def filter_patches(self, patches, patch_cuts, patch_weights, patch_idx, edges, lilbin_division=4, occupn_threshold=0.99):
+	def filter_patches(self, patches, patch_cuts, patch_weights, patch_idx, edges, occupn_threshold=0.5):
 		print('filtering survey-edges..')
-		occ_fracs = np.empty(len(patches))
 		pwei = np.empty(len(patches))
 		occupied_area = 0
 		retained_occ_area = 0
-		area = lilbin_division**2 # = 16 (default) in arbitrary units
-		norm_area = area*len(patches)
 
 		for i, patch in enumerate(patches):
 			# subdivide each patch for occupations
 			coords = np.column_stack((patch[self.cols[0]], patch[self.cols[1]], patch[self.cols[2]]))
 			r,d = patch_idx[i] # indices patch-edges
 			patch_edges = (edges[0][r], edges[0][r+1], edges[1][d], edges[1][d+1])
-			lilbins = (np.linspace(patch_edges[0], patch_edges[1], lilbin_division+1), np.linspace(patch_edges[2], patch_edges[3], lilbin_division+1))
-                        fine_bins = (np.linspace(patch_edges[0], patch_edges[1], 11), np.linspace(patch_edges[2], patch_edges[3], 11))
-			patch_hist2d = np.histogramdd(coords[:,:2], bins=lilbins)
-                        fine_hist2d = np.histogramdd(coords[:,:2], bins=fine_bins)
+			fine_bins = (np.linspace(patch_edges[0], patch_edges[1], 11), np.linspace(patch_edges[2], patch_edges[3], 11))
+			fine_hist2d = np.histogramdd(coords[:,:2], bins=fine_bins)
 
-			occupn_frac = np.sum(patch_hist2d[0]!=0) / area
-                        pweight = np.sum(fine_hist2d[0]!=0) / 100.
-                        occ_fracs[i] = occupn_frac
-                        pwei[i] = pweight#**2
-                        occupied_area += pweight*area
-                        if occupn_frac>occupn_threshold:
-                                retained_occ_area += pweight*area
+			pweight = np.sum(fine_hist2d[0]!=0) / 100.
+			pwei[i] = pweight#**2
+			occupied_area += pweight
+			if pweight >= occupn_threshold:
+				retained_occ_area += occupied_area
 
 		if self.do_sdss:
-			patch_filter = occ_fracs>=occupn_threshold
-			
+			patch_filter = pwei >= occupn_threshold
 		else:
-			patch_filter = np.ones_like(occ_fracs, dtype=bool)
+			patch_filter = np.ones_like(pwei, dtype=bool)
 
-		highfracs = (pwei**0.5)[patch_filter]
-		discarded_fraction = sum(patch_filter)/len(patch_filter)
+		highfracs = pwei[patch_filter]
 		print('occupation threshold (SDSS): ', occupn_threshold,
 			'\ntotal (populated) patches: ', len(patch_filter),
 			'\ndiscarded edge-patches (SDSS): ', sum(~patch_filter),
 			'\nremaining: ', sum(patch_filter),
-			'\nmin | max | mean | (step) in patch occupations: %.4f | %.4f | %.4f | (%.4f)'%(highfracs.min(), highfracs.max(), np.mean(highfracs), 1/area),
+			'\nmin | max | mean | (step) in patch occupations: %.4f | %.4f | %.4f | (%.4f)'%(highfracs.min(), highfracs.max(), np.mean(highfracs), 1/100.),
 			)
 
 		filtered_area_ratio = retained_occ_area/occupied_area
@@ -253,6 +244,7 @@ class resampleTools:
 			print('GAMA: no discarded patches')
 			scale_factor = 1.
 		else:
+			print('retained vs. occupied area fraction: %.3f'%filtered_area_ratio)
 			print('SCALE JACKKNIFE ERRORS DOWN BY ~%.3f TO ACCOUNT FOR LOST (EDGE) PATCHES...!!'%scale_factor)
 
 		patch_cuts = patch_cuts[patch_filter]
