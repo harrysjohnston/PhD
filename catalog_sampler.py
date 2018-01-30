@@ -121,8 +121,8 @@ class RealCatalogue:
 			logmstar = self.data[self.headers['logmstar']]+np.log10(self.data['fluxscale'])
 
 		if self.SDSS:
-			colour1 = self.data[self.headers['rf_g-r']]
-			colour = np.where(np.isnan(colour1), self.data['obs_u-r'], colour1)
+			colour = self.data[self.headers['rf_g-r']]
+			#colour = np.where(np.isnan(colour1), self.data['obs_u-r'], colour1)
 			total_bitmasks = np.zeros_like(colour)
 			logmstar = np.ones_like(colour)
 
@@ -179,8 +179,8 @@ class RealCatalogue:
 		# define colour, redshift, bitmask & BCG cuts
 		if colour_ != None:
 			red_cut = np.array((colour > colour_)) # larger (B-V) <-> 'redder' colour
-			if self.SDSS:
-				red_cut = np.where(np.isnan(colour1), False, red_cut) # where no rf_g-r colour, DISCARD obs frame galaxies
+			#if self.SDSS:
+				#red_cut = np.where(np.isnan(colour1), False, red_cut) # where no rf_g-r colour, DISCARD obs frame galaxies
 			blue_cut = ~red_cut
 			print('c cut [unique]: \t', colour_, np.unique(red_cut))
 		else:
@@ -255,7 +255,7 @@ class RealCatalogue:
 		self.Rmags = []
 		for sample in [self.highz_R,self.highz_B,self.lowz_R,self.lowz_B]:
             # save mean diff to pivot magnitude
-			self.Rmags.append(np.mean(sample[ '%s'% ['absmag_r', 'M_r'] [self.SDSS] ] + 22. ))
+			self.Rmags.append(np.mean(sample[ '%s'% ['absmag_r', 'M_r'] [self.SDSS] ] + 21. ))
 		self.zcut = z_cut
 		self.zcut_r = z_cut_r
 		self.redcut = red_cut
@@ -764,9 +764,6 @@ class RealCatalogue:
 			realcorr[:, 3:5] -= randcorr[:, 3:5]
 			np.savetxt(real_out, realcorr)
 
-		#	if 20<i<23:
-		#		os.system('cp %s /share/splinter/hj/PhD/TEST_randsub'%rand_out)
-
 			# clean up - if needing to analyse JKs, comment out below and use arg 'makejk_only'
 			os.system('rm %s'%rand_out) # random wcorr
 			os.system('rm %s_d'%join(JKdir, jk)) # copied density JK sample
@@ -806,7 +803,15 @@ class RealCatalogue:
 		# compute jackknife covariance & pearson-r corrcoeffs
 		Cp,Cx = np.cov(wgp,rowvar=0, aweights=jkweights),np.cov(wgx,rowvar=0, aweights=jkweights)
 
-		Cp,Cx = Cp*((Nobs-1)**2)/Nobs, Cx*((Nobs-1)**2)/Nobs # jackknife normalisation
+		# jackknife normalisation: numpy.cov calculates a bootstrap-style normalisation
+		# according to [N - 1]^-1 (equiv.to.)= [sum(w)-(sum(w**2)/sum(w))]^-1
+		# convert to jackknife-style by *= (N - 1)**2 / N, therefore;
+		Norm_jk_nom = jkweights.sum() - ( (jkweights**2).sum() / jkweights.sum() )
+		Norm_jk_denom = Norm_jk_nom + 1 
+		Norm_jack = Norm_jk_nom**2 / Norm_jk_denom
+		# ===>
+		Cp, Cx = Norm_jack * Cp, Norm_jack * Cx
+
 		Cp, Cx = Cp*(error_scaling**(-2)) , Cx*(error_scaling**(-2)) # jackknife area-scaling for lost (edge) patches
 		Cp_,Cx_ = copy.copy(Cp),copy.copy(Cx)
 		Rp,Rx = self.pearson_r(Cp),self.pearson_r(Cx)
@@ -980,7 +985,7 @@ if __name__ == "__main__":
 	parser.add_argument(
 	'-cCut',
 	type=np.float32,
-	help='red vs. blue colour threshold, rest-frame g-i (>1.0) for KiDSxGAMA, or rf_g-r (>0.63) || obs_u-r (>1.75)  for SDSS Main. Defaults to None',
+	help='red vs. blue colour threshold, rest-frame g-r (>0.66) for KiDSxGAMA, or rf_g-r (>0.66) for SDSS Main. Defaults to None',
 	default=None)
 	parser.add_argument(
 	'-Kneighbour',
@@ -1012,8 +1017,8 @@ if __name__ == "__main__":
 	parser.add_argument(
 	'-rpBins',
 	type=int,
-	help='specify no. of (log-spaced) bins in comoving transverse separation r_p (Mpc/h), for measurement of density-shape correlations. Defaults to 8',
-	default=8)
+	help='specify no. of (log-spaced) bins in comoving transverse separation r_p (Mpc/h), for measurement of density-shape correlations. Defaults to 11',
+	default=11)
 	parser.add_argument(
 	'-rpLims',
 	nargs=2,
@@ -1093,9 +1098,9 @@ if __name__ == "__main__":
 	default=1)
 	parser.add_argument(
 	'-patchSize',
-	help='****fix me - will break if not 3, 4, or 9****\npreferred mean patch size (deg^2) for sample covariance determinations, defaults to 9sqdeg - USE THIS ARG IF DOING CHI2',
+	help='target angular scale [deg] for jackknife patches, default=4',
 	type=np.float32,
-	default=9)
+	default=4)
 	parser.add_argument(
 	'-BCGdens',
 	help='select only BCGs for real density samples (1) or not (0), defaults to 0',
@@ -1130,7 +1135,7 @@ if __name__ == "__main__":
 	'-occ_thresh',
 	help='specify patch-occupation threshold for SDSS survey-edge filtering; float between 0 - 1, default=0.99',
 	type=np.float32,
-	default=0.99)
+	default=0.67)
 	parser.add_argument(
 	'-cubeZdepth',
 	help='specify target redshift increment of jackknife cubes, default=0.06',
@@ -1254,7 +1259,7 @@ if __name__ == "__main__":
 				catalog.highz_R_UnM,catalog.highz_B_UnM,catalog.lowz_R_UnM,catalog.lowz_B_UnM, 
 				catalog.highz,catalog.lowz]
 	
-	cuts = 'z-cut: %s\t colour-cut (g-i): %s'%(args.zCut,args.cCut)
+	cuts = 'z-cut: %s\t colour-cut (g-r): %s'%(args.zCut,args.cCut)
 	outfile_root = join(args.Path,'Wcorr')
 
 	print('CUTTING/SAVING SAMPLES...')
@@ -1321,7 +1326,7 @@ if __name__ == "__main__":
 			skinny_patch_cuts = []
 			for i,sam in enumerate(jkData):
 				# filter empty patches
-				skinny_patch_cut = np.array( [ ( x.shape!=(0,) ) & ( len(x)>=100 ) for x in sam ], dtype=bool )
+				skinny_patch_cut = np.array( [ ( x.shape!=(0,) ) for x in sam ], dtype=bool )
 				skinny_patch_cuts.append(skinny_patch_cut)
 				if (i<4) | (i>=8):
 					popd_sam = sam[ skinny_patch_cut ]
@@ -1375,7 +1380,7 @@ if __name__ == "__main__":
 			skinny_patch_cuts = []
 			for i,sam in enumerate(jkData[:8]):
 
-				skinny_patch_cut = np.array( [ ( x.shape!=(0,) ) & ( len(x)>=100 ) for x in sam ], dtype=bool )
+				skinny_patch_cut = np.array( [ ( x.shape!=(0,) ) for x in sam ], dtype=bool )
 				skinny_patch_cuts.append(skinny_patch_cut)
 				if i<4:
 					popd_sam = sam[ skinny_patch_cut ]
@@ -1440,7 +1445,11 @@ if __name__ == "__main__":
 			r_ccuts = dict(zip(samz_keys[:2], [r_redcut, ~r_redcut]))
 
 		for samz_k in samz_keys:
-			sam_z = samz_dict[samz_k]
+			try:
+				sam_z = samz_dict[samz_k]
+			except KeyError:
+				print('NO KEY: %s - skipping..'%samz_k)
+				continue
 
 			if args.SDSS & ('z1' not in samz_k):
 				r_3cols = randoms_3col[ r_ccuts[samz_k] ]
