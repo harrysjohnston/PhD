@@ -46,7 +46,7 @@ class RealCatalogue:
 			self.SDSS = 0
 		if SDSS:
 			self.headers = dict( zip( SDSSheads, SDSSheads ) )
-			self.DEI = 0
+			self.DEI = DEI = 0
 			self.SDSS = 1
 		if not DEI | SDSS:
 			self.headers = dict( zip( GAMAheads, ['RA_1_1', 'DEC_1_1', 'Z_TONRY', 'e1c', 'e2c', 'RankBCG_1', 'logmstar', 'pgm', 'absmag_g_1', 'absmag_r_1', 'col3'] ) )
@@ -66,7 +66,13 @@ class RealCatalogue:
 		data = hdulist[1].data
 
 		print('SELECTING R_MAG < %s'%mc)
-		data = data[data['%s'%(['absmag_r', 'M_r'][self.SDSS])]<mc]
+		if DEI:
+			fs = data['fluxscale']
+		else:
+			fs = np.ones(len(data))
+		Mr = data[['absmag_r', 'M_r'][self.SDSS]]
+		Mr = np.where(fs >= 1., Mr - 2.5*np.log10(fs), Mr)
+		data = data[Mr < mc]
 
 		print('cutting z < 0.02 randoms cannot extend this near')
 		data = data[ data[self.headers['z']] > 0.02 ]
@@ -255,7 +261,13 @@ class RealCatalogue:
 		self.Rmags = []
 		for sample in [self.highz_R,self.highz_B,self.lowz_R,self.lowz_B]:
             # save mean diff to pivot magnitude
-			self.Rmags.append(np.mean(sample[ '%s'% ['absmag_r', 'M_r'] [self.SDSS] ] + 21. ))
+			if self.DEI:
+				fs = sample['fluxscale']
+			else:
+				fs = np.ones(len(sample))
+			Mr = sample[['absmag_r', 'M_r'][self.SDSS]]
+			Mr = np.where(fs >= 1., Mr - 2.5*np.log10(fs), Mr)
+			self.Rmags.append(np.mean(Mr + 22.))
 		self.zcut = z_cut
 		self.zcut_r = z_cut_r
 		self.redcut = red_cut
@@ -374,7 +386,7 @@ class RealCatalogue:
 		if not isdir(outfile_root):
 			mkdir(outfile_root)
 
-		ascii.write(new_table, join(outfile_root, label + ".asc"), names=['# ra[rad]', 'dec[rad]', 'chi[Mpc/h]', 'e1', 'e2', 'e_weight'], delimiter='\t')
+		ascii.write(new_table, join(outfile_root, label + ".asc"), names=['# ra[rad]', 'dec[rad]', 'chi[Mpc/h]', 'e1', 'e2', 'e_weight'], delimiter='\t', overwrite=1)
 		sample_no = "%s # objects:\t%s"%(label,len(new_table))
 		return sample_no
 
@@ -393,7 +405,7 @@ class RealCatalogue:
 			Z = subsample.T[2]
 		newtable = np.column_stack((RA,DEC,Z))
 
-		ascii.write(newtable, join(self.new_root, 'swot_%s.asc'%label), names=['# ra[deg]', 'dec[deg]', 'z'], delimiter='\t')
+		ascii.write(newtable, join(self.new_root, 'swot_%s.asc'%label), names=['# ra[deg]', 'dec[deg]', 'z'], delimiter='\t', overwrite=1)
 
 		return Z # for random downsampling
 
@@ -407,7 +419,7 @@ class RealCatalogue:
 		if not isdir(sw_pDir):
 			mkdir(sw_pDir)
 
-		ascii.write(newpatch,join(sw_pDir,label+'%spatch.asc'%str(pnum).zfill(3)),names=['# ra[deg]','dec[deg]','z'],delimiter='\t')
+		ascii.write(newpatch,join(sw_pDir,label+'%spatch.asc'%str(pnum).zfill(3)),names=['# ra[deg]','dec[deg]','z'],delimiter='\t', overwrite=1)
 
 	def make_combos(self, densColours):
 		# construct sets of filenames, counts, & IDs for wcorr-calls
@@ -519,16 +531,19 @@ class RealCatalogue:
 			Pproperr2,Xproperr2 = np.ones_like(realErr),np.ones_like(realErr)
 			if JK:
 				try:
-					JKerrs = np.loadtxt(join(files_path,'JKerrs_%s'%new_labels[i]))
 					if largePi:
 						JKerrs = np.loadtxt(join(files_path,'JKerrs_%s_largePi'%new_labels[i]))
+					else:
+						JKerrs = np.loadtxt(join(files_path,'JKerrs_%s'%new_labels[i]))
 				except IOError:
 					print('IOError THROWN for JKerrs_%s.. (largePi=%s)!!'%(new_labels[i],largePi))
 					JKerrs = np.ones_like(np.array([realErr,randErr]).T)
 				Perr2 = JKerrs[:,0]
 				Xerr2 = JKerrs[:,1]
-				Pproperr2 = np.sqrt((Perr2**2) + (randErr**2))
-				Xproperr2 = np.sqrt((Xerr2**2) + (randErr**2)) # propagate errors
+				#Pproperr2 = np.sqrt((Perr2**2) + (randErr**2))
+				#Xproperr2 = np.sqrt((Xerr2**2) + (randErr**2)) # propagate errors
+				Pproperr2 = Perr2.copy()
+				Xproperr2 = Xerr2.copy()
 				Pproperrs2.append(Pproperr2)
 				Xproperrs2.append(Xproperr2)
 
@@ -542,7 +557,7 @@ class RealCatalogue:
 			# save reduced data to ascii for easy plotting
 
 			reducedData = np.column_stack((realData[0][:,0], realData[i][:,3], Pproperr, Pproperr2, realData[i][:,4], Xproperr, Xproperr2, propgErrs)) # = [r_p, wgplus, BTPerr, JKPerr, wgcross, BTXerr, JKXerr, analyticErrs]
-			ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'BT+err', 'JK+err', 'wgx', 'BTxerr', 'JKxerr', 'analyticerrs'])
+			ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'BT+err', 'JK+err', 'wgx', 'BTxerr', 'JKxerr', 'analyticerrs'], overwrite=1)
 
 		return wcorrOutputs
 
@@ -590,7 +605,7 @@ class RealCatalogue:
 		covarSigma = np.array(covarSigma)
 		
 		chi2Stats = np.column_stack((covarList,covarSigma[:,0],covarSigma[:,1],covarSigma[:,2]))
-		ascii.write(chi2Stats, join(path2data,'%schi2'%covartype), delimiter='\t', names=['dataset','chi^2','p-val','x-sigma'])
+		ascii.write(chi2Stats, join(path2data,'%schi2'%covartype), delimiter='\t', names=['dataset','chi^2','p-val','x-sigma'], overwrite=1)
 
 		return None
 
@@ -601,7 +616,7 @@ class RealCatalogue:
 		if not isdir(patchDir):
 			mkdir(patchDir)
 		patchName = join(patchDir,label+'%spatch.asc'%str(p_num).zfill(3))
-		ascii.write(patch, patchName, delimiter='\t', names=['# ra[rad]', 'dec[rad]', 'chi[Mpc/h]', 'e1', 'e2', 'e_weight'])
+		ascii.write(patch, patchName, delimiter='\t', names=['# ra[rad]', 'dec[rad]', 'chi[Mpc/h]', 'e1', 'e2', 'e_weight'], overwrite=1)
 		return patchDir
 
 	def wcorr_patches(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi):
@@ -670,7 +685,7 @@ class RealCatalogue:
 		BTerrs_out = join(patchDir,'..','BTerrs_%s'%label)
 		if largePi:
 			BTerrs_out = join(patchDir,'..','BTerrs_%s_largePi'%label)
-		ascii.write(BTstds, BTerrs_out, delimiter='\t', names=['# w(g+)err', 'w(gx)err'])
+		ascii.write(BTstds, BTerrs_out, delimiter='\t', names=['# w(g+)err', 'w(gx)err'], overwrite=1)
 		cov_combos = [[Cp,'P'],[Cx,'X']]
 
 		toplotDir = join(patchDir,'../to_plot')
@@ -678,15 +693,15 @@ class RealCatalogue:
 			mkdir(toplotDir)
 		if not largePi:
 			corrName = join(toplotDir,'BTcorrcoeff_%s'%label)
-			ascii.write(Rp, corrName, delimiter='\t')
+			ascii.write(Rp, corrName, delimiter='\t', overwrite=1)
 
 			for covs in cov_combos:
 				covName = join(toplotDir,'BTcovar%s_%s'%(covs[1],label))
-				ascii.write(covs[0], covName, delimiter='\t')
+				ascii.write(covs[0], covName, delimiter='\t', overwrite=1)
 		else:
 			for covs in cov_combos:
 				covName = join(toplotDir,'BTcovar%s_%s_largePi'%(covs[1],label))
-				ascii.write(covs[0], covName, delimiter='\t')
+				ascii.write(covs[0], covName, delimiter='\t', overwrite=1)
 
 		# BTanalysis = np.column_stack((Pmeans,Xmeans,Pmeds,Xmeds))
 		# BTanalysis_root = join(toplotDir,'BTanalysis_%s'%label)
@@ -713,7 +728,7 @@ class RealCatalogue:
 			del_one = np.delete(patch_cats,i,axis=0)
 			new_cat = np.concatenate(del_one)
 			cat_name = join(JKdir,'JKsample%s.asc'%(str(i).zfill(3)))
-			ascii.write(new_cat, cat_name, delimiter='\t', names=['# ra[rad]', 'dec[rad]', 'chi[Mpc/h]', 'e1', 'e2', 'e_weight'])
+			ascii.write(new_cat, cat_name, delimiter='\t', names=['# ra[rad]', 'dec[rad]', 'chi[Mpc/h]', 'e1', 'e2', 'e_weight'], overwrite=1)
 			del_one_weights = np.delete(patchWeights, i)
 			jkweights[i] = np.mean(del_one_weights)
 
@@ -826,7 +841,7 @@ class RealCatalogue:
 		if largePi & ('largePi' not in label):
 			label += '_largePi'
 		JKerrs_out = join(patchDir,'..','JKerrs_%s'%label)
-		ascii.write(JKstds, JKerrs_out, delimiter='\t', names=['# w(g+)err','w(gx)err'])
+		ascii.write(JKstds, JKerrs_out, delimiter='\t', names=['# w(g+)err','w(gx)err'], overwrite=1)
 		cov_combos = [[Cp_,'P'],[Cx_,'X']]
 
 		toplotDir = join(patchDir,'../to_plot')
@@ -834,11 +849,11 @@ class RealCatalogue:
 			mkdir(toplotDir)
 		if not largePi:
 			corrName = join(toplotDir,'JKcorrcoeff_%s'%label)
-			ascii.write(Rp, corrName, delimiter='\t')
+			ascii.write(Rp, corrName, delimiter='\t', overwrite=1)
 
 		for covs in cov_combos:
 			covName = join(toplotDir,'JKcovar%s_%s'%(covs[1],label))
-			ascii.write(covs[0], covName, delimiter='\t')
+			ascii.write(covs[0], covName, delimiter='\t', overwrite=1)
 		return None
 
 	def map_test(self, catalogs):
@@ -1294,7 +1309,7 @@ if __name__ == "__main__":
 
 			# jkData.shape = (10 subsamples, N patches/cubes) ----- jkWeights are actually cube weights until passed through jackknife_patches (delete-one) function !!
 			# random_cutter = N_patch array of functions, each to be applied to (ra, dec, z) of randoms
-			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=0, bitmaskCut=args.bitmaskCut, occ_thresh=args.occ_thresh)
+			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=0, bitmaskCut=args.bitmaskCut, occ_thresh=args.occ_thresh)
 			print('jkData: ', jkData.shape)
 			print('jkWeights: ', jkWeights.shape, '\n', jkWeights)
 			print('=======================\t=======================\terror_scaling: ', error_scaling)
@@ -1374,7 +1389,7 @@ if __name__ == "__main__":
 					catalog.jackknife(pDir, jksample_weights, error_scaling, 0)
 
 		if args.largePi:
-			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut)
+			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut)
 			Njkregions = len(jkData[0])
 
 			skinny_patch_cuts = []
