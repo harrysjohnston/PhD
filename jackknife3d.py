@@ -9,8 +9,8 @@ def betwixt((re1,re2,de1,de2,ze1,ze2)):
 		return (ra>=re1)&(ra<=re2)&(dec>=de1)&(dec<=de2)&(z>=ze1)&(z<=ze2)
 	return make_cut
 
-def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_zdepth=0.06, largePi=0, bitmaskCut=None, occ_thresh=0.5, mask_path='/share/splinter/hj/PhD/pixel_weights.fits'):
-	resampler = resampleTools(fitsdata, patchside, do_sdss, do_3d, sample_cuts, cube_zdepth=cube_zdepth, largePi=largePi)
+def resample_data(fitsdata, sample_cuts, patchside=6, zcut=0.26, do_sdss=0, do_3d=1, cube_zdepth=0.06, largePi=0, bitmaskCut=None, occ_thresh=0.5, mask_path='/share/splinter/hj/PhD/pixel_weights.fits'):
+	resampler = resampleTools(fitsdata, patchside, zcut, do_sdss, do_3d, sample_cuts, cube_zdepth=cube_zdepth, largePi=largePi)
 
 	# identify masked pixel coordinates
 	# lostpix_coords = resampler.find_lostpixels(bitmaskCut)
@@ -73,10 +73,11 @@ def resample_data(fitsdata, sample_cuts, patchside=6, do_sdss=0, do_3d=1, cube_z
 	return cubeData, cube_weights, error_scaling, random_cutter
 
 class resampleTools:
-	def __init__(self, fitsdata, patchside, do_sdss, do_3d, sample_cuts, cube_zdepth=0.06, largePi=0):
+	def __init__(self, fitsdata, patchside, zcut, do_sdss, do_3d, sample_cuts, cube_zdepth=0.06, largePi=0):
 		self.cols = [ ['RA_GAMA', 'DEC_GAMA', 'Z_TONRY'], ['ra', 'dec', 'z'] ] [do_sdss]
 		self.ranges = [ [ (i, j, -3., 3., 0., 0.6) for i,j in [ (129.,141.), (174.,186.), (211.5,223.5) ] ], None ] [do_sdss]
 		self.data = fitsdata
+		self.zcut = zcut
 		self.do_sdss = do_sdss
 		self.do_3d = do_3d
 		self.ra_side = self.dec_side = patchside
@@ -160,17 +161,21 @@ class resampleTools:
 			redg = []
 			dec_num = 6.//self.dec_side +1
 			dedg = np.linspace(-3., 3., dec_num)
-			zedg = list(np.linspace(0., 0.6, z_num))
+			zedg = np.linspace(0., 0.6, z_num)
+			if self.zcut != None:
+				z_push = self.zcut - min(zedg, key=lambda x:abs(x - self.zcut))
+				zedg = [zz for zz in (zedg + z_push) if (zz > 0.02) & (zz < 0.6)]
 			for edges in self.ranges:
 				ra_num = (edges[1] - edges[0])//self.ra_side + 1
 				redg += list(np.linspace(edges[0], edges[1], ra_num))
-		
+
 		redg,dedg,zedg = map(lambda x: np.array(x), [redg,dedg,zedg])
 		if self.do_sdss:
 			print('SDSS: forcing cube z-edges to 0., 0.125, 0.25')
 			zedg = np.linspace(0., 0.5, 5)
 		radiff, decdiff, zdiff = (np.diff(i) for i in [redg,dedg,zedg])
 		print('ra | dec | z sides: %.2f | %.2f | %.3f'%(radiff.min(),decdiff.min(),zdiff.min()))
+		self.ra_side, self.dec_side = radiff.min(), decdiff.min()
 
 		# identify populated patches
 		print('patching sky..')
@@ -208,22 +213,25 @@ class resampleTools:
 	def filter_patches(self, patches, patch_cuts, patch_weights, patch_idx, edges, occupn_threshold=0.5):
 		print('filtering survey-edges..')
 		pwei = np.empty(len(patches))
-		occupied_area = 0
-		retained_occ_area = 0
+		parea = np.empty(len(patches))
+		survey_area = 0
+		jackknife_area = 0
+		Area = lambda a1,a2,d1,d2: (a2-a1)*(np.sin(d2)-np.sin(d1))
 
 		for i, patch in enumerate(patches):
 			# subdivide each patch for occupations
 			coords = np.column_stack((patch[self.cols[0]], patch[self.cols[1]], patch[self.cols[2]]))
 			r,d = patch_idx[i] # indices patch-edges
 			patch_edges = (edges[0][r], edges[0][r+1], edges[1][d], edges[1][d+1])
+			patch_edges_rad = [np.deg2rad(pe) for pe in patch_edges]
 			fine_bins = (np.linspace(patch_edges[0], patch_edges[1], 11), np.linspace(patch_edges[2], patch_edges[3], 11))
 			fine_hist2d = np.histogramdd(coords[:,:2], bins=fine_bins)
 
-			pweight = np.sum(fine_hist2d[0]!=0) / 100.
-			pwei[i] = pweight#**2
-			occupied_area += pweight
-			if pweight >= occupn_threshold:
-				retained_occ_area += occupied_area
+			pwei[i] = np.sum(fine_hist2d[0]!=0) / 100.
+			parea[i] = Area(*patch_edges_rad) * (180./np.pi)**2
+			survey_area += pwei[i] * parea[i]
+			if pwei[i] >= occupn_threshold:
+				jackknife_area += survey_area
 
 		if self.do_sdss:
 			patch_filter = pwei >= occupn_threshold
@@ -238,20 +246,20 @@ class resampleTools:
 			'\nmin | max | mean | (step) in patch occupations: %.4f | %.4f | %.4f | (%.4f)'%(highfracs.min(), highfracs.max(), np.mean(highfracs), 1/100.),
 			)
 
-		filtered_area_ratio = retained_occ_area/occupied_area
-		scale_factor = filtered_area_ratio**-0.5
+		area_scaling = jackknife_area/survey_area
+		scale_factor = area_scaling**-0.5
 		if not self.do_sdss:
 			print('GAMA: no discarded patches')
 			scale_factor = 1.
 		else:
-			print('retained vs. occupied area fraction: %.3f'%filtered_area_ratio)
+			print('retained vs. occupied area fraction: %.3f'%area_scaling)
 			print('SCALE JACKKNIFE ERRORS DOWN BY ~%.3f TO ACCOUNT FOR LOST (EDGE) PATCHES...!!'%scale_factor)
 
 		patch_cuts = patch_cuts[patch_filter]
 		patch_weights = patch_weights[patch_filter]
 		if self.do_sdss:
-			patch_weights = pwei[patch_filter]
-			print('SDSS patch weights from occupations:\n', patch_weights)
+			patch_weights = pwei[patch_filter] * parea[patch_filter] / (self.ra_side * self.dec_side)
+			print('SDSS patch weights from area * occupation:\n', patch_weights)
 		return np.array(patch_cuts, dtype=bool), patch_weights, scale_factor
 
 	def make_sample_patchcuts(self, patch_cuts, sample_cut):
@@ -303,31 +311,5 @@ class resampleTools:
 		random_cutter = np.array(random_cutter)
 
 		return random_cutter
-
-# sdss = 0
-
-# cat = fits.open( ['./DEI_GAMAv20.fits', './RMandelbaum_catalogs/lss.14full0.rfgr.removegals.fits'] [sdss] )[1].data
-# cols = [ ['RA_GAMA', 'DEC_GAMA', 'Z_TONRY'], ['ra', 'dec', 'z'] ] [sdss]
-# ra,dec,z = (cat['%s'%i] for i in cols)
-# coords = np.column_stack((ra,dec,z))
-
-# ranges = [ [ (i, j, -3., 3., 0., 0.6) for i,j in [ (129.,141.), (174.,186.), (211.5,223.5) ] ], None ] [sdss]
-# cubes, cube_idx, bins = define_cubes(coords, 3., 3., 0.06, ranges=ranges) # if making cubes smaller, then lower lilbin_division(integer) also - cube filter very sensitive to this!
-# cubes = filter_cubes(cubes, cube_idx, bins, cols=cols, lilbin_division=4, occupn_threshold=0.9)
-
-# cols2 = [ ['RA_GAMA', 'DEC_GAMA', 'Z_TONRY', 'absmag_g_1', 'absmag_i_1'], ['ra', 'dec', 'z', 'rf_g-r'] ] [sdss]
-# out_cat = np.zeros([2, len(cols2)+1])
-
-# for c, cube in enumerate(cubes):
-# 	cube_cols = np.column_stack((cube['%s'%i] for i in cols2))
-# 	cube_cols = np.column_stack((cube_cols, [c]*len(cube)))
-# 	out_cat = np.append(out_cat, cube_cols, axis=0)
-
-# cols2 = [ ['# RA_GAMA', 'DEC_GAMA', 'Z_TONRY', 'absmag_g_1', 'absmag_i_1'], ['# ra', 'dec', 'z', 'rf_g-r'] ] [sdss]
-# out_cat = out_cat[2:]
-# ascii.write(out_cat, './3DJK_TEST.asc', names=cols2+['cube id'], delimiter='\t')
-
-
-
 
 
