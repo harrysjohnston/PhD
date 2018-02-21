@@ -14,7 +14,7 @@ def read_ncats(*paths):
 		print(path)
 		cat = np.loadtxt(path)
 		catalog_array.append(cat)
-	print('SDSS ?')
+	#print('SDSS ?')
 
 	return dict(zip(paths, np.array(catalog_array)))
 
