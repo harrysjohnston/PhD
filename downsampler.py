@@ -146,7 +146,7 @@ def unit_check(cat, give_back='degrees', tag=''):
 		current = 'degrees'
 	if current != give_back:
 		cat_ = cat.copy()
-		print('converting %s from %s to %s..'%(tag, current, give_back))
+		#print('converting %s from %s to %s..'%(tag, current, give_back))
 		if current == 'radians':
 			cat_.T[:2] *= (180/np.pi)
 		else:
@@ -156,7 +156,7 @@ def unit_check(cat, give_back='degrees', tag=''):
 		return cat
 
 def downsample(randoms, sample_z, nbin=12, target_nz=11):
-        # downsample artificial randoms to match mocks' N(z)
+	# downsample artificial randoms to match mocks' N(z)
 	if all(sample_z < 1.):
 		print('reals in REDSHIFT..')
 		assert all(randoms.T[2] < 1.), 'RANDOMS vs. REALS z/chi mismatched! Patches in REDSHIFT'
@@ -166,28 +166,28 @@ def downsample(randoms, sample_z, nbin=12, target_nz=11):
 		assert (not all(randoms.T[2] < 1.)), 'RANDOMS vs. REALS z/chi mismatched! Patches in COMOVING'
 		hist_range = (0., 1580)
 	hist_range = (sample_z.min(), sample_z.max())
-        real_nz = np.histogram(sample_z, bins=nbin, range=hist_range)[0]
-        real_Nz = real_nz/len(sample_z)
+	real_nz = np.histogram(sample_z, bins=nbin, range=hist_range)[0]
+	real_Nz = real_nz/len(sample_z)
 	print('real z.shape: ', sample_z.shape, '\nreal n(z): ', real_nz)
 
 	# trim edges of z-distn
-        random_z = randoms[:,2]
+	random_z = randoms[:,2]
 	zmin, zmax = sample_z.min(), sample_z.max() 
-	print('sample z minmax: %s, %s'%(sample_z.min(), sample_z.max()))
-	print('random z minmax: %s, %s'%(random_z.min(), random_z.max()))
 	ztrim = (random_z >= zmin) & (random_z <= zmax)
 	print('trimming random-z edges to reals..')
 	new_randoms, random_z = randoms[ztrim], random_z[ztrim]
+	print('sample z minmax: %s, %s'%(sample_z.min(), sample_z.max()))
+	print('random z minmax: %s, %s'%(random_z.min(), random_z.max()))
 
-        rand_num = np.random.random(size=len(random_z))
-        rand_nz = np.histogram(random_z, bins=nbin, range=hist_range)
-        zbins = rand_nz[1]
-        rand_nz = rand_nz[0]
-	print('rand z.shape: ', random_z.shape, '\nrand n(z): ', rand_nz)
-        reduce_factor = target_nz*(real_nz/rand_nz)
+	rand_num = np.random.random(size=len(random_z))
+	rand_nz = np.histogram(random_z, bins=nbin, range=hist_range)
+	zbins = rand_nz[1]
+	rand_nz = rand_nz[0]
+	#print('rand z.shape: ', random_z.shape, '\nrand n(z): ', rand_nz)
+	reduce_factor = target_nz*(real_nz/rand_nz)
 	reduce_factor = np.nan_to_num(reduce_factor)
 
-        print('downsampling random points...')
+	print('downsampling random points...')
 	nztune = np.zeros_like(random_z, dtype=bool)
 	for i in range(len(rand_nz)):
 		bincut = (zbins[i] < random_z) & (random_z <= zbins[i+1])
@@ -198,7 +198,7 @@ def downsample(randoms, sample_z, nbin=12, target_nz=11):
 			print('random-z bin %s / %s dN/dz too low..!'%(i, len(reduce_factor)))
 			nzbincut = bincut
 		nztune = np.where(nzbincut, True, nztune)
-	
+
 	new_randoms = new_randoms[nztune]
 	new_rand_z = new_randoms[:,2]
 	rand_Nz = np.histogram(new_rand_z, bins=nbin, range=hist_range)[0]/len(new_rand_z)

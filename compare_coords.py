@@ -51,6 +51,7 @@ def plot3dhist(sdss=0, legend=1, binning=100, **cats):
 	    ax[1].legend(handles=h, loc='upper center', fontsize=8, ncol=len(keys)//2)
 	else:
 	    ax[1].legend(handles=h, loc='lower center', fontsize=8, ncol=len(keys)//2)
+	return ax
 	
     
 def plot3dims(sdss=0, legend=1, **cats):
@@ -78,7 +79,7 @@ def plot3dims(sdss=0, legend=1, **cats):
 
     for i, x in enumerate([(0, 1), (1, 2), (2, 0)]):
 	for j, k in enumerate(keys):
-		ax[i].plot(cats[k].T[x[0]], cats[k].T[x[1]], c=cmap[j], marker='.', markeredgecolor=cmap[j], ms=2, alpha=0.3, ls='')
+		ax[i].plot(cats[k].T[x[0]], cats[k].T[x[1]], c=cmap[j], marker='.', ms=2, alpha=0.3, ls='')#, markeredgecolor=cmap[j])
         
 	ax[i].set_xlabel(('ra','dec','$\chi$')[x[0]])
         ax[i].set_ylabel(('ra','dec','$\chi$')[x[1]])
@@ -90,4 +91,6 @@ def plot3dims(sdss=0, legend=1, **cats):
 	    ax[0].legend(handles=h, loc='lower right', fontsize=8, ncol=len(keys)//2)
 	else:
 	    ax[0].legend(handles=h, loc='lower left', fontsize=8, ncol=len(keys)//2)
+	return ax
+
     

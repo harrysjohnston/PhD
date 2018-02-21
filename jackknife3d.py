@@ -164,7 +164,7 @@ class resampleTools:
 			zedg = np.linspace(0., 0.6, z_num)
 			if self.zcut != None:
 				z_push = self.zcut - min(zedg, key=lambda x:abs(x - self.zcut))
-				zedg = [zz for zz in (zedg + z_push) if (zz > 0.02) & (zz < 0.6)]
+				zedg = [zz for zz in (zedg + z_push) if (zz > 0.) & (zz < 0.6)]
 			for edges in self.ranges:
 				ra_num = (edges[1] - edges[0])//self.ra_side + 1
 				redg += list(np.linspace(edges[0], edges[1], ra_num))

@@ -427,16 +427,14 @@ class RealCatalogue:
 		wcorr_ind = [[8,8,9,9], [4,5,6,7]][densColours]
 
 		self.wcorr_combos = [
-		[self.labels[wcorr_ind[0]]+'.asc', self.samplecounts[wcorr_ind[0]], self.labels[0]+'.asc', self.samplecounts[0], catalog.wcorrLabels[0]],
-		[self.labels[wcorr_ind[1]]+'.asc', self.samplecounts[wcorr_ind[1]], self.labels[1]+'.asc', self.samplecounts[1], catalog.wcorrLabels[1]],
-		[self.labels[wcorr_ind[2]]+'.asc', self.samplecounts[wcorr_ind[2]], self.labels[2]+'.asc', self.samplecounts[2], catalog.wcorrLabels[2]],
-		[self.labels[wcorr_ind[3]]+'.asc', self.samplecounts[wcorr_ind[3]], self.labels[3]+'.asc', self.samplecounts[3], catalog.wcorrLabels[3]]
+		[self.labels[wcorr_ind[0]]+'.asc', self.samplecounts[wcorr_ind[0]], self.labels[0]+'.asc', self.samplecounts[0], self.wcorrLabels[0]],
+		[self.labels[wcorr_ind[1]]+'.asc', self.samplecounts[wcorr_ind[1]], self.labels[1]+'.asc', self.samplecounts[1], self.wcorrLabels[1]],
+		[self.labels[wcorr_ind[2]]+'.asc', self.samplecounts[wcorr_ind[2]], self.labels[2]+'.asc', self.samplecounts[2], self.wcorrLabels[2]],
+		[self.labels[wcorr_ind[3]]+'.asc', self.samplecounts[wcorr_ind[3]], self.labels[3]+'.asc', self.samplecounts[3], self.wcorrLabels[3]]
 		]
 		print('CHECK THIS wcorr call combinations:\n',self.wcorr_combos)
 		self.samplecounts = self.samplecounts[:10]
 		[print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
-		# print('total shapes: \t%s'%np.sum(self.samplecounts[:4]))
-		# print('total density: \t%s'%np.sum(self.samplecounts[4:]))
 
 	def prep_wcorr(self, files_path, wcorr_combos, rp_bins, rp_lims, los_bins, los_lim, nproc, large_pi, out_sh):
 		shell_script = [
@@ -557,7 +555,7 @@ class RealCatalogue:
 			# save reduced data to ascii for easy plotting
 
 			reducedData = np.column_stack((realData[0][:,0], realData[i][:,3], Pproperr, Pproperr2, realData[i][:,4], Xproperr, Xproperr2, propgErrs)) # = [r_p, wgplus, BTPerr, JKPerr, wgcross, BTXerr, JKXerr, analyticErrs]
-			ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'BT+err', 'JK+err', 'wgx', 'BTxerr', 'JKxerr', 'analyticerrs'], overwrite=1)
+			ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'BT+err', 'JK+err', 'wgx', 'BTxerr', 'JKxerr', 'analyticerrs'])
 
 		return wcorrOutputs
 
@@ -703,22 +701,13 @@ class RealCatalogue:
 				covName = join(toplotDir,'BTcovar%s_%s_largePi'%(covs[1],label))
 				ascii.write(covs[0], covName, delimiter='\t', overwrite=1)
 
-		# BTanalysis = np.column_stack((Pmeans,Xmeans,Pmeds,Xmeds))
-		# BTanalysis_root = join(toplotDir,'BTanalysis_%s'%label)
-		# ascii.write(BTanalysis,BTanalysis_root,delimiter='\t',
-		# 	names=['#wg+_pmean_rp%s'%i for i in range(Pmeans.shape[-1])]+['#wgx_pmean_rp%s'%i for i in range(Xmeans.shape[-1])]+['#wg+_pmed_rp%s'%i for i in range(Pmeds.shape[-1])]+['#wgx_pmed_rp%s'%i for i in range(Xmeds.shape[-1])])
-		# del BTanalysis
-		# gc.collect()
 		return None
 
 	def jackknife_patches(self, patchDir, patchWeights):
 		# resample patches & save JK samples
 		patches = [x for x in listdir(patchDir) if ('patch' in x)&('_' in x)]
 		patch_cats = np.array([np.loadtxt(join(patchDir,i)) for i in patches])
-		#patch_cut = np.array([(i.shape!=(0,))&(len(i.shape)!=1)&(len(i)>=100) for i in patch_cats])
 
-		#patch_cats = patch_cats[patch_cut]
-		#jkweights = patchWeights[patch_cut]
 		jkweights = patchWeights.copy()
 
 		JKdir = join(patchDir,'JKsamples')
@@ -886,66 +875,6 @@ class RandomCatalogue(RealCatalogue):
 		self.labels = [['rand_highZ','rand_lowZ'],['rand_highZ_Red','rand_highZ_Blue','rand_lowZ_Red','rand_lowZ_Blue']][densColours]
 		self.samples = []
 		self.samplecounts = []
-
-#	def cut_data(self, d_sample_Zs):
-#		"""""
-#		cut catalogue into redshift subsamples
-#
-#		"""""
-#		if not self.sdss:
-#			assert 'RA' in self.columns, "'RA' not in columns, see column headers: "+ str(self.columns)
-#			assert 'DEC' in self.columns, "'DEC' not in columns, see column headers: "+ str(self.columns)
-#			assert 'Z' in self.columns, "'Z' not in columns, see column headers: "+ str(self.columns)
-#			assert 'RAND_NUM' in self.columns, "'RAND_NUM' not in columns, see column headers: "+ str(self.columns)
-#
-#		# compute shapes' n(z) & target for rands
-#		nbin = 12
-#		print('# z-bins for RANDOM downsampling = %s'%nbin)
-#		sh_zhist = np.histogram(d_sample_Zs,bins=nbin,range=(0.,0.6))
-#		sh_nz = sh_zhist[0]
-#		sh_Nz = sh_nz/len(d_sample_Zs)
-#
-#		# compute rand n(z) & downsample each bin
-#		rnd_z = self.data[self.headers['z']]
-#		rnd_zhist = np.histogram(rnd_z,bins=nbin,range=(0.,0.6))
-#		zbins = rnd_zhist[1]
-#		rnd_nz = rnd_zhist[0]
-#		f_redc = np.nan_to_num(11*(sh_nz/rnd_nz))
-#
-#		nztune = np.zeros_like(rnd_z,dtype=bool)
-#		if 'RAND_NUM' not in self.headers:
-#			rand_num = np.random.random(len(rnd_z))
-#		else:
-#			rand_num = self.data['RAND_NUM']
-#		for i,nzbin in enumerate(rnd_nz):
-#			bincut = (zbins[i]<rnd_z)&(rnd_z<=zbins[i+1])
-#			nzcut = (f_redc[i]<rand_num)&(rand_num<=f_redc[i]*2)
-#			nzbincut = bincut&nzcut
-#			nztune = np.where(nzbincut,True,nztune)
-#
-#		# apply downsampling
-#		if self.sdss:
-#			new_dat = self.data.T[nztune]
-#		else:
-#			new_dat = self.data[nztune]
-#
-#		if self.sdss:
-#			newz = new_dat.T[self.headers['z']]
-#		else:
-#			newz = new_dat[self.headers['z']]
-#
-#		# trim edges of z-distn
-#		zmin, zmax = d_sample_Zs.min(), d_sample_Zs.max()
-#		ztrim = (newz >= zmin) & (newz <= zmax)
-#		new_dat, newz = new_dat[ztrim], newz[ztrim]
-#
-#		print('downsampled randoms shape: ', new_dat.shape)
-#		new_nz = np.histogram(newz,bins=nbin,range=(0.,0.6))[0]
-#		new_Nz = new_nz/len(newz)
-#		print('real/random N(z) (should be ~1): ',sh_Nz/new_Nz)
-#
-#		self.samples.append(new_dat)
-#		self.samplecounts.append(len(new_dat))
 
 	def cut_columns(self, table, h): 
 		"""""
@@ -1281,12 +1210,13 @@ if __name__ == "__main__":
 	sample_zs = []
 	swot_z = []
 	for i, sample in enumerate(samples):
-		if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
 		if args.flipe2: print('FLIPPING e2...!')
 		if i<4: shapes=1
 		else: shapes=0
 		new_table,sample_z = catalog.cut_columns(sample, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes)
 		sample_zs.append(sample_z)
+		if (args.zCut==None) & ('lowZ' in catalog.labels[i]):
+			continue
 		sample_num = catalog.save_tables(new_table, outfile_root, catalog.labels[i], args.zCut, args.cCut, args.notes)
 		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'),sample_z)
 		if i>3:
@@ -1368,7 +1298,8 @@ if __name__ == "__main__":
 			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=1, jk_randoms=1, patch_str='patch', paths='all', largePi=0, sdss=args.SDSS)
 			gc.collect()
 			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=0, save_jks=1, jk_randoms=1, patch_str='patch', paths='swot-all', largePi=0, sdss=args.SDSS)
-			
+
+			jknumbers, jkn_header = [], []
 			for i, lab in enumerate(catalog.labels[:4]):
 				pDir = join(catalog.new_root,lab)
 				if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
@@ -1381,12 +1312,16 @@ if __name__ == "__main__":
 					jkWeights_pop = jkWeights[ skinny_patch_cuts[i] ]
 					print('===================\t %s reduced jkWeights: '%lab, jkWeights_pop.shape)
 					jksample_weights = catalog.jackknife_patches(pDir, jkWeights_pop)
+					np.savetxt(join(catalog.new_root, 'jkWeights_%s.txt'%lab), jksample_weights, header='%s\n%i samples'%(lab, len(jksample_weights)))
+					jknumbers.append(len(jksample_weights))
+					jkn_header.append('%s\t'%lab)
 					if args.makejk_only:
 						print('====================\t====================\t SKIPPING JACKKNIFE CORRELATIONS ====================\t====================\t')
 					else:
 						catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
 					#catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
 					catalog.jackknife(pDir, jksample_weights, error_scaling, 0)
+			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers.txt'), np.array(jknumbers), header=jkn_header)
 
 		if args.largePi:
 			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut)
@@ -1415,6 +1350,7 @@ if __name__ == "__main__":
 			# no swot-files for largePi - can't set lower Pi-limit
 			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=1, sdss=args.SDSS)
 
+			jknumbers, jkn_header = [], []
 			for i, lab in enumerate(catalog.labels[:4]):
 				pDir = join(catalog.new_root,lab+'_largePi')
 				if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
@@ -1423,8 +1359,12 @@ if __name__ == "__main__":
 					jkWeights_pop = jkWeights[ skinny_patch_cuts[i] ]
 					print('===================\treduced jkWeights: ', jkWeights_pop.shape)
 					jksample_weights = catalog.jackknife_patches(pDir, jkWeights_pop)
+					np.savetxt(join(catalog.new_root, 'jkWeights_%s_largePi.txt'%lab), jksample_weights, header='%s largePi\n%i samples'%(lab, len(jksample_weights)))
+					jknumbers.append(len(jksample_weights))
+					jkn_header.append('%s\t'%lab)
 					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
 					catalog.jackknife(pDir, jksample_weights, error_scaling, 1)
+			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers_largePi.txt'), np.array(jknumbers), header=jkn_header+'\nlargePi')
 
 	catalog.make_combos(args.densColours)
 
@@ -1436,17 +1376,15 @@ if __name__ == "__main__":
 		adjusted_combos = np.array(catalog.wcorr_combos)[np.array([0,2])]
 	elif (args.zCut!=None)&(args.cCut!=None):
 		adjusted_combos = catalog.wcorr_combos
-	print('CHECK THIS z/colour cut-adjusted combos:\n',adjusted_combos)
+	print('CHECK THIS z/colour cut-adjusted combos:\n')
+	for ac in adjusted_combos:
+		print(ac)
 
 	catalog.prep_wcorr(catalog.new_root,adjusted_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
 
 	if args.wcorr:
 		print('QSUBBING REAL_WCORR..')
-		list_dir = np.array(listdir(catalog.new_root))
-		shells = np.array([i.endswith('.sh') for i in list_dir])
-		r_shells = np.array([i.startswith('real') for i in list_dir])
-		list_dir = list_dir[(shells&r_shells)]
-		[os.system('qsub '+ join(catalog.new_root, shell)) for shell in list_dir]
+		os.system('qsub '+ join(catalog.new_root, 'real_wcorr.sh'))
 
 	if args.Random != None:
 		catalog2 = RandomCatalogue(args.Random, args.densColours, args.SDSS)
@@ -1503,7 +1441,9 @@ if __name__ == "__main__":
 			rand_combos = np.array(rand_combos)[np.array([0,2])]
 		elif (args.zCut==None)&(args.cCut!=None):
 			rand_combos = rand_combos[:2]
-		print('CHECK THIS rand combos:\n',rand_combos)
+		print('CHECK THIS rand combos:\n')
+		for rc in rand_combos:
+			print(rc)
 
 		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'rand_wcorr')
 
@@ -1516,24 +1456,24 @@ if __name__ == "__main__":
 
 		if args.wcorr:
 			print('QSUBBING RANDOM_WCORR..')
-			list_dir = np.array(listdir(catalog.new_root))
-			shells = np.array([i.endswith('.sh') for i in list_dir])
-			r_shells = np.array([i.startswith('rand') for i in list_dir])
-			list_dir = list_dir[(shells&r_shells)]
-			[os.system('qsub '+ join(catalog.new_root, shell)) for shell in list_dir]
+			os.system('qsub '+ join(catalog.new_root, 'rand_wcorr.sh'))
 
+	import datetime
+	now = datetime.datetime.now()
 	print('FINISHED!')
 	with open(join(catalog.new_root,'C-lineArgs_SampleProps.txt'),'a') as script:
-		script.write(str(args))
 		script.write('\n')
-		[script.write('%s: \t%d, mean R_mag: %.4f\n'%(catalog.labels[i],catalog.samplecounts[i],catalog.Rmags[i])) for i in range(len(catalog.labels[:4]))]
+		script.write('\n')
+		script.write(now.strftime("%Y-%m-%d %H:%M"))
+		script.write('\n')
+		for argk in np.sort(vars(args).keys()):
+			script.write("\n%s = %s"%(argk, vars(args)[argk]))
+		script.write('\n')
+		[script.write('%s: \t%d, mean(R_mag - 22.): %.4f\n'%(catalog.labels[i],catalog.samplecounts[i],catalog.Rmags[i])) for i in range(len(catalog.labels[:4]))]
 		[script.write('%s: \t%d\n'%(catalog.labels[i+4],catalog.samplecounts[i+4])) for i in range(len(catalog.labels[4:]))]
 		[script.write('%s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
-#	os.system('cp %s %s'%( join(catalog.new_root, 'C-lineArgs_SampleProps.txt'), join(catalog.new_root, 'to_plot/') ) )
-	#np.savetxt(join(catalog.new_root,'Rmags.txt'),catalog.Rmags,header='mean absmag_r; hzr,hzb,lzr,lzb')
 	np.savetxt(join(catalog.new_root, 'R-band_pivot_deltas.txt'), np.array(catalog.Rmags), header='mean differences between sample & pivot R-band abs mag\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t')
-	np.savetxt(join(catalog.new_root, 'SamplePopulations.txt'), np.column_stack((np.array(catalog.samplecounts[:4]), np.array(catalog.samplecounts[4:8]))), header='populations of shapes (density) samples\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t')
-#	os.system('cp %s %s'%( join(catalog.new_root, 'Rmags.txt'), join(catalog.new_root, 'to_plot/') ) )
+	np.savetxt(join(catalog.new_root, 'SamplePopulations.txt'), np.column_stack((np.array(catalog.samplecounts[:4]), np.array(catalog.samplecounts[4:8]))), header='populations of\nshapes\t\tdensity samples\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t')
 
 
 
