@@ -76,11 +76,11 @@ def save_reals(reals, path, zrange=None, rad=0):
 	if fpath|zrang|radfac:
 		try:
 			print('saving reals.asc..')
-			ascii.write(reals, asc_out, names=colnames, delimiter='\t')
+			ascii.write(reals, asc_out, names=colnames, delimiter='\t', overwrite=1)
 		except ValueError:
 			print('..with weights..')
 			colnames += ['weights']
-			ascii.write(reals, asc_out, names=colnames, delimiter='\t')	
+			ascii.write(reals, asc_out, names=colnames, delimiter='\t', overwrite=1)
 	else:
 		print('nothing changed, not re-saving reals')
 
@@ -105,10 +105,10 @@ def save_newrandoms(new_randoms, path, zrange=None, outfile=None, rad=0):
 		new_randoms.T[:2] = new_randoms.T[:2] * (np.pi/180)
 	print('saving randoms...')
 	try:
-        	ascii.write(new_randoms,rand_out,delimiter='\t',names=['# RA','DEC','z','weight'])
+        	ascii.write(new_randoms,rand_out,delimiter='\t',names=['# RA','DEC','z','weight'], overwrite=1)
 	except ValueError:
 		new_randoms = np.column_stack((new_randoms, np.ones_like(new_randoms.T[0])))
-        	ascii.write(new_randoms,rand_out,delimiter='\t',names=['# RA','DEC','z','weight'])
+        	ascii.write(new_randoms,rand_out,delimiter='\t',names=['# RA','DEC','z','weight'], overwrite=1)
 
 def find_limits(reals):
 	ramin, decmin, zmin = (reals.T[i].min() for i in range(3))
@@ -158,17 +158,9 @@ def unit_check(cat, give_back='degrees', tag=''):
 def downsample(randoms, sample_z, nbin=12, target_nz=11):
 	# downsample artificial randoms to match mocks' N(z)
 	if all(sample_z < 1.):
-		print('reals in REDSHIFT..')
 		assert all(randoms.T[2] < 1.), 'RANDOMS vs. REALS z/chi mismatched! Patches in REDSHIFT'
-		hist_range = (0., 0.6)
 	else:
-		print('reals in COMOVING DIST..')
 		assert (not all(randoms.T[2] < 1.)), 'RANDOMS vs. REALS z/chi mismatched! Patches in COMOVING'
-		hist_range = (0., 1580)
-	hist_range = (sample_z.min(), sample_z.max())
-	real_nz = np.histogram(sample_z, bins=nbin, range=hist_range)[0]
-	real_Nz = real_nz/len(sample_z)
-	print('real z.shape: ', sample_z.shape, '\nreal n(z): ', real_nz)
 
 	# trim edges of z-distn
 	random_z = randoms[:,2]
@@ -179,16 +171,14 @@ def downsample(randoms, sample_z, nbin=12, target_nz=11):
 	print('sample z minmax: %s, %s'%(sample_z.min(), sample_z.max()))
 	print('random z minmax: %s, %s'%(random_z.min(), random_z.max()))
 
-	rand_num = np.random.random(size=len(random_z))
-	rand_nz = np.histogram(random_z, bins=nbin, range=hist_range)
-	zbins = rand_nz[1]
-	rand_nz = rand_nz[0]
-	#print('rand z.shape: ', random_z.shape, '\nrand n(z): ', rand_nz)
+	rand_nz, zbins = np.histogram(random_z, bins=nbin)
+	real_nz = np.histogram(sample_z, bins=zbins)[0]
 	reduce_factor = target_nz*(real_nz/rand_nz)
 	reduce_factor = np.nan_to_num(reduce_factor)
 
 	print('downsampling random points...')
 	nztune = np.zeros_like(random_z, dtype=bool)
+	rand_num = np.random.random(size=len(random_z))
 	for i in range(len(rand_nz)):
 		bincut = (zbins[i] < random_z) & (random_z <= zbins[i+1])
 		if (reduce_factor[i] <= 0.95):
@@ -201,13 +191,9 @@ def downsample(randoms, sample_z, nbin=12, target_nz=11):
 
 	new_randoms = new_randoms[nztune]
 	new_rand_z = new_randoms[:,2]
-	rand_Nz = np.histogram(new_rand_z, bins=nbin, range=hist_range)[0]/len(new_rand_z)
+	rand_Nz = np.histogram(new_rand_z, bins=zbins)[0] / len(new_rand_z)
+	real_Nz = real_nz/len(sample_z)
 	print('real/random N(z) (should be ~1):\n',real_Nz/rand_Nz)
-
-#	else:
-#		print('reduce_factor: ', reduce_factor)
-#		new_rand_z = new_randoms[:,2]
-#		print('no random downsampling required.')
 
 	print('done.')
 	return new_randoms
@@ -222,7 +208,7 @@ def para_jk_save(jkdir, patches, save_jks, jk_randoms, randoms, units, names, ra
 		jksample = np.concatenate(del_one_patches)
 		jksample = unit_check(jksample, give_back=units, tag='JKsample%s'%(str(j).zfill(3)))
 
-		ascii.write(jksample, jksample_str, names=names, delimiter='\t')
+		ascii.write(jksample, jksample_str, names=names, delimiter='\t', overwrite=1)
 		del jksample
 		gc.collect()
 
@@ -251,7 +237,7 @@ def para_jk_save(jkdir, patches, save_jks, jk_randoms, randoms, units, names, ra
 		elif Nmissing_cols<0:
 			jkrands = jkrands[:, :len(rand_names)]
 
-		ascii.write(jkrands, jk_rand_str, names=rand_names, delimiter='\t')
+		ascii.write(jkrands, jk_rand_str, names=rand_names, delimiter='\t', overwrite=1)
 		del jkrands
 		gc.collect()
 
@@ -266,6 +252,11 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 		     'shapes': ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue']}
 
 	samples = pathdict[paths]
+	_randoms_ = randoms.copy()
+	if (paths!='swot-all') & (all(_randoms_.T[2] <= 1.)):
+		print('converting random redshifts to comoving distances [Mpc/h]..')
+		_randoms_[:,2] = MICEcosmo.comoving_distance(_randoms_.T[2]) * 0.7 # * h
+
 	if sdss: samples = samples[:2]
 	for s, sample in enumerate(samples):
 		print('reading from: %s' % (['', '(____largePi)'][largePi]) )
@@ -278,10 +269,10 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 			print('no directory %s - skipping..'%pdir)
 			continue
 
-		copy_randoms = randoms.copy()
-		if (paths!='swot-all') & (all(copy_randoms.T[2] <= 1.)) & ('swot' not in sample):
-			print('converting random redshifts to comoving distances [Mpc/h]..')
-			copy_randoms[:,2] = MICEcosmo.comoving_distance(copy_randoms.T[2]) * 0.7 # * h
+		copy_randoms = _randoms_.copy()
+		#if (paths!='swot-all') & (all(copy_randoms.T[2] <= 1.)) & ('swot' not in sample):
+		#	print('converting random redshifts to comoving distances [Mpc/h]..')
+		#	copy_randoms[:,2] = MICEcosmo.comoving_distance(copy_randoms.T[2]) * 0.7 # * h
 			
 		jkdir = join(pdir, 'JKsamples')
 		if not isdir(jkdir):
@@ -318,14 +309,14 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 		for random_cube in random_cutter_:
 			combined_random_cutter |= np.array(random_cube, dtype=bool)
 		copy_randoms = copy_randoms[combined_random_cutter]
-		print('combined_random_cutter: ', sum(combined_random_cutter), '/', len(combined_random_cutter))
+		#print('combined_random_cutter: ', sum(combined_random_cutter), '/', len(combined_random_cutter))
 		#patches = patches[pop_patch_cut]
 
 		# downsample randoms to patches
 		patches_z = np.concatenate(patches, axis=0).T[2]
 		print('downsampling patched randoms before JK sampling..')
 		ds_randoms = downsample(copy_randoms, patches_z, nbin=(3, 1)[sdss], target_nz=10)
-		print('ds_randoms.shape: ', ds_randoms.shape)
+		#print('ds_randoms.shape: ', ds_randoms.shape)
 
 		names = ascii.read(join(pdir, ldir[0])).keys()
 		names[:2] = [['# ra[deg]', 'dec[deg]'], ['# ra[rad]', 'dec[rad]']] [radians]

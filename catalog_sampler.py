@@ -1042,7 +1042,8 @@ if __name__ == "__main__":
 	default=1)
 	parser.add_argument(
 	'-patchSize',
-	help='target angular scale [deg] for jackknife patches, default=4',
+	help='target angular scale [deg] for jackknife patches, can give 1x float, or 2x (ra, dec), default=4',
+	nargs='*',
 	type=np.float32,
 	default=4)
 	parser.add_argument(
@@ -1299,7 +1300,7 @@ if __name__ == "__main__":
 			gc.collect()
 			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=0, save_jks=1, jk_randoms=1, patch_str='patch', paths='swot-all', largePi=0, sdss=args.SDSS)
 
-			jknumbers, jkn_header = [], []
+			jknumbers, jkn_header = [], ''
 			for i, lab in enumerate(catalog.labels[:4]):
 				pDir = join(catalog.new_root,lab)
 				if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
@@ -1314,7 +1315,7 @@ if __name__ == "__main__":
 					jksample_weights = catalog.jackknife_patches(pDir, jkWeights_pop)
 					np.savetxt(join(catalog.new_root, 'jkWeights_%s.txt'%lab), jksample_weights, header='%s\n%i samples'%(lab, len(jksample_weights)))
 					jknumbers.append(len(jksample_weights))
-					jkn_header.append('%s\t'%lab)
+					jkn_header += '%s\t'%lab
 					if args.makejk_only:
 						print('====================\t====================\t SKIPPING JACKKNIFE CORRELATIONS ====================\t====================\t')
 					else:
@@ -1325,6 +1326,30 @@ if __name__ == "__main__":
 
 		if args.largePi:
 			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut)
+			Njkregions = len(jkData[0])
+
+			# read & downsample randoms, for JK trimming
+			jkrandoms = ds.read_randoms(args.Random)[:, :3]
+
+			if args.SDSS:
+				rand_colour = fits.open(args.Random)[1].data['color']
+				jkrandoms = np.column_stack(( jkrandoms, rand_colour ))
+
+			zlabel = ('Z_TONRY', 'z')[args.SDSS]
+			sample_z = catalog.data[zlabel]
+			print('INITIAL jackknife random downsampling..')
+			jkrandoms = ds.downsample(jkrandoms, sample_z, 1, 20) # 1 bin, target 20x real density
+			jkrandoms = jkrandoms[ (jkrandoms.T[2] >= sample_z.min()) & (jkrandoms.T[2] <= sample_z.max()) ]
+			ra, dec, z = jkrandoms.T[:3]
+
+			# merge random patch & redshift cuts
+			random_cut_bool = np.ones([len(random_cutter), len(jkrandoms)])
+			for i, edge_cut in enumerate(random_cutter):
+				# edge_cuts: 0 = patch-cut, 1 = z-cut
+				if args.jk3d:
+					random_cut_bool[i] = edge_cut[0](ra, dec, z) & edge_cut[1](ra, dec, z)
+				else:
+					random_cut_bool[i] = edge_cut(ra, dec, z)
 			Njkregions = len(jkData[0])
 
 			skinny_patch_cuts = []
@@ -1350,7 +1375,7 @@ if __name__ == "__main__":
 			# no swot-files for largePi - can't set lower Pi-limit
 			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=1, sdss=args.SDSS)
 
-			jknumbers, jkn_header = [], []
+			jknumbers, jkn_header = [], ''
 			for i, lab in enumerate(catalog.labels[:4]):
 				pDir = join(catalog.new_root,lab+'_largePi')
 				if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
@@ -1361,7 +1386,7 @@ if __name__ == "__main__":
 					jksample_weights = catalog.jackknife_patches(pDir, jkWeights_pop)
 					np.savetxt(join(catalog.new_root, 'jkWeights_%s_largePi.txt'%lab), jksample_weights, header='%s largePi\n%i samples'%(lab, len(jksample_weights)))
 					jknumbers.append(len(jksample_weights))
-					jkn_header.append('%s\t'%lab)
+					jkn_header += '%s\t'%lab
 					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
 					catalog.jackknife(pDir, jksample_weights, error_scaling, 1)
 			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers_largePi.txt'), np.array(jknumbers), header=jkn_header+'\nlargePi')
@@ -1450,7 +1475,7 @@ if __name__ == "__main__":
 		if args.plot:
 			with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
 				script.write(
-				'\npython /share/splinter/hj/PhD/catalog_sampler.py -Catalog %s -Path %s -patchSize %s -plotNow 1 -chiSqu 0 -bootstrap %s -jackknife %s -SDSS %s'%(args.Catalog,catalog.new_root,args.patchSize,args.bootstrap,args.jackknife,args.SDSS)
+				'\npython /share/splinter/hj/PhD/catalog_sampler.py -Catalog %s -Path %s -plotNow 1 -chiSqu 0 -bootstrap %s -jackknife %s -SDSS %s'%(args.Catalog, catalog.new_root, args.bootstrap, args.jackknife, args.SDSS)
 				)
 				script.write('\n')
 

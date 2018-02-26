@@ -80,6 +80,7 @@ def plot3dims(sdss=0, legend=1, **cats):
     for i, x in enumerate([(0, 1), (1, 2), (2, 0)]):
 	for j, k in enumerate(keys):
 		ax[i].plot(cats[k].T[x[0]], cats[k].T[x[1]], c=cmap[j], marker='.', ms=2, alpha=0.3, ls='')#, markeredgecolor=cmap[j])
+		if (i == 0) & (j%2==0): ax[i].annotate(j, xy=(cats[k].T[x[0]].mean(), cats[k].T[x[1]].mean()), xycoords='data', fontsize=11)#, markeredgecolor=cmap[j])
         
 	ax[i].set_xlabel(('ra','dec','$\chi$')[x[0]])
         ax[i].set_ylabel(('ra','dec','$\chi$')[x[1]])

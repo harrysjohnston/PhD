@@ -1,15 +1,48 @@
 # coding: utf-8
-from __future__ import print_function, division ; from astropy.io import fits, ascii ; import numpy as np ; import matplotlib.pylab as plt
-from astropy.cosmology import Planck13
+from __future__ import print_function, division
+from astropy.io import fits
+import numpy as np
+from astropy.cosmology import FlatLambdaCDM as FLCDM
+MICEcosmo = FLCDM(Om0=0.25, H0=70, Ob0=0.044)
+cmpc = MICEcosmo.comoving_distance
 import healpy as hp
 import gc
+
+def slice_jackknife(z, zmin=0.02, zmax=0.5, cube_cmpc_depth=150, dz=0.001):
+	z1 = z[(z >= zmin) & (z <= zmax)]
+	pdf = np.histogram(z1, bins=np.linspace(zmin, zmax, int((zmax - zmin)/dz)))
+	fp = pdf[0] / float(pdf[0].sum())
+	cdf = np.cumsum(fp)
+	zm = pdf[1][:-1]
+
+	nbin = 10
+	fracs = np.linspace(0., 1., nbin + 1)
+	ze = np.interp(fracs, cdf, zm)
+	min_depth = np.diff(cmpc(ze) * 0.7).min()
+	while np.float32(min_depth) <= cube_cmpc_depth:
+		nbin -= 1
+		fracs = np.linspace(0., 1., nbin + 1)
+		ze1 = np.interp(fracs, cdf, zm)
+		min_depth = np.diff(cmpc(ze1) * 0.7).min()
+		ze = ze1
+		#print('nbin = %i'%nbin)
+		#print(cmpc(ze) * 0.7)
+		#print(np.diff(cmpc(ze) * 0.7))
+		#print('\n')
+	new_z_edge = np.concatenate(([zmin], ze[1:-1], [zmax]))
+	print('nbin = %i'%(len(new_z_edge) - 1))
+	print('z-edges:')
+	print(new_z_edge)
+	print('cMpc diffs:')
+	print(np.diff(cmpc(new_z_edge) * 0.7))
+	return new_z_edge
 
 def betwixt((re1,re2,de1,de2,ze1,ze2)):
 	def make_cut(ra,dec,z):
 		return (ra>=re1)&(ra<=re2)&(dec>=de1)&(dec<=de2)&(z>=ze1)&(z<=ze2)
 	return make_cut
 
-def resample_data(fitsdata, sample_cuts, patchside=6, zcut=0.26, do_sdss=0, do_3d=1, cube_zdepth=0.06, largePi=0, bitmaskCut=None, occ_thresh=0.5, mask_path='/share/splinter/hj/PhD/pixel_weights.fits'):
+def resample_data(fitsdata, sample_cuts, patchside=6, zcut=None, do_sdss=0, do_3d=1, cube_zdepth=0.06, largePi=0, bitmaskCut=None, occ_thresh=0.67, mask_path='/share/splinter/hj/PhD/pixel_weights.fits'):
 	resampler = resampleTools(fitsdata, patchside, zcut, do_sdss, do_3d, sample_cuts, cube_zdepth=cube_zdepth, largePi=largePi)
 
 	# identify masked pixel coordinates
@@ -80,7 +113,10 @@ class resampleTools:
 		self.zcut = zcut
 		self.do_sdss = do_sdss
 		self.do_3d = do_3d
-		self.ra_side = self.dec_side = patchside
+		if len(patchside) == 1:
+			self.ra_side = self.dec_side = patchside[0]
+		else:
+			self.ra_side, self.dec_side = patchside
 		self.z_side = cube_zdepth
 		self.sample_cuts = sample_cuts
 		self.largePi = largePi
@@ -162,17 +198,22 @@ class resampleTools:
 			dec_num = 6.//self.dec_side +1
 			dedg = np.linspace(-3., 3., dec_num)
 			zedg = np.linspace(0., 0.6, z_num)
-			if self.zcut != None:
-				z_push = self.zcut - min(zedg, key=lambda x:abs(x - self.zcut))
-				zedg = [zz for zz in (zedg + z_push) if (zz > 0.) & (zz < 0.6)]
 			for edges in self.ranges:
 				ra_num = (edges[1] - edges[0])//self.ra_side + 1
 				redg += list(np.linspace(edges[0], edges[1], ra_num))
 
+		# minimum cube depth = 150 Mpc/h HARD-CODED
+		# largePi jackknife should be done in 2D !!
+		if self.zcut != None: # align with redshift cut
+			ze1 = slice_jackknife(gal_coords.T[2], zmin=0.02, zmax=self.zcut)
+			ze2 = slice_jackknife(gal_coords.T[2], zmin=self.zcut, zmax=0.5)
+			zedg = np.concatenate((ze1[:-1], ze2))
+		elif gama: # or use full gama
+			zedg = slice_jackknife(gal_coords.T[2], zmin=0.02, zmax=0.5)
+		else: # or sdss
+			zedg = slice_jackknife(gal_coords.T[2], zmin=0.02, zmax=0.3)
+
 		redg,dedg,zedg = map(lambda x: np.array(x), [redg,dedg,zedg])
-		if self.do_sdss:
-			print('SDSS: forcing cube z-edges to 0., 0.125, 0.25')
-			zedg = np.linspace(0., 0.5, 5)
 		radiff, decdiff, zdiff = (np.diff(i) for i in [redg,dedg,zedg])
 		print('ra | dec | z sides: %.2f | %.2f | %.3f'%(radiff.min(),decdiff.min(),zdiff.min()))
 		self.ra_side, self.dec_side = radiff.min(), decdiff.min()
@@ -231,7 +272,7 @@ class resampleTools:
 			parea[i] = Area(*patch_edges_rad) * (180./np.pi)**2
 			survey_area += pwei[i] * parea[i]
 			if pwei[i] >= occupn_threshold:
-				jackknife_area += survey_area
+				jackknife_area += pwei[i] * parea[i]
 
 		if self.do_sdss:
 			patch_filter = pwei >= occupn_threshold
@@ -275,8 +316,8 @@ class resampleTools:
 		cubes = []
 		cube_weights = []
 		new_random_cutter = []
-		if self.do_sdss:
-			zedges = zedges[zedges <= 0.25]
+		#if self.do_sdss:
+		#	zedges = zedges[zedges <= 0.25]
 		for i, patch in enumerate(patches):
 			patch_z = patch[self.cols[2]]
 			zcuts = [ (patch_z>=zedges[j]) & (patch_z<=zedges[j+1]) for j in range(len(zedges)-1) ]

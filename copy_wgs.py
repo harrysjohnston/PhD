@@ -10,7 +10,7 @@ file_names = dict(zip(keys, ['highZ_Blue', 'highZ_Red', 'lowZ_Blue', 'lowZ_Red',
 # SPECIFY PATHS TO POINT TO CATALOG_SAMPLER OUTPUT DIRECTORY
 PHD = "/share/splinter/hj/PhD/"
 # Standard
-gama = PHD + "Wcorr_11rpbin_4deg3D_z0.26_c0.66/"
+gama = PHD + "Wcorr_jk3x5_24_02_18_z0.26_c0.66/"
 sdss = PHD + "Wcorr_SDSS_11rpbin_10deg3D_c0.66/"
 # HH
 HH = 0
@@ -24,8 +24,8 @@ if largePi:
 	sdss = PHD + "Wcorr_SDSS_largePi_test_c0.66/"
 
 # COPY WG+/x FILES FROM GAMA AND/OR SDSS OUTPUT DIRS
-do_gama = 0
-do_sdss = 1
+do_gama = 1
+do_sdss = 0
 
 IA = 1
 clus = 0
