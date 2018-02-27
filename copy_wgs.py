@@ -11,7 +11,8 @@ file_names = dict(zip(keys, ['highZ_Blue', 'highZ_Red', 'lowZ_Blue', 'lowZ_Red',
 PHD = "/share/splinter/hj/PhD/"
 # Standard
 gama = PHD + "Wcorr_jk3x5_24_02_18_z0.26_c0.66/"
-sdss = PHD + "Wcorr_SDSS_11rpbin_10deg3D_c0.66/"
+#gama = PHD + "Wcorr_jk3x5_24_02_18_z0.22_c0.66/"
+sdss = PHD + "Wcorr_SDSS_jk10x10_25_02_18_c0.66/"
 # HH
 HH = 0
 if HH:
@@ -25,7 +26,7 @@ if largePi:
 
 # COPY WG+/x FILES FROM GAMA AND/OR SDSS OUTPUT DIRS
 do_gama = 1
-do_sdss = 0
+do_sdss = 1
 
 IA = 1
 clus = 0
