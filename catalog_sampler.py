@@ -720,8 +720,6 @@ class RealCatalogue:
 			new_cat = np.concatenate(del_one)
 			cat_name = join(JKdir,'JKsample%s.asc'%(str(i).zfill(3)))
 			ascii.write(new_cat, cat_name, delimiter='\t', names=['# ra[rad]', 'dec[rad]', 'chi[Mpc/h]', 'e1', 'e2', 'e_weight'], overwrite=1)
-			del_one_weights = np.delete(patchWeights, i)
-			jkweights[i] = np.mean(del_one_weights)
 
 		return jkweights
 
@@ -1244,7 +1242,7 @@ if __name__ == "__main__":
 		print('COMPUTING SAMPLE COVARIANCES...')
 		if not args.largePiOnly:
 
-			# jkData.shape = (10 subsamples, N patches/cubes) ----- jkWeights are actually cube weights until passed through jackknife_patches (delete-one) function !!
+			# jkData.shape = (10 subsamples, N patches/cubes)
 			# random_cutter = N_patch array of functions, each to be applied to (ra, dec, z) of randoms
 			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=0, bitmaskCut=args.bitmaskCut, occ_thresh=args.occ_thresh)
 			print('jkData: ', jkData.shape)
