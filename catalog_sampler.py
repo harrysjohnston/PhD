@@ -74,8 +74,8 @@ class RealCatalogue:
 		Mr = np.where(fs >= 1., Mr - 2.5*np.log10(fs), Mr)
 		data = data[Mr < mc]
 
-		print('cutting z < 0.02 randoms cannot extend this near')
-		data = data[ data[self.headers['z']] > 0.02 ]
+		print('cutting 0.02 < z < 0.5 randoms cannot extend this near, and GAMA too sparse after z=0.5')
+		data = data[ (0.02 < data[self.headers['z']]) & (data[self.headers['z']] <= 0.5) ]
 
 		self.data = data
 		del data
@@ -432,7 +432,9 @@ class RealCatalogue:
 		[self.labels[wcorr_ind[2]]+'.asc', self.samplecounts[wcorr_ind[2]], self.labels[2]+'.asc', self.samplecounts[2], self.wcorrLabels[2]],
 		[self.labels[wcorr_ind[3]]+'.asc', self.samplecounts[wcorr_ind[3]], self.labels[3]+'.asc', self.samplecounts[3], self.wcorrLabels[3]]
 		]
-		print('CHECK THIS wcorr call combinations:\n',self.wcorr_combos)
+		print('CHECK THIS wcorr call combinations:')
+		for wcc in self.wcorr_combos:
+			print(wcc)
 		self.samplecounts = self.samplecounts[:10]
 		[print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
 
@@ -442,7 +444,7 @@ class RealCatalogue:
 		'#PBS -q compute',
 		'#PBS -N %s'%out_sh,
 		'#PBS -l nodes=1:ppn=16',
-		'#PBS -l walltime=120:00:00',
+		'#PBS -l walltime=24:00:00',
 		'#PBS -l mem=50gb',
 		'#PBS -o %s'%join(files_path,out_sh+'.out'),
 		'#PBS -e %s'%join(files_path,out_sh+'.err'),
@@ -733,12 +735,14 @@ class RealCatalogue:
 		if densColours:
 			dens_dir = join(dirname(patchDir), pdir_key + '_UnMasked')
 			if largePi:
-				dens_dir = join(dirname(patchDir), pdir_key[:-8] + '_UnMasked_largePi')
+				dens_dir = join(dirname(patchDir), pdir_key.replace('_largePi', '_UnMasked_largePi'))
 		else:
 			if 'highZ' in patchDir:
 				dens_dir = join(dirname(patchDir), 'highZ')
 			if 'lowZ' in patchDir:
 				dens_dir = join(dirname(patchDir), 'lowZ')
+			if largePi:
+				dens_dir += '_largePi'
 		#print('pdir_key:\t', pdir_key)
 		#print('dens_dir:\t', dens_dir)
 		#print('\n\n\n\n')
@@ -771,10 +775,11 @@ class RealCatalogue:
 			# clean up - if needing to analyse JKs, comment out below and use arg 'makejk_only'
 			os.system('rm %s'%rand_out) # random wcorr
 			os.system('rm %s_d'%join(JKdir, jk)) # copied density JK sample
-			os.system('rm %s'%dpath) # density JK sample
-			os.system('rm %s'%join(JKdir, jk)) # shapes JK sample
 			os.system('rm %s'%join(JKdir, randjk)) # copied random JK sample
-			os.system('rm %s'%rdpath) # random sample
+			os.system('rm %s'%join(JKdir, jk)) # shapes JK sample
+			if densColours | ('_Blue' in patchDir):
+				os.system('rm %s'%dpath) # density JK sample
+				os.system('rm %s'%rdpath) # random sample
 
 		return None
 
@@ -1200,6 +1205,7 @@ if __name__ == "__main__":
 		sys.exit()
 
 	catalog.cut_data(pgm_=args.pgm_cut, z_=args.zCut, colour_=args.cCut, lmstar_=args.lmstarCut, LRG=args.LRGs, LRG1=args.LRG1, LRG2=args.LRG2, LRG3=args.LRG3, LRG4=args.LRG4, LRG5=args.LRG5, LRG6=args.LRG6, BCGdens=args.BCGdens, BCGshap=args.BCGshap, bitmask_=args.bitmaskCut)
+
 	samples = [catalog.highz_R,catalog.highz_B,catalog.lowz_R,catalog.lowz_B, 
 				catalog.highz_R_UnM,catalog.highz_B_UnM,catalog.lowz_R_UnM,catalog.lowz_B_UnM, 
 				catalog.highz,catalog.lowz]
@@ -1274,11 +1280,13 @@ if __name__ == "__main__":
 				# filter empty patches
 				skinny_patch_cut = np.array( [ ( x.shape!=(0,) ) for x in sam ], dtype=bool )
 				skinny_patch_cuts.append(skinny_patch_cut)
-				if (i<4) | (i>=8):
+				if i<4:
 					popd_sam = sam[ skinny_patch_cut ]
-				elif 4<=i<8: # if unmasked sample
+				else: # if density sample
 					popd_sam = sam[ skinny_patch_cuts[i-4] ] # match patch cuts to shapes for IA
-					swot_sam = sam[ skinny_patch_cut ] # and save all for clustering
+					if i>=8:
+						popd_sam = sam[ skinny_patch_cut ] # no direct match if not using colour-cut densities - hope new jackknife works...
+					swot_sam = sam[ skinny_patch_cut ] # save all for clustering
 					for j,p in enumerate(swot_sam):
 						if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
 						catalog.save_swotpatches(p, catalog.labels[i], j)
@@ -1289,26 +1297,30 @@ if __name__ == "__main__":
 					if i<4: shapes=1
 					else: shapes=0
 					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes)
-					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 0) # save_patches returns str(patchDir) with largePi if arg=1
+					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 0) # save_patches returns str(patchDir)
 			del jkData, popd_sam
 			gc.collect()
 
 			# make jackknife randoms (&reals) for norm (&swot)
 			print('making jackknife samples..') 				# MUST feed this fn randoms & random_cutter (.shape=(Ncubes, Nrandoms)) , or will BREAK!!
 			gc.collect()
-			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=1, jk_randoms=1, patch_str='patch', paths='all', largePi=0, sdss=args.SDSS)
-			gc.collect()
-			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=0, save_jks=1, jk_randoms=1, patch_str='patch', paths='swot-all', largePi=0, sdss=args.SDSS)
+			if args.densColours:
+				for radians_bool, paths_key in [(1, 'all'), (0, 'swot-all')]:
+					ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=radians_bool, save_jks=1, jk_randoms=1, patch_str='patch', paths=paths_key, largePi=0, sdss=args.SDSS, ccut=args.cCut)
+					gc.collect()
+			else:
+				for radians_bool, paths_key in [(1, 'dc0'), (0, 'swot-dc0')]:
+					ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=radians_bool, save_jks=1, jk_randoms=1, patch_str='patch', paths=paths_key, largePi=0, sdss=args.SDSS, ccut=args.cCut)
+					gc.collect()
+				#ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=1, jk_randoms=1, patch_str='patch', paths='all', largePi=0, sdss=args.SDSS, ccut=args.cCut)
+				#gc.collect()
+				#ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=0, save_jks=1, jk_randoms=1, patch_str='patch', paths='swot-all', largePi=0, sdss=args.SDSS, ccut=args.cCut)
 
 			jknumbers, jkn_header = [], ''
 			for i, lab in enumerate(catalog.labels[:4]):
 				pDir = join(catalog.new_root,lab)
 				if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
 					print('no z/colour-cut; skipping %s..'%lab)
-#########################################################################################################
-				#elif lab == 'highZ_Red':
-					#print('skipping highZ_Red')
-######################################################################################################### GET RID OF THIS
 				elif args.jackknife:
 					jkWeights_pop = jkWeights[ skinny_patch_cuts[i] ]
 					print('===================\t %s reduced jkWeights: '%lab, jkWeights_pop.shape)
@@ -1320,9 +1332,8 @@ if __name__ == "__main__":
 						print('====================\t====================\t SKIPPING JACKKNIFE CORRELATIONS ====================\t====================\t')
 					else:
 						catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
-					#catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
 					catalog.jackknife(pDir, jksample_weights, error_scaling, 0)
-			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers.txt'), np.array(jknumbers), header=jkn_header)
+			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers.txt'), np.array(jknumbers), header=jkn_header, fmt='%i')
 
 		if args.largePi:
 			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut)
@@ -1353,11 +1364,11 @@ if __name__ == "__main__":
 			Njkregions = len(jkData[0])
 
 			skinny_patch_cuts = []
-			for i,sam in enumerate(jkData[:8]):
+			for i,sam in enumerate(jkData):
 
 				skinny_patch_cut = np.array( [ ( x.shape!=(0,) ) for x in sam ], dtype=bool )
 				skinny_patch_cuts.append(skinny_patch_cut)
-				if i<4:
+				if (i<4) | (i>=8):
 					popd_sam = sam[ skinny_patch_cut ]
 				else:
 					popd_sam = sam[ skinny_patch_cuts[i-4] ]
@@ -1367,13 +1378,16 @@ if __name__ == "__main__":
 					if i<4: shapes=1
 					else: shapes=0
 					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes)
-					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1) # pDir includes _largePi
-				if 3<i<8: # unmasked samples ; gen jk samples
+					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1) # pDir (patch/cube directory) appended with _largePi
+				if (3<i<8) | ((i>=8) & args.densColours): # density samples ; gen jk samples
 					if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
 					jks_w = catalog.jackknife_patches(pDir, jkWeights) # need this function call for WEIGHTS
 
 			# no swot-files for largePi - can't set lower Pi-limit
-			ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=1, sdss=args.SDSS)
+			if args.densColours:
+				ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=1, sdss=args.SDSS, ccut=args.cCut)
+			else:
+				ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=0, jk_randoms=1, patch_str='patch', paths='dc0', largePi=1, sdss=args.SDSS, ccut=args.cCut)
 
 			jknumbers, jkn_header = [], ''
 			for i, lab in enumerate(catalog.labels[:4]):
@@ -1389,7 +1403,7 @@ if __name__ == "__main__":
 					jkn_header += '%s\t'%lab
 					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
 					catalog.jackknife(pDir, jksample_weights, error_scaling, 1)
-			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers_largePi.txt'), np.array(jknumbers), header=jkn_header+'\nlargePi')
+			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers_largePi.txt'), np.array(jknumbers), header=jkn_header+'\nlargePi', fmt='%i')
 
 	catalog.make_combos(args.densColours)
 
@@ -1415,13 +1429,6 @@ if __name__ == "__main__":
 		catalog2 = RandomCatalogue(args.Random, args.densColours, args.SDSS)
 		randoms_3col = np.column_stack(( catalog2.data[catalog2.headers['ra']], catalog2.data[catalog2.headers['dec']], catalog2.data[catalog2.headers['z']] ))
 
-		if args.SDSS:
-			r_ccut = args.cCut
-			if r_ccut == None:
-				r_ccut = -20.
-			r_redcut = np.array(catalog2.data['color'] > r_ccut) # RED
-			r_ccuts = dict(zip(samz_keys[:2], [r_redcut, ~r_redcut]))
-
 		for samz_k in samz_keys:
 			try:
 				sam_z = samz_dict[samz_k]
@@ -1430,7 +1437,16 @@ if __name__ == "__main__":
 				continue
 
 			if args.SDSS & ('z1' not in samz_k):
-				r_3cols = randoms_3col[ r_ccuts[samz_k] ]
+				acC = args.cCut # conditional below does not work unless renaming args.cCut...
+				if args.densColours & (acC != None):
+					# apply colour cut to SDSS randoms - creates much better n(z) wrt real samples
+					r_redcut = np.array(catalog2.data['color'] > args.cCut)
+					if samz_k.endswith('r'):
+						r_3cols = randoms_3cols[ r_redcut ]
+					elif samz_k.endswith('b'):
+						r_3cols = randoms_3cols[ ~r_redcut ]
+				else:
+					r_3cols = randoms_3col.copy()
 			else:
 				r_3cols = randoms_3col.copy()
 
@@ -1497,8 +1513,8 @@ if __name__ == "__main__":
 		[script.write('%s: \t%d, mean(R_mag - 22.): %.4f\n'%(catalog.labels[i],catalog.samplecounts[i],catalog.Rmags[i])) for i in range(len(catalog.labels[:4]))]
 		[script.write('%s: \t%d\n'%(catalog.labels[i+4],catalog.samplecounts[i+4])) for i in range(len(catalog.labels[4:]))]
 		[script.write('%s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
-	np.savetxt(join(catalog.new_root, 'R-band_pivot_deltas.txt'), np.array(catalog.Rmags), header='mean differences between sample & pivot R-band abs mag\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t')
-	np.savetxt(join(catalog.new_root, 'SamplePopulations.txt'), np.column_stack((np.array(catalog.samplecounts[:4]), np.array(catalog.samplecounts[4:8]))), header='populations of\nshapes\t\tdensity samples\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t')
+	np.savetxt(join(catalog.new_root, 'R-band_pivot_deltas.txt'), np.array(catalog.Rmags), header='mean differences between sample & pivot R-band abs mag\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t', fmt='%.4f')
+	np.savetxt(join(catalog.new_root, 'SamplePopulations.txt'), np.column_stack((np.array(catalog.samplecounts[:4]), np.array(catalog.samplecounts[4:8]))), header='populations of\nshapes\t\tdensity samples\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t', fmt='%i')
 
 
 

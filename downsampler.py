@@ -241,19 +241,21 @@ def para_jk_save(jkdir, patches, save_jks, jk_randoms, randoms, units, names, ra
 		del jkrands
 		gc.collect()
 
-def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians=0, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=0, sdss=0):
+def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians=0, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=0, sdss=0, ccut=None):
 	# empty_patches is boolean array of length uncut-Npatches
 	# True where all skinny-patch cuts are met
 	# index 0-3: shapes, 4-7: densities, 8-9: all-colour densities
 	patch_str = patch_str.split('*')
 	units = ['degrees', 'radians'][radians]
 	pathdict = {'all': ['highZ_Red_UnMasked', 'highZ_Blue_UnMasked', 'lowZ_Red_UnMasked', 'lowZ_Blue_UnMasked'],
+				'dc0': ['highZ', 'lowZ'],
 		    'swot-all': ['swot_highZ_Red_UnMasked', 'swot_highZ_Blue_UnMasked', 'swot_lowZ_Red_UnMasked', 'swot_lowZ_Blue_UnMasked'],
+		    'swot-dc0': ['swot_highZ', 'swot_lowZ'],
 		     'shapes': ['highZ_Red', 'highZ_Blue', 'lowZ_Red', 'lowZ_Blue']}
 
 	samples = pathdict[paths]
 	_randoms_ = randoms.copy()
-	if (paths!='swot-all') & (all(_randoms_.T[2] <= 1.)):
+	if (paths not in ['swot-all', 'swot-dc0']) & (all(_randoms_.T[2] <= 1.)):
 		print('converting random redshifts to comoving distances [Mpc/h]..')
 		_randoms_[:,2] = MICEcosmo.comoving_distance(_randoms_.T[2]) * 0.7 # * h
 
@@ -270,9 +272,6 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 			continue
 
 		copy_randoms = _randoms_.copy()
-		#if (paths!='swot-all') & (all(copy_randoms.T[2] <= 1.)) & ('swot' not in sample):
-		#	print('converting random redshifts to comoving distances [Mpc/h]..')
-		#	copy_randoms[:,2] = MICEcosmo.comoving_distance(copy_randoms.T[2]) * 0.7 # * h
 			
 		jkdir = join(pdir, 'JKsamples')
 		if not isdir(jkdir):
@@ -287,9 +286,12 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 		print('N unmasked patches: %s'%patches.shape[0])
 
 		# if SDSS, cut randoms by colour
-		if sdss:
-			redcut = copy_randoms.T[-1] > 0.63
-			colour = np.array( [~redcut, redcut][int('Red' in sample)], dtype=bool )
+		if sdss & (ccut != None):
+			redcut = copy_randoms.T[-1] > ccut
+			if paths not in ['dc0', 'swot-dc0']:
+				colour = np.array( [~redcut, redcut][int('Red' in sample)], dtype=bool )
+			else: # do not apply colour cut if using general density samples
+				colour = np.ones_like(redcut, dtype=bool)
 			random_cutter_ = np.array( [np.array(rc, dtype=bool) & colour for rc in random_cutter], dtype=bool )
 		else:
 			random_cutter_ = np.array(random_cutter, dtype=bool)
@@ -297,6 +299,10 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 		if paths=='all':
 			ep_cut = np.array(empty_patches[s])
 			print('N shapes patches: %s'%np.sum(ep_cut))
+		elif paths in ['dc0', 'swot-dc0']:
+			ep_cut = np.array(empty_patches[s+8])
+			print('N density patches (should match the above): %s'%np.sum(ep_cut))
+			assert np.sum(ep_cut) == patches.shape[0], "subregion count mismatch between ccut shapes & no-ccut densities!"
 		elif paths=='swot-all':
 			ep_cut = np.array(empty_patches[s+4])
 			print('N swot patches: %s'%np.sum(ep_cut))
