@@ -438,7 +438,7 @@ class RealCatalogue:
 		self.samplecounts = self.samplecounts[:10]
 		[print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
 
-	def prep_wcorr(self, files_path, wcorr_combos, rp_bins, rp_lims, los_bins, los_lim, nproc, large_pi, out_sh):
+	def prep_wcorr(self, files_path, wcorr_combos, rp_bins, rp_lims, los_bins, los_lim, large_pi, out_sh):
 		shell_script = [
 		'#!/bin/tcsh',
 		'#PBS -q compute',
@@ -1390,7 +1390,7 @@ if __name__ == "__main__":
 			jknumbers, jkn_header = [], ''
 			for i, lab in enumerate(catalog.labels[:4]):
 				pDir = join(catalog.new_root,lab+'_largePi')
-				if ((args.zCut==None)&(lab.startswith('low')))|((args.cCut==None)&('Blue' in lab)):
+				if ((args.zCut==None) & (lab.startswith('low'))) | ((args.cCut==None) & ('Blue' in lab)):
 					print('no z/colour-cut; skipping %s..'%lab)
 				elif args.jackknife:
 					jkWeights_pop = jkWeights[ skinny_patch_cuts[i] ]
@@ -1405,19 +1405,19 @@ if __name__ == "__main__":
 
 	catalog.make_combos(args.densColours)
 
-	if (args.zCut==None)&(args.cCut==None):
+	if (args.zCut==None) & (args.cCut==None):
 		adjusted_combos = [catalog.wcorr_combos[0]]
-	elif (args.zCut==None)&(args.cCut!=None):
+	elif (args.zCut==None) & (args.cCut!=None):
 		adjusted_combos = catalog.wcorr_combos[:2]
-	elif (args.zCut!=None)&(args.cCut==None):
+	elif (args.zCut!=None) & (args.cCut==None):
 		adjusted_combos = np.array(catalog.wcorr_combos)[np.array([0,2])]
-	elif (args.zCut!=None)&(args.cCut!=None):
+	elif (args.zCut!=None) & (args.cCut!=None):
 		adjusted_combos = catalog.wcorr_combos
 	print('CHECK THIS z/colour cut-adjusted combos:\n')
 	for ac in adjusted_combos:
 		print(ac)
 
-	catalog.prep_wcorr(catalog.new_root,adjusted_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.nproc,args.largePi,'real_wcorr')
+	catalog.prep_wcorr(catalog.new_root,adjusted_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.largePi,'real_wcorr')
 
 	if args.wcorr:
 		print('QSUBBING REAL_WCORR..')
@@ -1484,7 +1484,7 @@ if __name__ == "__main__":
 		for rc in rand_combos:
 			print(rc)
 
-		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, args.largePi, 'rand_wcorr')
+		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.largePi, 'rand_wcorr')
 
 		if args.plot:
 			with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
