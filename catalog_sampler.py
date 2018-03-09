@@ -295,7 +295,7 @@ class RealCatalogue:
 
 		return None
 
-	def cut_columns(self, subsample, h, flipe2, Kneighbour, R0cut, shapes=0):
+	def cut_columns(self, subsample, h, flipe2, Kneighbour, R0cut, shapes=0, mbias=(0., 0.)):
 		"""""
 		take subsample data
 		& isolate columns for wcorr
@@ -337,6 +337,10 @@ class RealCatalogue:
 				R = table['R0_r']
 				#print(np.sum(np.where( (R>R0cut[0]) & (R<R0cut[1]), 1, 0)))
 				shape_cut *= np.where( (R>R0cut[0]) & (R<R0cut[1]), 1, 0) # gtr or lt?? what is cut?? cut in both for band-diffs??
+
+			m1, m2 = mbias
+			e1 = e1 * (1 + m1)
+			e2 = e2 * (1 + m2)
 
 		if self.SDSS:
 			shape_cut = np.where( ((abs(e1)>9.9)|(abs(e2)>9.9)), 0, 1)
@@ -1151,6 +1155,12 @@ if __name__ == "__main__":
 	nargs=2,
 	type=np.float32,
 	help='define resolution (r-band) window for non-zero correlation weighting, default=None=all')
+	parser.add_argument(
+	'-mbias',
+	nargs=2,
+	type=np.float32,
+	default=(-0.0040, -0.0035),
+	help='m1, m2 multiplicative ellipticity biases, default=(-0.0040, -0.0035) - C.Georgiou etal. Table 1')
 	args = parser.parse_args()
 
 	if args.Catalog.startswith('MUST'):
@@ -1218,7 +1228,7 @@ if __name__ == "__main__":
 		if args.flipe2: print('FLIPPING e2...!')
 		if i<4: shapes=1
 		else: shapes=0
-		new_table,sample_z = catalog.cut_columns(sample, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes)
+		new_table,sample_z = catalog.cut_columns(sample, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes, mbias=args.mbias)
 		sample_zs.append(sample_z)
 		if (args.zCut==None) & ('lowZ' in catalog.labels[i]):
 			continue
@@ -1294,7 +1304,7 @@ if __name__ == "__main__":
 					if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
 					if i<4: shapes=1
 					else: shapes=0
-					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes)
+					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes, mbias=args.mbias)
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 0) # save_patches returns str(patchDir)
 			del jkData, popd_sam
 			gc.collect()
@@ -1375,7 +1385,7 @@ if __name__ == "__main__":
 					if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
 					if i<4: shapes=1
 					else: shapes=0
-					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes)
+					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes, mbias=args.mbias)
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1) # pDir (patch/cube directory) appended with _largePi
 				if (3<i<8) | ((i>=8) & args.densColours): # density samples ; gen jk samples
 					if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
