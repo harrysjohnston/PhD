@@ -26,7 +26,8 @@ def setup(options):
 	nbin = options.get_int(option_section,'nbin',default=50)
 
 	nla = options.get_bool(option_section,'NLA',default=False) # only need bias factors if using NLA
-	bias = options.get_string(option_section,'sample_bias',default='dummy') # None/dummy == using HOD
+	skey = options.get_string(option_section,'shapes_key',default='dummy')
+	dkey = options.get_string(option_section,'dens_key',default=skey)
 	HOD_bias_loc = options.get_string(option_section,'HOD_bias_loc',default='dummy/dummy') # hod_section/name of HOD generated bias(z) for manual appln to matter-int spectra
 	HOD_bias_loc = HOD_bias_loc.split('/')
 	if nla & (HOD_bias_loc[0]!='dummy'):
@@ -43,7 +44,8 @@ def setup(options):
 		'IA_section':IA_section,
 		'hkl_section':hkl_section,
 		'wg_section':wg_section,
-		'bias':bias,
+		'skey':skey,
+		'dkey':dkey,
 		'nbin':nbin,
 		'nla':nla,
 		'wgg':wgg,
@@ -65,20 +67,31 @@ def execute(block, config):
 	dz = z[1]-z[0]
 	nofz_shap = block[nz_section,'nofz_shapes']
 	nofz_dens = block[nz_section,'nofz_density']
-	if wgg: nofz_shap = nofz_dens
+	if wgg:
+		nofz_shap = nofz_dens
+
 	eta = block.get_double(IA_section,'eta',default=0)
+
 	# run beta_red/blue
-	if block.has_value(IA_section, 'beta_colour'): beta = block[IA_section, 'beta_colour']
-	# or individual sample beta's
-	else: beta = block.get_double(IA_section, 'beta_%s'%bias, default=0.)
-	Rmag = block.get_double(IA_section, 'Rmag_%s'%bias, default=0.)
+	if skey.endswith('R'):
+		beta = block[IA_section, 'beta_R']
+	elif skey.endswith('B'):
+		beta = block[IA_section, 'beta_B']
+	else:
+		print('skey must be colour-specific!!')
+		sys.exit()
+
+	Rmag = block.get_double(IA_section, 'Rmag_%s'%skey, default=0.)
 
 	# compute W(z)
-	Wz,Wz_scaled = compute_Wz(z,nofz_shap,nofz_dens,eta,beta,Rmag,wgg) # wgg switch prevents application of power-law scalings to gg
+	Wz,Wz_scaled = compute_Wz(z,nofz_shap,nofz_dens,eta,beta,Rmag,wgg)
+	# ^wgg switch prevents application of power-law scalings to gg
 
 	if not compute_wp:
-		if nla: block[wz_section, 'w_z'] = Wz_scaled
-		else: block[wz_section, 'w_z'] = Wz
+		if nla:
+			block[wz_section, 'w_z'] = Wz_scaled
+		else:
+			block[wz_section, 'w_z'] = Wz
 		block[wz_section, 'z'] = z
 
 	else:
@@ -94,18 +107,27 @@ def execute(block, config):
 
 		tags = ['wgp','wgg']
 		if nla:
-			A_i =  block[IA_section,'A_%s'%bias]
+			if skey.endswith('R'):
+				A_i =  block[IA_section,'A_R']
+			elif skey.endswith('B'):
+				A_i =  block[IA_section,'A_B']
+			else:
+				print('skey must be colour-specific!!')
+				sys.exit()
+
 			if not wgg:
 				wg_r *= A_i
-			bg = block[bias_section,'b_g_%s'%bias]
+
+			bg = block[bias_section,'b_g_%s'%dkey]
 			wg_r *= bg
+
 			if wgg:
-				#print('COMPUTING w_gg; bias factor squared, and INTEGRAL CONSTRAINT added..')
-				C = block[bias_section,'ic_%s'%bias]
+				C = block[bias_section,'ic_%s'%dkey]
 				wg_r *= bg
 				wg_r += C
+
 		elif wgg:
-				C = block[bias_section,'ic_%s'%bias]
+				C = block[bias_section,'ic_%s'%dkey]
 				wg_r += C
 		block.put_double_array_1d(wg_section,'%s_r'%tags[int(wgg)],wg_r)
 		block.put_double_array_1d(wg_section,'%s_r_minus'%tags[int(wgg)],-wg_r)
