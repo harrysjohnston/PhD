@@ -330,13 +330,8 @@ class RealCatalogue:
 
 			if R0cut != None:
 				assert len(R0cut) == 2, "give upper and lower limit for R0_r"
-				#print('R0 range: %s - %s' % (R0cut[0], R0cut[1]) )
-				#R0cols = [i for i in table.columns.names if 'R0' in i]
-				#R0 = [table[i] for i in R0cols]
-				#for R in R0:
 				R = table['R0_r']
-				#print(np.sum(np.where( (R>R0cut[0]) & (R<R0cut[1]), 1, 0)))
-				shape_cut *= np.where( (R>R0cut[0]) & (R<R0cut[1]), 1, 0) # gtr or lt?? what is cut?? cut in both for band-diffs??
+				shape_cut *= np.where( (R>R0cut[0]) & (R<R0cut[1]), 1, 0)
 
 			m1, m2 = mbias
 			e1 = e1 * (1 + m1)
@@ -453,13 +448,10 @@ class RealCatalogue:
 		'#PBS -o %s'%join(files_path,out_sh+'.out'),
 		'#PBS -e %s'%join(files_path,out_sh+'.err'),
 		'',
-		'module load dev_tools/oct2015/python-Anaconda-2-4.0.0',
+		'date',
 		'',
-		'cd $PBS_O_WORKDIR',
-		'',
-		'setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/share/splinter/hj/PhD/CosmoFisherForecast/bjutils/lib/',
-		'',
-		'date']
+		'source ~/.login',
+		'']
 
 		for combo in wcorr_combos: 
 			# write 4x wcorr-calls to .sh script, & another 4x if largePi testing
@@ -561,7 +553,7 @@ class RealCatalogue:
 			# save reduced data to ascii for easy plotting
 
 			reducedData = np.column_stack((realData[0][:,0], realData[i][:,3], Pproperr, Pproperr2, realData[i][:,4], Xproperr, Xproperr2, propgErrs)) # = [r_p, wgplus, BTPerr, JKPerr, wgcross, BTXerr, JKXerr, analyticErrs]
-			ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'BT+err', 'JK+err', 'wgx', 'BTxerr', 'JKxerr', 'analyticerrs'])
+			ascii.write(reducedData, join(easyPlotDir, basename(normpath(path))[6:-4]), delimiter='\t', names=['r_p', 'wg+', 'BT+err', 'JK+err', 'wgx', 'BTxerr', 'JKxerr', 'analyticerrs'], overwrite=1)
 
 		return wcorrOutputs
 
@@ -709,12 +701,10 @@ class RealCatalogue:
 
 		return None
 
-	def jackknife_patches(self, patchDir, patchWeights):
+	def jackknife_patches(self, patchDir):
 		# resample patches & save JK samples
 		patches = [x for x in listdir(patchDir) if ('patch' in x)&('_' in x)]
 		patch_cats = np.array([np.loadtxt(join(patchDir,i)) for i in patches])
-
-		jkweights = patchWeights.copy()
 
 		JKdir = join(patchDir,'JKsamples')
 		if not isdir(JKdir):
@@ -725,7 +715,7 @@ class RealCatalogue:
 			cat_name = join(JKdir,'JKsample%s.asc'%(str(i).zfill(3)))
 			ascii.write(new_cat, cat_name, delimiter='\t', names=['# ra[rad]', 'dec[rad]', 'chi[Mpc/h]', 'e1', 'e2', 'e_weight'], overwrite=1)
 
-		return jkweights
+		return None
 
 	def wcorr_jackknife(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi, densColours):
 		# wcorr JK samples - this function gets called only for shapes samples
@@ -1332,15 +1322,15 @@ if __name__ == "__main__":
 				elif args.jackknife:
 					jkWeights_pop = jkWeights[ skinny_patch_cuts[i] ]
 					print('===================\t %s reduced jkWeights: '%lab, jkWeights_pop.shape)
-					jksample_weights = catalog.jackknife_patches(pDir, jkWeights_pop)
-					np.savetxt(join(catalog.new_root, 'jkWeights_%s.txt'%lab), jksample_weights, header='%s\n%i samples'%(lab, len(jksample_weights)))
-					jknumbers.append(len(jksample_weights))
+					catalog.jackknife_patches(pDir)
+					np.savetxt(join(catalog.new_root, 'jkWeights_%s.txt'%lab), jkWeights_pop, header='%s\n%i samples'%(lab, len(jkWeights_pop)))
+					jknumbers.append(len(jkWeights_pop))
 					jkn_header += '%s\t'%lab
 					if args.makejk_only:
 						print('====================\t====================\t SKIPPING JACKKNIFE CORRELATIONS ====================\t====================\t')
 					else:
 						catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
-					catalog.jackknife(pDir, jksample_weights, error_scaling, 0)
+					catalog.jackknife(pDir, jkWeights_pop, error_scaling, 0)
 			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers.txt'), np.array(jknumbers), header=jkn_header, fmt='%i')
 
 		if args.largePi:
@@ -1389,13 +1379,13 @@ if __name__ == "__main__":
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1) # pDir (patch/cube directory) appended with _largePi
 				if (3<i<8) | ((i>=8) & args.densColours): # density samples ; gen jk samples
 					if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
-					jks_w = catalog.jackknife_patches(pDir, jkWeights) # need this function call for WEIGHTS
+					catalog.jackknife_patches(pDir) # need this function call for WEIGHTS
 
 			# no swot-files for largePi - can't set lower Pi-limit
 			if args.densColours:
 				ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=1, sdss=args.SDSS, ccut=args.cCut)
 			else:
-				ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=0, jk_randoms=1, patch_str='patch', paths='dc0', largePi=1, sdss=args.SDSS, ccut=args.cCut)
+				ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=1, jk_randoms=1, patch_str='patch', paths='dc0', largePi=1, sdss=args.SDSS, ccut=args.cCut)
 
 			jknumbers, jkn_header = [], ''
 			for i, lab in enumerate(catalog.labels[:4]):
@@ -1405,12 +1395,12 @@ if __name__ == "__main__":
 				elif args.jackknife:
 					jkWeights_pop = jkWeights[ skinny_patch_cuts[i] ]
 					print('===================\treduced jkWeights: ', jkWeights_pop.shape)
-					jksample_weights = catalog.jackknife_patches(pDir, jkWeights_pop)
-					np.savetxt(join(catalog.new_root, 'jkWeights_%s_largePi.txt'%lab), jksample_weights, header='%s largePi\n%i samples'%(lab, len(jksample_weights)))
-					jknumbers.append(len(jksample_weights))
+					catalog.jackknife_patches(pDir)
+					np.savetxt(join(catalog.new_root, 'jkWeights_%s_largePi.txt'%lab), jkWeights_pop, header='%s largePi\n%i samples'%(lab, len(jkWeights_pop)))
+					jknumbers.append(len(jkWeights_pop))
 					jkn_header += '%s\t'%lab
 					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
-					catalog.jackknife(pDir, jksample_weights, error_scaling, 1)
+					catalog.jackknife(pDir, jkWeights_pop, error_scaling, 1)
 			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers_largePi.txt'), np.array(jknumbers), header=jkn_header+'\nlargePi', fmt='%i')
 
 	catalog.make_combos(args.densColours)
