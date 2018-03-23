@@ -51,6 +51,7 @@ def plot3dhist(sdss=0, legend=1, binning=100, **cats):
 	    ax[1].legend(handles=h, loc='upper center', fontsize=8, ncol=len(keys)//2)
 	else:
 	    ax[1].legend(handles=h, loc='lower center', fontsize=8, ncol=len(keys)//2)
+	plt.tight_layout()
 	return ax
 	
     
@@ -92,6 +93,7 @@ def plot3dims(sdss=0, legend=1, **cats):
 	    ax[0].legend(handles=h, loc='lower right', fontsize=8, ncol=len(keys)//2)
 	else:
 	    ax[0].legend(handles=h, loc='lower left', fontsize=8, ncol=len(keys)//2)
+	plt.tight_layout()
 	return ax
 
     

@@ -261,8 +261,7 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 
 	if sdss: samples = samples[:2]
 	for s, sample in enumerate(samples):
-		print('reading from: %s' % (['', '(____largePi)'][largePi]) )
-		print(sample)
+		print('reading from:\n%s' % (sample, sample+'_largePi')[largePi] )
 
 		pdir = join(wdir, sample)
 		if largePi:
