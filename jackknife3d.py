@@ -42,8 +42,8 @@ def betwixt((re1,re2,de1,de2,ze1,ze2)):
 		return (ra>=re1)&(ra<=re2)&(dec>=de1)&(dec<=de2)&(z>=ze1)&(z<=ze2)
 	return make_cut
 
-def resample_data(fitsdata, sample_cuts, patchside=6, zcut=None, do_sdss=0, do_3d=1, cube_zdepth=0.06, largePi=0, bitmaskCut=None, occ_thresh=0.67, mask_path='/share/splinter/hj/PhD/pixel_weights.fits'):
-	resampler = resampleTools(fitsdata, patchside, zcut, do_sdss, do_3d, sample_cuts, cube_zdepth=cube_zdepth, largePi=largePi)
+def resample_data(fitsdata, sample_cuts, patchside=6, zcut=None, do_sdss=0, do_3d=1, cube_zdepth=0.06, largePi=0, mice=0, bitmaskCut=None, occ_thresh=0.67, mask_path='/share/splinter/hj/PhD/pixel_weights.fits'):
+	resampler = resampleTools(fitsdata, patchside, zcut, do_sdss, do_3d, sample_cuts, cube_zdepth=cube_zdepth, largePi=largePi, mice=mice)
 
 	# identify masked pixel coordinates
 	# lostpix_coords = resampler.find_lostpixels(bitmaskCut)
@@ -106,7 +106,7 @@ def resample_data(fitsdata, sample_cuts, patchside=6, zcut=None, do_sdss=0, do_3
 	return cubeData, cube_weights, error_scaling, random_cutter
 
 class resampleTools:
-	def __init__(self, fitsdata, patchside, zcut, do_sdss, do_3d, sample_cuts, cube_zdepth=0.06, largePi=0):
+	def __init__(self, fitsdata, patchside, zcut, do_sdss, do_3d, sample_cuts, cube_zdepth=0.06, largePi=0, mice=0):
 		self.cols = [ ['RA_GAMA', 'DEC_GAMA', 'Z_TONRY'], ['ra', 'dec', 'z'] ] [do_sdss]
 		self.ranges = [ [ (i, j, -3., 3., 0., 0.6) for i,j in [ (129.,141.), (174.,186.), (211.5,223.5) ] ], None ] [do_sdss]
 		self.data = fitsdata
@@ -120,6 +120,7 @@ class resampleTools:
 		self.z_side = cube_zdepth
 		self.sample_cuts = sample_cuts
 		self.largePi = largePi
+		self.mice = mice
 
 	def find_lostpixels(self, *bitmask_):
 		# find coordinates of pixels lost to masking
@@ -192,6 +193,9 @@ class resampleTools:
 		if self.largePi:
 			z_num = 0.6//0.1 +1
 		redg,dedg,zedg = np.linspace(0,360,ra_num), np.linspace(-90,90,dec_num), np.linspace(0,0.6,z_num)
+		if self.mice:
+			dec_num = 80//self.dec_side + 1
+			dedg = np.linspace(0, 80, dec_num)
 		if type(self.ranges)!=type(None):
 			print('GAMA equatorial: jackknifing specified ranges...')
 			redg = []
@@ -202,16 +206,17 @@ class resampleTools:
 				ra_num = (edges[1] - edges[0])//self.ra_side + 1
 				redg += list(np.linspace(edges[0], edges[1], ra_num))
 
-		# minimum cube depth = 150 Mpc/h HARD-CODED
-		# largePi jackknife should be done in 2D !!
-		if self.zcut != None: # align with redshift cut
-			ze1 = slice_jackknife(gal_coords.T[2], zmin=0.02, zmax=self.zcut)
-			ze2 = slice_jackknife(gal_coords.T[2], zmin=self.zcut, zmax=0.5)
-			zedg = np.concatenate((ze1[:-1], ze2))
-		elif gama: # or use full gama
-			zedg = slice_jackknife(gal_coords.T[2], zmin=0.02, zmax=0.5)
-		else: # or sdss
-			zedg = slice_jackknife(gal_coords.T[2], zmin=0.02, zmax=0.3)
+		if self.do_3d:
+			# minimum cube depth = 150 Mpc/h HARD-CODED
+			# largePi jackknife should be done in 2D !!
+			if self.zcut != None: # align with redshift cut
+				ze1 = slice_jackknife(gal_coords.T[2], zmin=0.02, zmax=self.zcut)
+				ze2 = slice_jackknife(gal_coords.T[2], zmin=self.zcut, zmax=0.5)
+				zedg = np.concatenate((ze1[:-1], ze2))
+			elif gama: # or use full gama
+				zedg = slice_jackknife(gal_coords.T[2], zmin=0.02, zmax=0.5)
+			else: # or sdss
+				zedg = slice_jackknife(gal_coords.T[2], zmin=0.02, zmax=0.3)
 
 		redg,dedg,zedg = map(lambda x: np.array(x), [redg,dedg,zedg])
 		radiff, decdiff, zdiff = (np.diff(i) for i in [redg,dedg,zedg])
