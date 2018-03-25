@@ -17,7 +17,8 @@ def setup(options):
     # compute W(z) and skip computation of wp(rp)
 	compute_wp = options.get_bool(option_section, 'compute_wp', default=True)
 	wz_section = options.get_string(option_section, 'wz_section', default='')
-	if not compute_wp: assert wz_section != '', "specify W(z) out-section if skipping wp computation; wz_section=______"
+	if not compute_wp:
+		assert wz_section != '', "specify W(z) out-section if skipping wp computation; wz_section=______"
 
     # sections from which to read n(z), proj-fns, NLA power-laws(opt)
 	nz_section = options.get_string(option_section,'nz_section',default='wl_number_density')
@@ -25,10 +26,13 @@ def setup(options):
 	hkl_section = options.get_string(option_section,'projn_section',default='hankel_out')
 	nbin = options.get_int(option_section,'nbin',default=50)
 
-	nla = options.get_bool(option_section,'NLA',default=False) # only need bias factors if using NLA
-	skey = options.get_string(option_section,'shapes_key',default='dummy')
+    # only need bias factors if using NLA
+	nla = options.get_bool(option_section,'NLA',default=True)
+	skey = options.get_string(option_section,'shapes_key')
 	dkey = options.get_string(option_section,'dens_key',default=skey)
-	HOD_bias_loc = options.get_string(option_section,'HOD_bias_loc',default='dummy/dummy') # hod_section/name of HOD generated bias(z) for manual appln to matter-int spectra
+
+    # hod_section/name of HOD generated bias(z) for manual appln to matter-int spectra
+	HOD_bias_loc = options.get_string(option_section,'HOD_bias_loc',default='dummy/dummy')
 	HOD_bias_loc = HOD_bias_loc.split('/')
 	if nla & (HOD_bias_loc[0]!='dummy'):
 		print('HOD/HM & NLA conflict !!')
@@ -36,7 +40,8 @@ def setup(options):
 		sys.exit()
 
 	wgg = options.get_bool(option_section,'do_wgg',default=False)
-	wg_section = options[option_section,'wg_section'] # for weight/corrn fn outputs
+    # for weight/corrn fn outputs
+	wg_section = options[option_section,'wg_section']
 
 	# return the config for execute fn
 	config = {
@@ -84,7 +89,7 @@ def execute(block, config):
 	Rmag = block.get_double(IA_section, 'Rmag_%s'%skey, default=0.)
 
 	# compute W(z)
-	Wz,Wz_scaled = compute_Wz(z,nofz_shap,nofz_dens,eta,beta,Rmag,wgg)
+	Wz, Wz_scaled = compute_Wz(z, nofz_shap, nofz_dens, eta, beta, Rmag, wgg)
 	# ^wgg switch prevents application of power-law scalings to gg
 
 	if not compute_wp:
@@ -96,13 +101,15 @@ def execute(block, config):
 
 	else:
 		# compute wp(rp)
-		wg_rz = np.array([block[hkl_section,'bin_%s_%s'%(i+1,i+1)] for i in range(nbin)])
+		wg_rz = np.array([block[hkl_section, 'bin_%s_%s'%(i+1, i+1)] for i in range(nbin)])
+
 		if HOD_bias_loc[0] != 'dummy':
 			b_z = block[HOD_bias_loc[0], HOD_bias_loc[1]]
 			assert len(wg_rz)==len(b_z), 'wgp(r, z) vs. HOD bias(z) length mismatch'
 			wg_rz = (wg_rz.T * b_z).T
 			if wgg:
 				wg_rz = (wg_rz.T * b_z).T
+
 		wg_r = compute_wgp(Wz_scaled,wg_rz,nbin,dz)
 
 		tags = ['wgp','wgg']
@@ -115,8 +122,11 @@ def execute(block, config):
 				print('skey must be colour-specific!!')
 				sys.exit()
 
+			shear_responsivity = block[IA_section, 'SR_%s'%skey]
+
 			if not wgg:
 				wg_r *= A_i
+				wg_r /= shear_responsivity
 
 			bg = block[bias_section,'b_g_%s'%dkey]
 			wg_r *= bg
