@@ -1440,9 +1440,9 @@ if __name__ == "__main__":
 					# apply colour cut to SDSS randoms - creates much better n(z) wrt real samples
 					r_redcut = np.array(catalog2.data['color'] > args.cCut)
 					if samz_k.endswith('r'):
-						r_3cols = randoms_3cols[ r_redcut ]
+						r_3cols = randoms_3col[ r_redcut ]
 					elif samz_k.endswith('b'):
-						r_3cols = randoms_3cols[ ~r_redcut ]
+						r_3cols = randoms_3col[ ~r_redcut ]
 				else:
 					r_3cols = randoms_3col.copy()
 			else:
