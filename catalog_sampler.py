@@ -31,13 +31,14 @@ ds_jkfunc = ds.make_jks
 
 class RealCatalogue:
 
-	def __init__(self, path, DEI, mc, SDSS, cols=None, largePi=0): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
+	def __init__(self, path, DEI, mc, SDSS, cols=None, largePi=0, MICEdensity=0): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
 		"""""
 		read-in catalogue
 
 		"""""
 		self.path = path
 		self.largePi = largePi
+		self.MICEdensity = MICEdensity
 		GAMAheads = ['ra', 'dec', 'z', 'e1', 'e2', 'RankBCG', 'logmstar', 'pgm', 'absmag_g', 'absmag_r', 'mask']
 		SDSSheads = ['ra', 'dec', 'z', 'e1', 'e2', 'sigma_gamma', 'rf_g-r']
 		if DEI:					################# GET RID OF PGM #################
@@ -242,18 +243,21 @@ class RealCatalogue:
 			BCGargs = (0, 0)
 
 		# apply cuts
-		self.highz_R = self.data[(z_cut&red_cut&bitmask_cut&BCG_sc&lmstar_cut)]
-		self.highz_B = self.data[(z_cut&blue_cut&bitmask_cut&BCG_sc&lmstar_cut)]
-		self.lowz_R = self.data[(z_cut_r&red_cut&bitmask_cut&BCG_sc&lmstar_cut)]
-		self.lowz_B = self.data[(z_cut_r&blue_cut&bitmask_cut&BCG_sc&lmstar_cut)]
+		self.highz_R = self.data[(z_cut & red_cut & bitmask_cut & BCG_sc & lmstar_cut)]
+		self.highz_B = self.data[(z_cut & blue_cut & bitmask_cut & BCG_sc & lmstar_cut)]
+		self.lowz_R = self.data[(z_cut_r & red_cut & bitmask_cut & BCG_sc & lmstar_cut)]
+		self.lowz_B = self.data[(z_cut_r & blue_cut & bitmask_cut & BCG_sc & lmstar_cut)]
 
-		self.highz_R_UnM = self.data[(z_cut&red_cut&BCG_sc&lmstar_cut)]
-		self.highz_B_UnM = self.data[(z_cut&blue_cut&BCG_sc&lmstar_cut)]
-		self.lowz_R_UnM = self.data[(z_cut_r&red_cut&BCG_sc&lmstar_cut)]
-		self.lowz_B_UnM = self.data[(z_cut_r&blue_cut&BCG_sc&lmstar_cut)]
+		if self.MICEdensity:
+			MICE_limit = self.data['absmag_r'] < -18.9
+			BCG_dc &= MICE_limit
+		self.highz_R_UnM = self.data[(z_cut & red_cut & BCG_dc & lmstar_cut)]
+		self.highz_B_UnM = self.data[(z_cut & blue_cut & BCG_dc & lmstar_cut)]
+		self.lowz_R_UnM = self.data[(z_cut_r & red_cut & BCG_dc & lmstar_cut)]
+		self.lowz_B_UnM = self.data[(z_cut_r & blue_cut & BCG_dc & lmstar_cut)]
 
-		self.highz = self.data[(z_cut&BCG_dc&lmstar_cut)]
-		self.lowz = self.data[(z_cut_r&BCG_dc&lmstar_cut)]
+		self.highz = self.data[(z_cut & BCG_dc & lmstar_cut)]
+		self.lowz = self.data[(z_cut_r & BCG_dc & lmstar_cut)]
 
 		self.samplecounts = []
 
@@ -279,16 +283,16 @@ class RealCatalogue:
 		self.BCG_sc = BCG_sc
 		self.BCGargs = BCGargs
 
-		self.hzr_cut = (self.zcut&self.redcut&self.bitmaskcut&self.BCG_sc&self.lmstarcut)
-		self.hzb_cut = (self.zcut&self.bluecut&self.bitmaskcut&self.BCG_sc&self.lmstarcut)
-		self.lzr_cut = (self.zcut_r&self.redcut&self.bitmaskcut&self.BCG_sc&self.lmstarcut)
-		self.lzb_cut = (self.zcut_r&self.bluecut&self.bitmaskcut&self.BCG_sc&self.lmstarcut)
-		self.hzrU_cut = (self.zcut&self.redcut&self.BCG_sc&self.lmstarcut)
-		self.hzbU_cut = (self.zcut&self.bluecut&self.BCG_sc&self.lmstarcut)
-		self.lzrU_cut = (self.zcut_r&self.redcut&self.BCG_sc&self.lmstarcut)
-		self.lzbU_cut = (self.zcut_r&self.bluecut&self.BCG_sc&self.lmstarcut)
-		self.hzU_cut = (self.zcut&self.BCG_sc&self.lmstarcut)
-		self.lzU_cut = (self.zcut_r&self.BCG_sc&self.lmstarcut)
+		self.hzr_cut = (self.zcut & self.redcut & self.bitmaskcut & self.BCG_sc & self.lmstarcut)
+		self.hzb_cut = (self.zcut & self.bluecut & self.bitmaskcut & self.BCG_sc & self.lmstarcut)
+		self.lzr_cut = (self.zcut_r & self.redcut & self.bitmaskcut & self.BCG_sc & self.lmstarcut)
+		self.lzb_cut = (self.zcut_r & self.bluecut & self.bitmaskcut & self.BCG_sc & self.lmstarcut)
+		self.hzrU_cut = (self.zcut & self.redcut & self.BCG_dc & self.lmstarcut)
+		self.hzbU_cut = (self.zcut & self.bluecut & self.BCG_dc & self.lmstarcut)
+		self.lzrU_cut = (self.zcut_r & self.redcut & self.BCG_dc & self.lmstarcut)
+		self.lzbU_cut = (self.zcut_r & self.bluecut & self.BCG_dc & self.lmstarcut)
+		self.hzU_cut = (self.zcut & self.BCG_dc & self.lmstarcut)
+		self.lzU_cut = (self.zcut_r & self.BCG_dc & self.lmstarcut)
 		self.samplecuts = np.array([self.hzr_cut,self.hzb_cut,self.lzr_cut,self.lzb_cut,
 							self.hzrU_cut,self.hzbU_cut,self.lzrU_cut,self.lzbU_cut,
 							self.hzU_cut,self.lzU_cut])
@@ -764,7 +768,7 @@ class RealCatalogue:
 			realcorr[:, 3:5] -= randcorr[:, 3:5]
 			np.savetxt(real_out, realcorr)
 
-			# clean up - if needing to analyse JKs, comment out below and use arg 'makejk_only'
+			# clean up - if needing to analyse JKs, use arg 'makejk_only'- bypasses this function
 			os.system('rm %s'%rand_out) # random wcorr
 			os.system('rm %s_d'%join(JKdir, jk)) # copied density JK sample
 			os.system('rm %s'%join(JKdir, randjk)) # copied random JK sample
@@ -1151,6 +1155,16 @@ if __name__ == "__main__":
 	type=np.float32,
 	default=(-0.0040, -0.0035),
 	help='m1, m2 multiplicative ellipticity biases, default=(-0.0040, -0.0035) - C.Georgiou etal. Table 1')
+	parser.add_argument(
+	'-MICEdens',
+	type=int,
+	default=0,
+	help='1=limit density samples to M_r < -18.9, aligning with MICE sims resolution from which clustering errors and hence sample biases are derived. Default=0')
+	parser.add_argument(
+	'-make_shear',
+	type=int,
+	default=0,
+	help='1=convert ellipticity correlations/covariances to shear (post-processing), calculating responsivities from shape sample ellipticity distributions. Default=0')
 	args = parser.parse_args()
 
 	if args.Catalog.startswith('MUST'):
@@ -1159,7 +1173,7 @@ if __name__ == "__main__":
 
 	print('=======================\tREADING CATALOG: %s'%args.Catalog)
 
-	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS, cols=args.cols, largePi=args.largePi)
+	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS, cols=args.cols, largePi=args.largePi, MICEdensity=args.MICEdens)
 
 	if args.plotNow:
 		# reduce & save data files, returning filename-list
@@ -1486,11 +1500,17 @@ if __name__ == "__main__":
 
 		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.largePi, 'rand_wcorr')
 
-		if args.plot:
-			with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
+		with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
+			if args.plot:
+				script.write('\n')
 				script.write(
 				'\npython /share/splinter/hj/PhD/catalog_sampler.py -Catalog %s -Path %s -plotNow 1 -chiSqu 0 -bootstrap %s -jackknife %s -SDSS %s'%(args.Catalog, catalog.new_root, args.bootstrap, args.jackknife, args.SDSS)
 				)
+				script.write('\n')
+
+			if args.make_shear:
+				script.write('\n')
+				script.write('\npython ShearResp.py %s %s' % (('-gama', '-sdss')[args.SDSS], catalog.new_root))
 				script.write('\n')
 
 		if args.wcorr:
