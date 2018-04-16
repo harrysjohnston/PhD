@@ -13,12 +13,12 @@ if __name__ == '__main__':
 	parser.add_argument(
 		'-gama',
 		type=str,
-		default=PHD + "Wcorr_jk3x5_24_02_18_z0.26_c0.66/",
+		default=PHD + "Wcorr_GAMA_final_z0.26_c0.66/",
 		help='path to GAMA Wcorr directory')
 	parser.add_argument(
 		'-sdss',
 		type=str,
-		default=PHD + "Wcorr_SDSS_jk10x10_25_02_18_c0.66/",
+		default=PHD + "Wcorr_SDSS_final_c0.66/",
 		help='path to SDSS Wcorr directory')
 	parser.add_argument(
 		'-do_gama',
