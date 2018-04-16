@@ -148,14 +148,14 @@ def unit_check(cat, give_back='degrees', tag=''):
 		cat_ = cat.copy()
 		#print('converting %s from %s to %s..'%(tag, current, give_back))
 		if current == 'radians':
-			cat_.T[:2] *= (180/np.pi)
+			cat_.T[:2] *= (180./np.pi)
 		else:
-			cat_.T[:2] *= (np.pi/180)
+			cat_.T[:2] *= (np.pi/180.)
 		return cat_
 	else:
 		return cat
 
-def downsample(randoms, sample_z, nbin=12, target_nz=11):
+def downsample(randoms, sample_z, nbin=1, target_nz=10):
 	# downsample artificial randoms to match mocks' N(z)
 	if all(sample_z < 1.):
 		assert all(randoms.T[2] < 1.), 'RANDOMS vs. REALS z/chi mismatched! Patches in REDSHIFT'
@@ -202,7 +202,7 @@ def para_jk_save(jkdir, patches, save_jks, jk_randoms, randoms, units, names, ra
 	# define JK samples, real and/or random, 1-per-patch
 	jksample_str = join(jkdir, 'JKsample%s.asc'%(str(j).zfill(3)))
 	jk_rand_str = join(jkdir, 'rand_JKsample%s.asc'%(str(j).zfill(3)))
-		
+
 	if save_jks:
 		del_one_patches = np.delete(patches, j, axis=0)
 		jksample = np.concatenate(del_one_patches)
