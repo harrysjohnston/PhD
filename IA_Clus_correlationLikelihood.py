@@ -39,7 +39,6 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood): # called 'wgplus' but works
 		data_file = self.options.get_string("data_file")
 		self.NLA = self.options.get_bool("NLA")
 		self.drop_large_bins = self.options.get_int("drop_large_bins", default=0)
-		#self.drop_point = self.options.get_int("drop_point", default=None)
 		try:
 			rp,wgp = np.loadtxt(data_file).T[:2]
 		except ValueError:
@@ -55,8 +54,6 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood): # called 'wgplus' but works
 		if self.drop_large_bins!=0:
 			print('DISCARDING %s largest r_p bins'%self.drop_large_bins)
 			rp, wgp = rp[:-self.drop_large_bins], wgp[:-self.drop_large_bins]
-
-		if self.
 
 		# define relevant x-range for theory curve
 		self.data_x_range = (rp.min()*0.8, rp.max()*1.2)
