@@ -42,7 +42,7 @@ def betwixt((re1,re2,de1,de2,ze1,ze2)):
 		return (ra>=re1)&(ra<=re2)&(dec>=de1)&(dec<=de2)&(z>=ze1)&(z<=ze2)
 	return make_cut
 
-def resample_data(fitsdata, sample_cuts, patchside=6, zcut=None, do_sdss=0, do_3d=1, cube_zdepth=0.06, largePi=0, mice=0, bitmaskCut=None, occ_thresh=0.67, mask_path='/share/splinter/hj/PhD/pixel_weights.fits'):
+def resample_data(fitsdata, sample_cuts, patchside=6, zcut=None, do_sdss=0, do_3d=1, cube_zdepth=0.06, largePi=0, mice=0, bitmaskCut=None, occ_thresh=0.67, mask_path='/share/splinter/hj/PhD/pixel_weights.fits', SHIFT=0):
 	resampler = resampleTools(fitsdata, patchside, zcut, do_sdss, do_3d, sample_cuts, cube_zdepth=cube_zdepth, largePi=largePi, mice=mice)
 
 	# identify masked pixel coordinates
@@ -56,7 +56,7 @@ def resample_data(fitsdata, sample_cuts, patchside=6, zcut=None, do_sdss=0, do_3
 		pixel_coords = None
 
 	# define patches & their degree of masking
-	patch_cuts, patch_weights, patch_idx, edges = resampler.define_edgecuts(pixel_coords=pixel_coords)
+	patch_cuts, patch_weights, patch_idx, edges = resampler.define_edgecuts(pixel_coords=pixel_coords, SHIFT=SHIFT)
 
 	# apply patch cuts to data
 	patches = resampler.make_patches(fitsdata, patch_cuts)
@@ -180,7 +180,7 @@ class resampleTools:
 		pixel_coords = np.column_stack(( ra, dec, z, mask_map ))
 		return pixel_coords
 
-	def define_edgecuts(self, pixel_coords=None): # if gama, pixel_coords has 4 cols = (ra, dec, z(dummy), weight) and npix-rows
+	def define_edgecuts(self, pixel_coords=None, SHIFT=0): # if gama, pixel_coords has 4 cols = (ra, dec, z(dummy), weight) and npix-rows
 		# given desired patch/box-sizes, divide sky into patches
 		# return sets of patch-cuts for application to catalogs, with weights due to lost pixels
 
@@ -200,7 +200,11 @@ class resampleTools:
 			print('GAMA equatorial: jackknifing specified ranges...')
 			redg = []
 			dec_num = 6.//self.dec_side +1
-			dedg = np.linspace(-3., 3., dec_num)
+			if SHIFT:
+				dec_num = int(5.//self.dec_side +1)
+				dedg = np.linspace(-2., 3., dec_num)
+			else:
+				dedg = np.linspace(-3., 3., dec_num)
 			zedg = np.linspace(0., 0.6, z_num)
 			for edges in self.ranges:
 				ra_num = (edges[1] - edges[0])//self.ra_side + 1
