@@ -31,7 +31,7 @@ ds_jkfunc = ds.make_jks
 
 class RealCatalogue:
 
-	def __init__(self, path, DEI, mc, SDSS, cols=None, largePi=0, MICEdensity=0): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
+	def __init__(self, path, DEI, mc, SDSS, cols=None, largePi=0, MICEdensity=0, SHIFT=0): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
 		"""""
 		read-in catalogue
 
@@ -40,13 +40,13 @@ class RealCatalogue:
 		self.largePi = largePi
 		self.MICEdensity = MICEdensity
 		GAMAheads = ['ra', 'dec', 'z', 'e1', 'e2', 'RankBCG', 'logmstar', 'pgm', 'absmag_g', 'absmag_r', 'mask']
-		SDSSheads = ['ra', 'dec', 'z', 'e1', 'e2', 'sigma_gamma', 'rf_g-r']
+		SDSSheads = ['ra', 'dec', 'z', 'e1', 'e2', 'sigma_gamma', 'rf_g-r', 'absmag_r']
 		if DEI:					################# GET RID OF PGM #################
-			self.headers = dict( zip( GAMAheads, ['RA_GAMA', 'DEC_GAMA', 'Z_TONRY', 'e1', 'e2', 'RankBCG', 'logmstar', 'pgm', 'absmag_g', 'absmag_r', 'MASK'] ) )
+			self.headers = dict( zip( GAMAheads, ['RA_GAMA', 'DEC_GAMA', 'Z_TONRY', 'e1_r', 'e2_r', 'RankBCG', 'logmstar', 'pgm', 'absmag_g', 'absmag_r', 'MASK_r'] ) )
 			self.DEI = 1
 			self.SDSS = 0
 		if SDSS:
-			self.headers = dict( zip( SDSSheads, SDSSheads ) )
+			self.headers = dict( zip( SDSSheads, SDSSheads[:-1] + ['M_r'] ) )
 			self.DEI = DEI = 0
 			self.SDSS = 1
 		if not DEI | SDSS:
@@ -66,12 +66,19 @@ class RealCatalogue:
 		hdulist = fits.open(path)
 		data = hdulist[1].data
 
+		if (not SDSS) & SHIFT:
+			g12_ra = data[ self.headers['ra'] ]
+			shifted_dec = data[ self.headers['dec'] ]
+			G12 = (g12_ra > 170) & (g12_ra < 190)
+			shifted_dec = np.where(G12, shifted_dec + 1, shifted_dec)
+			data[ self.headers['dec'] ] = shifted_dec
+
 		print('SELECTING R_MAG < %s'%mc)
 		if DEI:
 			fs = data['fluxscale']
 		else:
 			fs = np.ones(len(data))
-		Mr = data[['absmag_r', 'M_r'][self.SDSS]]
+		Mr = data[[self.headers['absmag_r'], 'M_r'][self.SDSS]]
 		Mr = np.where(fs >= 1., Mr - 2.5*np.log10(fs), Mr)
 		data = data[Mr < mc]
 
@@ -249,7 +256,10 @@ class RealCatalogue:
 		self.lowz_B = self.data[(z_cut_r & blue_cut & bitmask_cut & BCG_sc & lmstar_cut)]
 
 		if self.MICEdensity:
-			MICE_limit = self.data['absmag_r'] < -18.9
+			fs = self.data['fluxscale']
+			Mr = self.data[self.headers['absmag_r']]
+			Mr = np.where(fs >= 1., Mr - 2.5*np.log10(fs), Mr)
+			MICE_limit = Mr < -19.67
 			BCG_dc &= MICE_limit
 		self.highz_R_UnM = self.data[(z_cut & red_cut & BCG_dc & lmstar_cut)]
 		self.highz_B_UnM = self.data[(z_cut & blue_cut & BCG_dc & lmstar_cut)]
@@ -269,7 +279,7 @@ class RealCatalogue:
 				fs = sample['fluxscale']
 			else:
 				fs = np.ones(len(sample))
-			Mr = sample[['absmag_r', 'M_r'][self.SDSS]]
+			Mr = sample[[self.headers['absmag_r'], 'M_r'][self.SDSS]]
 			Mr = np.where(fs >= 1., Mr - 2.5*np.log10(fs), Mr)
 			self.Rmags.append(np.mean(Mr + 22.))
 		self.zcut = z_cut
@@ -279,7 +289,7 @@ class RealCatalogue:
 		self.lmstarcut = lmstar_cut
 		self.bitmaskcut = bitmask_cut
 		self.pgmcut = pgm_cut
-		self.BCG_dc = BCG_dc
+		self.BCG_dc = BCG_dc # contains MICE limit if appl.
 		self.BCG_sc = BCG_sc
 		self.BCGargs = BCGargs
 
@@ -322,7 +332,8 @@ class RealCatalogue:
 			e2 *= -1
 
 		if self.DEI:
-			flag_cols = [i for i in table.columns.names if i.startswith('flag_DEIMOS')]
+			#flag_cols = [i for i in table.columns.names if i.startswith('flag_DEIMOS')]
+			flag_cols = [i for i in table.columns.names if i == 'flag_DEIMOS_r']
 			shape_cut = np.ones_like(e1)
 			for fc in flag_cols:
 				shape_cut *= np.where(table[fc]=='0000', 1, 0)
@@ -839,7 +850,7 @@ class RealCatalogue:
 			mkdir(toplotDir)
 		if not largePi:
 			corrName = join(toplotDir,'JKcorrcoeff_%s'%label)
-			ascii.write(Rp, corrName, delimiter='\t', overwrite=1)
+			#ascii.write(Rp, corrName, delimiter='\t', overwrite=1)
 
 		for covs in cov_combos:
 			covName = join(toplotDir,'JKcovar%s_%s'%(covs[1],label))
@@ -862,7 +873,7 @@ class RealCatalogue:
 
 class RandomCatalogue(RealCatalogue):
 
-	def __init__(self, path, densColours, sdss):
+	def __init__(self, path, densColours, sdss, SHIFT=0):
 		"""""
 		read-in catalogue
 
@@ -876,6 +887,13 @@ class RandomCatalogue(RealCatalogue):
 		self.labels = [['rand_highZ','rand_lowZ'],['rand_highZ_Red','rand_highZ_Blue','rand_lowZ_Red','rand_lowZ_Blue']][densColours]
 		self.samples = []
 		self.samplecounts = []
+
+		if (not sdss) & SHIFT:
+			random_ra = self.data[ self.headers['ra'] ].copy()
+			shifted_dec = self.data[ self.headers['dec'] ].copy()
+			G12 = (random_ra > 170) & (random_ra < 190)
+			shifted_dec = np.where(G12, shifted_dec + 1, shifted_dec)
+			self.data[ self.headers['dec'] ] = shifted_dec
 
 	def cut_columns(self, table, h): 
 		"""""
@@ -1165,7 +1183,13 @@ if __name__ == "__main__":
 	type=int,
 	default=0,
 	help='1=convert ellipticity correlations/covariances to shear (post-processing), calculating responsivities from shape sample ellipticity distributions. Default=0')
+	parser.add_argument(
+	'-SHIFT',
+	type=int,
+	default=0,
+	help='1=SHIFT ALL DECLINATIONS IN G12 +1deg - for jackknife testing. Default=0')
 	args = parser.parse_args()
+	SHIFT = args.SHIFT
 
 	if args.Catalog.startswith('MUST'):
 		print(args.Catalog.split('_'))
@@ -1173,7 +1197,7 @@ if __name__ == "__main__":
 
 	print('=======================\tREADING CATALOG: %s'%args.Catalog)
 
-	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS, cols=args.cols, largePi=args.largePi, MICEdensity=args.MICEdens)
+	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS, cols=args.cols, largePi=args.largePi, MICEdensity=args.MICEdens, SHIFT=SHIFT)
 
 	if args.plotNow:
 		# reduce & save data files, returning filename-list
@@ -1258,7 +1282,7 @@ if __name__ == "__main__":
 
 			# jkData.shape = (10 subsamples, N patches/cubes)
 			# random_cutter = N_patch array of functions, each to be applied to (ra, dec, z) of randoms
-			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=0, bitmaskCut=args.bitmaskCut, occ_thresh=args.occ_thresh)
+			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=0, bitmaskCut=args.bitmaskCut, occ_thresh=args.occ_thresh, SHIFT=SHIFT)
 			print('jkData: ', jkData.shape)
 			print('jkWeights: ', jkWeights.shape, '\n', jkWeights)
 			print('=======================\t=======================\terror_scaling: ', error_scaling)
@@ -1269,6 +1293,13 @@ if __name__ == "__main__":
 			if args.SDSS:
 				rand_colour = fits.open(args.Random)[1].data['color']
 				jkrandoms = np.column_stack(( jkrandoms, rand_colour ))
+
+			if (not args.SDSS) & SHIFT:
+				random_ra = jkrandoms.T[0].copy()
+				shifted_dec = jkrandoms.T[1].copy()
+				G12 = (random_ra > 170) & (random_ra < 190)
+				shifted_dec = np.where(G12, shifted_dec + 1, shifted_dec)
+				jkrandoms[:, 1] = shifted_dec
 
 			zlabel = ('Z_TONRY', 'z')[args.SDSS]
 			sample_z = catalog.data[zlabel]
@@ -1348,7 +1379,7 @@ if __name__ == "__main__":
 			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers.txt'), np.array(jknumbers), header=jkn_header, fmt='%i')
 
 		if args.largePi:
-			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut)
+			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut, SHIFT=SHIFT)
 			Njkregions = len(jkData[0])
 
 			# read & downsample randoms, for JK trimming
@@ -1357,6 +1388,13 @@ if __name__ == "__main__":
 			if args.SDSS:
 				rand_colour = fits.open(args.Random)[1].data['color']
 				jkrandoms = np.column_stack(( jkrandoms, rand_colour ))
+
+			if (not args.SDSS) & SHIFT:
+				random_ra = jkrandoms.T[0].copy()
+				shifted_dec = jkrandoms.T[1].copy()
+				G12 = (random_ra > 170) & (random_ra < 190)
+				shifted_dec = np.where(G12, shifted_dec + 1, shifted_dec)
+				jkrandoms[:, 1] = shifted_dec
 
 			zlabel = ('Z_TONRY', 'z')[args.SDSS]
 			sample_z = catalog.data[zlabel]
@@ -1438,7 +1476,7 @@ if __name__ == "__main__":
 		os.system('qsub '+ join(catalog.new_root, 'real_wcorr.sh'))
 
 	if args.Random != None:
-		catalog2 = RandomCatalogue(args.Random, args.densColours, args.SDSS)
+		catalog2 = RandomCatalogue(args.Random, args.densColours, args.SDSS, SHIFT=SHIFT)
 		randoms_3col = np.column_stack(( catalog2.data[catalog2.headers['ra']], catalog2.data[catalog2.headers['dec']], catalog2.data[catalog2.headers['z']] ))
 
 		for samz_k in samz_keys:
