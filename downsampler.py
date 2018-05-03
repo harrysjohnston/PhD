@@ -320,7 +320,7 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 		# downsample randoms to patches
 		patches_z = np.concatenate(patches, axis=0).T[2]
 		print('downsampling patched randoms before JK sampling..')
-		ds_randoms = downsample(copy_randoms, patches_z, nbin=(3, 1)[sdss], target_nz=10)
+		ds_randoms = downsample(copy_randoms, patches_z, nbin=(1, 1)[sdss], target_nz=10)
 		#print('ds_randoms.shape: ', ds_randoms.shape)
 
 		names = ascii.read(join(pdir, ldir[0])).keys()

@@ -18,15 +18,15 @@ def read_ncats(*paths):
 
 	return dict(zip(paths, np.array(catalog_array)))
 
-def read_cats(sample_path, jk_number=0, shapes_patch=0):
-	dens_path = basename(normpath(sample_path)) + '_UnMasked'
-	if shapes_patch:
-		shapes = np.loadtxt( join( sample_path, sample_path + '%spatch.asc'%str(jk_number).zfill(3) ))
-	else:
-		shapes = np.loadtxt( join( sample_path, 'JKsamples', 'JKsample%s.asc'%str(jk_number).zfill(3) ))
-	densities = np.loadtxt( join( dens_path, 'JKsamples', 'JKsample%s.asc'%str(jk_number).zfill(3) ))
-	randoms = np.loadtxt( join( dens_path, 'JKsamples', 'rand_JKsample%s.asc'%str(jk_number).zfill(3) ))
-	return shapes, densities, randoms
+#def read_cats(sample_path, jk_number=0, shapes_patch=0):
+#	dens_path = basename(normpath(sample_path)) + '_UnMasked'
+#	if shapes_patch:
+#		shapes = np.loadtxt( join( sample_path, sample_path + '%spatch.asc'%str(jk_number).zfill(3) ))
+#	else:
+#		shapes = np.loadtxt( join( sample_path, 'JKsamples', 'JKsample%s.asc'%str(jk_number).zfill(3) ))
+#	densities = np.loadtxt( join( dens_path, 'JKsamples', 'JKsample%s.asc'%str(jk_number).zfill(3) ))
+#	randoms = np.loadtxt( join( dens_path, 'JKsamples', 'rand_JKsample%s.asc'%str(jk_number).zfill(3) ))
+#	return shapes, densities, randoms
 
 def plot3dhist(sdss=0, legend=1, binning=100, **cats):
     keys = cats.keys()

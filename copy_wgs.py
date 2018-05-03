@@ -58,10 +58,6 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 
 	# SPECIFY PATHS TO POINT TO CATALOG_SAMPLER OUTPUT DIRECTORY
-	# Standard
-	#gama = PHD + "Wcorr_jk3x5_24_02_18_z0.22_c0.66/"
-	#gama = PHD + "Wcorr_jk3x5_24_02_18_z0.26_c0.66/"
-	#sdss = PHD + "Wcorr_SDSS_jk10x10_25_02_18_c0.66/"
 	gama = args.gama
 	sdss = args.sdss
 
@@ -69,8 +65,8 @@ if __name__ == '__main__':
 	#HH = 0
 	HH = args.hh
 	if HH:
-		gama = PHD + "Wcorr_HH_jk4x5_25_02_18_allz/"
-		sdss = PHD + "Wcorr_HH_SDSS_jk10x10_25_02_18_allz/"
+		gama = PHD + "Wcorr_HH_GAMA_allz/"
+		sdss = PHD + "Wcorr_HH_SDSS_allz/"
 
 	# largePi
 	#largePi = 1

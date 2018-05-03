@@ -491,6 +491,7 @@ class RealCatalogue:
 		Text = '\n'.join(shell_script)
 		Write.write(str(Text))
 		Write.close()
+		os.system('chmod +x %s'%File)
 
 	def plot_wcorr(self, files_path, wcorrIDs, BT, JK, largePi):
 		wcorrOutputs = []
@@ -1500,7 +1501,8 @@ if __name__ == "__main__":
 			else:
 				r_3cols = randoms_3col.copy()
 
-			nbins = (3, 1)[args.SDSS] # currenty favoured: GAMA=1 (or 3?), SDSS=1(if can split red/blue)
+			#nbins = (1, 1)[args.SDSS] # currenty favoured: GAMA=1 (or 3?), SDSS=1(if can split red/blue)
+			nbins = 1
 			ds_randoms = ds.downsample(r_3cols, sam_z, nbin=nbins, target_nz=10)
 			catalog2.samples.append( ds_randoms )
 			catalog2.samplecounts.append( len(ds_randoms) )
