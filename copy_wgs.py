@@ -72,8 +72,8 @@ if __name__ == '__main__':
 	#largePi = 1
 	largePi = args.lpi
 	if largePi:
-		gama = PHD + "Wcorr_GAMA_largePi_jk3x5_6rpbins_z0.26_c0.66/"
-		sdss = PHD + "Wcorr_SDSS_largePi_jk10x10_6rpbins_c0.66/"
+		gama = PHD + "Wcorr_GAMA_largePi_final_z0.26_c0.66/"
+		sdss = PHD + "Wcorr_SDSS_largePi_final_c0.66/"
 
 	# COPY WG+/x FILES FROM GAMA AND/OR SDSS OUTPUT DIRS
 	#do_gama = 1

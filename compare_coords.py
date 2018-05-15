@@ -41,7 +41,7 @@ def plot3dhist(sdss=0, legend=1, binning=100, **cats):
 	for i, k in enumerate(keys):
         	bins = ( np.linspace(cats[k].T[0].min(), cats[k].T[0].max(), binning + 1), np.linspace(cats[k].T[1].min(), cats[k].T[1].max(), binning+ 1), np.linspace(cats[k].T[2].min(), cats[k].T[2].max(), binning + 1) ) [x]
 		lab = basename( normpath(k) )
-		h_x, e_x, p = ax[x].hist(cats[k].T[x], bins=bins, stacked=True, normed=True, color=cmap[i], histtype='step', lw=2, alpha=0.7, label=lab)
+		h_x, e_x, p = ax[x].hist(cats[k].T[x], bins=bins, normed=True, color=cmap[i], histtype='step', lw=2, alpha=0.7, label=lab)
 		ax[x].set_ylim( h_x.min(), h_x.max()*1.1 )
 	ax[x].grid(which='both', ls='-', alpha=0.2)
 
