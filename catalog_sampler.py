@@ -28,6 +28,7 @@ import astropy.stats as astat
 import jackknife3d as jk3d
 import downsampler as ds
 ds_jkfunc = ds.make_jks
+import pickle
 
 class RealCatalogue:
 
@@ -269,11 +270,18 @@ class RealCatalogue:
 		self.highz = self.data[(z_cut & BCG_dc & lmstar_cut)]
 		self.lowz = self.data[(z_cut_r & BCG_dc & lmstar_cut)]
 
+		self.samples = [self.highz_R, self.highz_B, self.lowz_R, self.lowz_B, 
+						self.highz_R_UnM, self.highz_B_UnM, self.lowz_R_UnM, self.lowz_B_UnM, 
+						self.highz, self.lowz]
+		self.keys = ['z2_r', 'z2_b', 'z1_r', 'z1_b',
+					'z2_r_unm', 'z2_b_unm', 'z1_r_unm', 'z1_b_unm',
+					'z2', 'z1']
 		self.samplecounts = []
 
-		# save cuts for later use
+		# save cuts & sample properties
 		self.Rmags = []
-		for sample in [self.highz_R,self.highz_B,self.lowz_R,self.lowz_B]:
+		Sprops = {}
+		for key, sample in zip(self.keys, self.samples):
             # save mean diff to pivot magnitude
 			if self.DEI:
 				fs = sample['fluxscale']
@@ -281,7 +289,20 @@ class RealCatalogue:
 				fs = np.ones(len(sample))
 			Mr = sample[[self.headers['absmag_r'], 'M_r'][self.SDSS]]
 			Mr = np.where(fs >= 1., Mr - 2.5*np.log10(fs), Mr)
-			self.Rmags.append(np.mean(Mr + 22.))
+			if key in self.keys[:4]:
+				self.Rmags.append(np.mean(Mr + 22.))
+
+			Sprops['L_%s'%key] = 10**(-0.4 * np.mean(Mr + 22.))
+			Sprops['Z_%s'%key] = np.mean(sample[self.headers['z']])
+			if colour_ is None:
+				if self.DEI:
+					colour = sample[self.headers['absmag_g']] - sample[self.headers['absmag_r']]
+				if self.SDSS:
+					colour = sample[self.headers['rf_g-r']]
+				Sprops['RF_%s'%key] = (colour > 0.66).sum() / float(len(colour))
+
+		self.Sprops = Sprops
+
 		self.zcut = z_cut
 		self.zcut_r = z_cut_r
 		self.redcut = red_cut
@@ -309,7 +330,7 @@ class RealCatalogue:
 
 		return None
 
-	def cut_columns(self, subsample, h, flipe2, Kneighbour, R0cut, shapes=0, mbias=(0., 0.)):
+	def cut_columns(self, subsample, h, flipe1, flipe2, Kneighbour, R0cut, shapes=0, mbias=(0., 0.)):
 		"""""
 		take subsample data
 		& isolate columns for wcorr
@@ -327,6 +348,9 @@ class RealCatalogue:
 		e1 = table[self.headers['e1']]/pgm
 		e2 = table[self.headers['e2']]/pgm
 
+		if flipe1:
+			#print('FLIPPING e1 !!!!!!')
+			e1 *= -1
 		if flipe2:
 			#print('FLIPPING e2 !!!!!!')
 			e2 *= -1
@@ -452,12 +476,18 @@ class RealCatalogue:
 		self.samplecounts = self.samplecounts[:10]
 		[print('# objects %s: \t'%self.labels[i], v) for i, v in enumerate(self.samplecounts)]
 
-	def prep_wcorr(self, files_path, wcorr_combos, rp_bins, rp_lims, los_bins, los_lim, large_pi, out_sh):
+	def prep_wcorr(self, files_path, wcorr_combos, rp_bins, rp_lims, los_bins, los_lim, large_pi, nproc, play, out_sh):
+		processor_string = 'nodes=1:ppn=16'
+		nprocessors = 16
+		if play:
+			print('OVERRIDING wcorr processors!')
+			processor_string = 'nodes=1:ppn=%s'%nproc
+			nprocessors = nproc
 		shell_script = [
 		'#!/bin/tcsh',
 		'#PBS -q compute',
 		'#PBS -N %s'%out_sh,
-		'#PBS -l nodes=1:ppn=16',
+		'#PBS -l %s'%processor_string,
 		'#PBS -l walltime=24:00:00',
 		'#PBS -l mem=50gb',
 		'#PBS -o %s'%join(files_path,out_sh+'.out'),
@@ -472,15 +502,15 @@ class RealCatalogue:
 			# write 4x wcorr-calls to .sh script, & another 4x if largePi testing
 			shell_script.append('')
 			outfile = combo[4]
-			shell_script.append( ( '/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s 16 0 0' %   
-									(files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile) )
+			shell_script.append( ( '/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0' %   
+									(files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile, nprocessors) )
 			)
 			shell_script.append('')
 			if large_pi:
 				outfile += '_largePi'
 				shell_script.append('')
-				shell_script.append( ( '/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s 16 1 0' % 
-									(files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile) )
+				shell_script.append( ( '/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 1 0' % 
+									(files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile, nprocessors) )
 				)
 			shell_script.append('')
 
@@ -1087,8 +1117,13 @@ if __name__ == "__main__":
 	type=int,
 	default=0)
 	parser.add_argument(
+	'-flipe1',
+	help='flip the sign on e1',
+	type=int,
+	default=0)
+	parser.add_argument(
 	'-flipe2',
-	help='flip the sign on e2 - DOUBLE CHECK THE CHANGE I MADE TO BJ CODE',
+	help='flip the sign on e2',
 	type=int,
 	default=0)
 	parser.add_argument(
@@ -1103,9 +1138,9 @@ if __name__ == "__main__":
 	default=0.67)
 	parser.add_argument(
 	'-cubeZdepth',
-	help='specify target redshift increment of jackknife cubes, default=0.06',
+	help='specify target comoving Mpc/h increment of jackknife cubes, default=150',
 	type=np.float32,
-	default=0.06)
+	default=150.)
 	parser.add_argument(
 	'-rmagCut',
 	help='R-band magnitude above which to exclude faint sources, defaults to 0',
@@ -1189,6 +1224,11 @@ if __name__ == "__main__":
 	type=int,
 	default=0,
 	help='1=SHIFT ALL DECLINATIONS IN G12 +1deg - for jackknife testing. Default=0')
+	parser.add_argument(
+	'-play',
+	type=int,
+	default=1,
+	help='1 = spawn separate jobs to carry out sample wg+ correlations (default)')
 	args = parser.parse_args()
 	SHIFT = args.SHIFT
 
@@ -1254,10 +1294,14 @@ if __name__ == "__main__":
 	sample_zs = []
 	swot_z = []
 	for i, sample in enumerate(samples):
-		if args.flipe2: print('FLIPPING e2...!')
-		if i<4: shapes=1
-		else: shapes=0
-		new_table,sample_z = catalog.cut_columns(sample, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes, mbias=args.mbias)
+		if args.flipe1 | args.flipe2:
+			print('FLIPPING e1 (%s), e2 (%s)' % (args.flipe1, args.flipe2))
+		if i<4:
+			shapes=1
+		else:
+			shapes=0
+
+		new_table,sample_z = catalog.cut_columns(sample, args.H, args.flipe1, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes, mbias=args.mbias)
 		sample_zs.append(sample_z)
 		if (args.zCut==None) & ('lowZ' in catalog.labels[i]):
 			continue
@@ -1340,7 +1384,7 @@ if __name__ == "__main__":
 					if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
 					if i<4: shapes=1
 					else: shapes=0
-					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes, mbias=args.mbias)
+					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe1, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes, mbias=args.mbias)
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 0) # save_patches returns str(patchDir)
 			del jkData, popd_sam
 			gc.collect()
@@ -1428,7 +1472,7 @@ if __name__ == "__main__":
 					if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
 					if i<4: shapes=1
 					else: shapes=0
-					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes, mbias=args.mbias)
+					new_p,patch_z = catalog.cut_columns(p, args.H, args.flipe1, args.flipe2, args.Kneighbour, args.R0cut, shapes=shapes, mbias=args.mbias)
 					pDir = catalog.save_patches(new_p, catalog.new_root, catalog.labels[i], j, 1) # pDir (patch/cube directory) appended with _largePi
 				if (3<i<8) | ((i>=8) & args.densColours): # density samples ; gen jk samples
 					if (args.zCut==None) & ('lowZ' in catalog.labels[i]): continue
@@ -1470,11 +1514,14 @@ if __name__ == "__main__":
 	for ac in adjusted_combos:
 		print(ac)
 
-	catalog.prep_wcorr(catalog.new_root,adjusted_combos,args.rpBins,args.rpLims,args.losBins,args.losLim,args.largePi,'real_wcorr')
+	catalog.prep_wcorr(catalog.new_root, adjusted_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.largePi, args.nproc, args.play, 'real_wcorr')
 
 	if args.wcorr:
 		print('QSUBBING REAL_WCORR..')
-		os.system('qsub '+ join(catalog.new_root, 'real_wcorr.sh'))
+		if args.play:
+			os.system(join(catalog.new_root, 'real_wcorr.sh'))
+		else:
+			os.system('qsub '+ join(catalog.new_root, 'real_wcorr.sh'))
 
 	if args.Random != None:
 		catalog2 = RandomCatalogue(args.Random, args.densColours, args.SDSS, SHIFT=SHIFT)
@@ -1538,7 +1585,7 @@ if __name__ == "__main__":
 		for rc in rand_combos:
 			print(rc)
 
-		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.largePi, 'rand_wcorr')
+		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.largePi, args.nproc, args.play, 'rand_wcorr')
 
 		with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
 			if args.plot:
@@ -1551,11 +1598,16 @@ if __name__ == "__main__":
 			if args.make_shear:
 				script.write('\n')
 				script.write('\npython ShearResp.py %s %s' % (('-gama', '-sdss')[args.SDSS], catalog.new_root))
+				if args.largePi:
+					script.write('\npython ShearResp.py %s %s -lpi 1' % (('-gama', '-sdss')[args.SDSS], catalog.new_root))
 				script.write('\n')
 
 		if args.wcorr:
 			print('QSUBBING RANDOM_WCORR..')
-			os.system('qsub '+ join(catalog.new_root, 'rand_wcorr.sh'))
+			if args.play:
+				os.system(join(catalog.new_root, 'rand_wcorr.sh'))
+			else:
+				os.system('qsub '+ join(catalog.new_root, 'rand_wcorr.sh'))
 
 	import datetime
 	now = datetime.datetime.now()
@@ -1573,6 +1625,7 @@ if __name__ == "__main__":
 		[script.write('%s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
 	np.savetxt(join(catalog.new_root, 'R-band_pivot_deltas.txt'), np.array(catalog.Rmags), header='mean differences between sample & pivot R-band abs mag\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t', fmt='%.4f')
 	np.savetxt(join(catalog.new_root, 'SamplePopulations.txt'), np.column_stack((np.array(catalog.samplecounts[:4]), np.array(catalog.samplecounts[4:8]))), header='populations of\nshapes\t\tdensity samples\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t', fmt='%i')
+	pickle.dump(catalog.Sprops, open(join(catalog.new_root, 'SampleProps.p'), 'w'))
 
 
 
