@@ -32,7 +32,7 @@ import pickle
 
 class RealCatalogue:
 
-	def __init__(self, path, DEI, mc, SDSS, cols=None, largePi=0, MICEdensity=0, SHIFT=0): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
+	def __init__(self, path, DEI, mc, SDSS, other=0, radians=0, cols=None, largePi=0, MICEdensity=0, SHIFT=0, PLOTNOW=0): # ADD MORE self.SPECS HERE; FEWER ARGS FOR FNS!
 		"""""
 		read-in catalogue
 
@@ -47,13 +47,14 @@ class RealCatalogue:
 			self.DEI = 1
 			self.SDSS = 0
 		if SDSS:
-			self.headers = dict( zip( SDSSheads, SDSSheads[:-1] + ['M_r'] ) )
+			self.headers = dict( zip( SDSSheads, SDSSheads ) )
 			self.DEI = DEI = 0
 			self.SDSS = 1
 		if not DEI | SDSS:
 			self.headers = dict( zip( GAMAheads, ['RA_1_1', 'DEC_1_1', 'Z_TONRY', 'e1c', 'e2c', 'RankBCG_1', 'logmstar', 'pgm', 'absmag_g_1', 'absmag_r_1', 'col3'] ) )
 			self.DEI = 0
 			self.SDSS = 0
+		self.other = other
 
 		if cols!=None:
 			if DEI:
@@ -79,12 +80,19 @@ class RealCatalogue:
 			fs = data['fluxscale']
 		else:
 			fs = np.ones(len(data))
-		Mr = data[[self.headers['absmag_r'], 'M_r'][self.SDSS]]
-		Mr = np.where(fs >= 1., Mr - 2.5*np.log10(fs), Mr)
-		data = data[Mr < mc]
 
-		print('cutting 0.02 < z < 0.5 randoms cannot extend this near, and GAMA too sparse after z=0.5')
-		data = data[ (0.02 < data[self.headers['z']]) & (data[self.headers['z']] <= 0.5) ]
+		if not PLOTNOW:
+			Mr = data[self.headers['absmag_r']]
+			Mr = np.where(fs >= 1., Mr - 2.5*np.log10(fs), Mr)
+			data = data[Mr < mc]
+
+			if not self.other:
+				print('cutting 0.02 < z < 0.5 randoms cannot extend this near, and GAMA too sparse after z=0.5')
+				data = data[ (0.02 < data[self.headers['z']]) & (data[self.headers['z']] <= 0.5) ]
+
+			if radians:
+				data[self.headers['ra']] = data[self.headers['ra']] * (180./np.pi)
+				data[self.headers['dec']] = data[self.headers['dec']] * (180./np.pi)
 
 		self.data = data
 		del data
@@ -287,7 +295,7 @@ class RealCatalogue:
 				fs = sample['fluxscale']
 			else:
 				fs = np.ones(len(sample))
-			Mr = sample[[self.headers['absmag_r'], 'M_r'][self.SDSS]]
+			Mr = sample[self.headers['absmag_r']]
 			Mr = np.where(fs >= 1., Mr - 2.5*np.log10(fs), Mr)
 			if key in self.keys[:4]:
 				self.Rmags.append(np.mean(Mr + 22.))
@@ -437,13 +445,17 @@ class RealCatalogue:
 			RA = subsample[self.headers['ra']]
 			DEC = subsample[self.headers['dec']]
 			Z = subsample[self.headers['z']]
+			e1 = subsample[self.headers['e1']]
+			e2 = subsample[self.headers['e2']]
 		except IndexError:
 			RA = subsample.T[0]
 			DEC = subsample.T[1]
 			Z = subsample.T[2]
-		newtable = np.column_stack((RA,DEC,Z))
+			e1 = np.ones_like(Z)
+			e2 = np.ones_like(Z)
+		newtable = np.column_stack((RA,DEC,Z,e1,e2))
 
-		ascii.write(newtable, join(self.new_root, 'swot_%s.asc'%label), names=['# ra[deg]', 'dec[deg]', 'z'], delimiter='\t', overwrite=1)
+		ascii.write(newtable, join(self.new_root, 'swot_%s.asc'%label), names=['# ra[deg]', 'dec[deg]', 'z', 'e1', 'e2'], delimiter='\t', overwrite=1)
 
 		return Z # for random downsampling
 
@@ -1228,7 +1240,22 @@ if __name__ == "__main__":
 	'-play',
 	type=int,
 	default=1,
-	help='1 = spawn separate jobs to carry out sample wg+ correlations (default)')
+	help='1 = carry out sample wg+ correlations in shell (default), 0 = spawn separate jobs')
+	parser.add_argument(
+	'-other',
+	type=int,
+	default=0,
+	help='1 = neither GAMA/SDSS; make no redshift boundary cuts before sampling')
+	parser.add_argument(
+	'-radians',
+	type=int,
+	default=0,
+	help='1 = RA/DEC columns are given in radians; convert to degrees on initialisation')
+	parser.add_argument(
+	'-unit_weights',
+	type=int,
+	default=0,
+	help='1 = force jackknife patch weights to unity')
 	args = parser.parse_args()
 	SHIFT = args.SHIFT
 
@@ -1238,7 +1265,7 @@ if __name__ == "__main__":
 
 	print('=======================\tREADING CATALOG: %s'%args.Catalog)
 
-	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS, cols=args.cols, largePi=args.largePi, MICEdensity=args.MICEdens, SHIFT=SHIFT)
+	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS, other=args.other, radians=args.radians, cols=args.cols, largePi=args.largePi, MICEdensity=args.MICEdens, SHIFT=SHIFT, PLOTNOW=args.plotNow)
 
 	if args.plotNow:
 		# reduce & save data files, returning filename-list
@@ -1413,7 +1440,12 @@ if __name__ == "__main__":
 					jkWeights_pop = jkWeights[ skinny_patch_cuts[i] ]
 					print('===================\t %s reduced jkWeights: '%lab, jkWeights_pop.shape)
 					catalog.jackknife_patches(pDir)
+
+					if args.unit_weights:
+						print('===================\t FORCING UNIT WEIGHTS FOR JACKKNIFE \t===================')
+						jkWeights_pop = np.ones_like(jkWeights_pop, dtype=float)
 					np.savetxt(join(catalog.new_root, 'jkWeights_%s.txt'%lab), jkWeights_pop, header='%s\n%i samples'%(lab, len(jkWeights_pop)))
+
 					jknumbers.append(len(jkWeights_pop))
 					jkn_header += '%s\t'%lab
 					if args.makejk_only:
@@ -1622,7 +1654,8 @@ if __name__ == "__main__":
 		script.write('\n')
 		[script.write('%s: \t%d, mean(R_mag - 22.): %.4f\n'%(catalog.labels[i],catalog.samplecounts[i],catalog.Rmags[i])) for i in range(len(catalog.labels[:4]))]
 		[script.write('%s: \t%d\n'%(catalog.labels[i+4],catalog.samplecounts[i+4])) for i in range(len(catalog.labels[4:]))]
-		[script.write('%s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
+		if args.Random != None:
+			[script.write('%s: \t%d\n'%(catalog2.labels[i],catalog2.samplecounts[i])) for i in range(len(catalog2.labels))]
 	np.savetxt(join(catalog.new_root, 'R-band_pivot_deltas.txt'), np.array(catalog.Rmags), header='mean differences between sample & pivot R-band abs mag\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t', fmt='%.4f')
 	np.savetxt(join(catalog.new_root, 'SamplePopulations.txt'), np.column_stack((np.array(catalog.samplecounts[:4]), np.array(catalog.samplecounts[4:8]))), header='populations of\nshapes\t\tdensity samples\nignore any lowZ for SDSS\n'+'\t'.join(catalog.labels[:4]), delimiter='\t', fmt='%i')
 	pickle.dump(catalog.Sprops, open(join(catalog.new_root, 'SampleProps.p'), 'w'))

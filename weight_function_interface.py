@@ -78,11 +78,15 @@ def execute(block, config):
 	eta = block.get_double(IA_section,'eta',default=0)
 
 	# run beta_red/blue
-	if skey.endswith('R'):
-		beta = block[IA_section, 'beta_R']
-	elif skey.endswith('B'):
-		beta = block[IA_section, 'beta_B']
-	else:
+	try:
+		try:
+			if skey.endswith('R'):
+				beta = block[IA_section, 'beta_R']
+			elif skey.endswith('B'):
+				beta = block[IA_section, 'beta_B']
+		except:
+			beta = block[IA_section, 'beta_%s'%skey]
+	except:
 		print('skey must be colour-specific!!')
 		sys.exit()
 
@@ -114,19 +118,23 @@ def execute(block, config):
 
 		tags = ['wgp','wgg']
 		if nla:
-			if skey.endswith('R'):
-				A_i =  block[IA_section,'A_R']
-			elif skey.endswith('B'):
-				A_i =  block[IA_section,'A_B']
-			else:
+			try:
+				try:
+					if skey.endswith('R'):
+						A_i =  block[IA_section,'A_R']
+					elif skey.endswith('B'):
+						A_i =  block[IA_section,'A_B']
+				except:
+					A_i = block[IA_section, 'A_%s'%skey]
+			except:
 				print('skey must be colour-specific!!')
 				sys.exit()
 
-			shear_responsivity = block[IA_section, 'SR_%s'%skey]
+#			shear_responsivity = block[IA_section, 'SR_%s'%skey]
 
 			if not wgg:
 				wg_r *= A_i
-				wg_r /= shear_responsivity
+#				wg_r /= shear_responsivity
 
 			bg = block[bias_section,'b_g_%s'%dkey]
 			wg_r *= bg

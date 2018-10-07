@@ -1,11 +1,5 @@
 from cosmosis.datablock import names, option_section
-import numpy as np
 from PkHankel import *
-#from PkHankel import read_z
-#from PkHankel import create_nz
-#from PkHankel import cut_krange
-#from PkHankel import zero_pad
-#from PkHankel import interpolate
 
 # We have a collection of commonly used pre-defined block section names.
 # If none of the names here is relevant for your calculation you can use any
@@ -19,6 +13,7 @@ def setup(options):
 
     # prep P(k) for hankel transformation
     coerce_pk = options.get_bool(option_section,'coerce_pk',default=False)
+    PAD = options.get_bool(option_section,'pad',default=False)
     power_section = options.get_string(option_section,'power_section',default='dummy')
     nbin = options.get_int(option_section,'nbin',default=50)
 
@@ -38,31 +33,36 @@ def setup(options):
         print('and/or (2) create 2x n(z) 1d-arrays (2 samples) for computing weight fns')
 
     # return the config for execute fn
-    return (power_section, nz_section, nbin, nz, make_nz_args, coerce_pk)
+    return (power_section, nz_section, nbin, nz, make_nz_args, coerce_pk, PAD)
 
 def execute(block, config):
     # this function is called every time you have a new sample of cosmological and other parameters
     # collect config variables
-	power_section, nz_section, nbin, nz, make_nz_args, coerce_pk = config
+	power_section, nz_section, nbin, nz, make_nz_args, coerce_pk, PAD = config
 
 	if coerce_pk:
-		print('PkHankel: readying P(k) for hankel transform..')
+		#print('PkHankel: readying P(k) for hankel transform..')
 		# load from datablock
 		k_h = block[power_section,'k_h']
 		p_k = block[power_section,'p_k']
 
 		# take measures against possible ringing - cut k-range or zero-pad
 
-		# pre-padding cut
-		k_h,p_k = cut_krange(k_h, p_k, kmin=10**-3, kmax=10**3) 
-		# start padding at effklims, and stop at zeroklims
-		k_h,p_k = zero_pad(k_h, p_k, effkmin=10**-3, effkmax=10**2, zerokmin=1e-4, zerokmax=1e4, linear=1) # zerokmax=10**5.7842 to pad about kPk mean when 1h-amp=0.21
 		if len(k_h)<500:
 			# interpolate to increase k-sampling
-			upsampled_k = np.logspace(np.log10(2e-4), np.log10(9e3), 1e3)
-			k_h,p_k = interpolate(upsampled_k, k_h, p_k)
-		# post-padding trim
-		k_h,p_k = cut_krange(k_h, p_k, kmin=10**-3, kmax=10**3) 
+			upsampled_k = np.logspace(log10(k_h.min()), log10(k_h.max()), 1e3)
+			#upsampled_k_1 = np.logspace(log10(2e-4), log10(1), 1e3)
+			#upsampled_k_2 = np.logspace(log10(1), log10(9e3), 5e3)
+			#upsampled_k = np.concatenate((upsampled_k_1, upsampled_k_2[1:]))
+			k_h, p_k = interpolate(upsampled_k, k_h, p_k)
+
+		#import pdb ; pdb.set_trace()
+		if PAD:
+			# start padding at effklims, and stop at zeroklims
+			k_h, p_k = zero_pad(k_h, p_k, effkmin=1e-4, effkmax=80.,
+										zerokmin=1e-8, zerokmax=1e3,
+										linear=1, linzero=1)
+			#k_h, p_k = loop(k_h, p_k)
 
 		block[power_section,'ell'] = k_h
 		block[power_section,'nbin'] = nbin
@@ -70,7 +70,7 @@ def execute(block, config):
 			block[power_section,'bin_%s_%s'%(i+1,i+1)] = p_k[i]
 
 	if make_nz_args[0]:
-		print('PkHankel: making n(z) arrays for weight functions..')
+		#print('PkHankel: making n(z) arrays for weight functions..')
 		shapes_z, density_z = read_z(make_nz_args[1], make_nz_args[2])
 		z = block['distances', 'z']
 		z_mids, nofz_shap = create_nz(shapes_z, nz, nbin, z)

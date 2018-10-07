@@ -20,7 +20,7 @@ def compute_Wz(z, nofz_s, nofz_d, eta, beta, Rmag, wgg=0):
     assert pz_d.shape==z.shape, "p(z) vs. z mismatch"
 
     # compute X(z) = comoving coordiante
-    MICEcomov = lambda x: MICEcosmo.comoving_distance(x)
+    MICEcomov = lambda x: MICEcosmo.comoving_distance(x) # h (hubble parameter) cancels
     Xz = MICEcomov(z)
     Xz2 = Xz**2
 
