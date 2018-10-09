@@ -12,7 +12,7 @@ def setup(options):
 	bessel_nu = options.get_int(option_section, 'bessel_nu', default=2)
 	stepsize_h = options.get_double(option_section, 'stepsize_h', default=0.)
 	r_min, r_max = [float(ir) for ir in options.get_string(option_section, 'r_lims', default='0.1, 60').strip(' ').split(',')]
-	num_r = options.get_int(option_section, 'num_r', default=30)
+	num_r = options.get_int(option_section, 'num_r', default=20)
 	abs_Pi_max = options.get_double(option_section, 'abs_Pi_max', default=60.)
 	num_Pi = options.get_int(option_section, 'num_Pi', default=30)
 	norm = options.get_string(option_section, 'norm', default='-1./(2*np.pi**2)')
@@ -44,7 +44,8 @@ def setup(options):
 		'fkperp':f_kperp,
 		'intz':intz,
 		'nz_sec':nz_sec,
-		'div_sec':div_sec}
+		'div_sec':div_sec
+			}
 	return config
 
 def execute(block, config):
@@ -78,15 +79,32 @@ def execute(block, config):
 
 	# prep integrations
 	if cf.h == 0:
-		# try to optimise step-size h
-		# this method is NOT always reliable, or even good...
-		fpk = interp1d(k, pk[0], fill_value='extrapolate')
-		cf.h = choose_h(fpk, cf.nu, rp[0], rp[-1])
+		if block.has_value('hankel', 'h'):
+			cf.h = block['hankel', 'h']
+		else:
+			# try to optimise step-size h
+			# this method is NOT always reliable, or even good...
+			fpk = interp1d(k, pk[0], fill_value='extrapolate')
+			cf.h = choose_h(fpk, cf.nu, rp[0], rp[-1])
+			block.put('hankel', 'h', cf.h)
+			print('optimal hankel stepsize h determined = %.2f'%cf.h)
 	HT = hankel.HankelTransform(nu=cf.nu, h=cf.h)
 	xi = np.zeros([len(pk), len(Pi), len(rp)])
 
+	if cf.intz:
+		# compute redshift weight-fn, skip W(z) = 0 loops
+		nz1 = block[cf.nz_sec, 'nofz_shapes']
+		nz2 = block[cf.nz_sec, 'nofz_density']
+		W = compute_Wz(z, nz1, nz2)
+
 	# looping over redshifts
 	for iz, ipk in enumerate(pk):
+		# if W(z) == 0; skip
+		if cf.intz:
+			if W[iz] == 0:
+				xi[iz] = np.zeros_like(xi[0])
+				continue
+
 		# build P(k) interpolator
 		PKinterp = interp1d(k, ipk, bounds_error=0, fill_value=0.)
 		pkgrid = PKinterp(kgrid)
@@ -120,9 +138,9 @@ def execute(block, config):
 	# divide CF by 1+xi_gg clustering CF, if appl.
 	if cf.div_sec != 'none':
 		assert block.has_value(cf.div_sec, 'xi'), "MUST have (sec='div_sec', val='xi') in the block for division by 1 + xi -- did you run this module already?"
-		xi_gg = 1. + block[cf.div_sec, 'xi']
+		xi_gg = block[cf.div_sec, 'xi']
 		assert xi_gg.shape == xi.shape, "(z, Pi, rp) dimensions mismatched between spectra!"
-		xi = xi / xi_gg
+		xi = xi / (1. + xi_gg)
 		block.put(cf.out_sec, 'xi_div', xi)
 
 	# sum over Pi & save -- any divisions (above) present henceforth
@@ -132,10 +150,7 @@ def execute(block, config):
 	block.put(cf.out_sec, 'w_rpz', xi_proj)
 
 	if cf.intz:
-		# compute redshift weight-fn, integrate & save
-		nz1 = block[cf.nz_sec, 'nofz_shapes']
-		nz2 = block[cf.nz_sec, 'nofz_density']
-		W = compute_Wz(z, nz1, nz2)
+		# integrate over redshift & save
 		xi_proj = np.trapz(xi_proj.T * W, x=z, axis=1)
 		block.put(cf.out_sec, 'w_rp', xi_proj)
 		block.put(cf.out_sec, 'w_z', W)
