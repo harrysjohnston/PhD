@@ -11,22 +11,28 @@ cosmo = FLCDM(Om0=0.25, H0=70, Ob0=0.044)
 def k_scale_cuts(kx, low, high):
 	return kx[(kx >= low) & (kx <= high)]
 
-def upsample_k(kx, factor):
-	return np.logspace(np.log10(kx.min()), np.log10(kx.max()), int(factor * len(kx)))
+def upsample_k(kx, factor, spacing='log'):
+	if spacing == 'log':
+		return np.logspace(np.log10(kx.min()), np.log10(kx.max()), int(factor * len(kx)))
+	if spacing == 'lin':
+		return np.linspace(kx.min(), kx.max(), int(factor * len(kx)))
 
 def fivept_stencil(func, x, h):
-    # returns f'(x), via 5pt stencil, for grid-spacing h
-    return (-func(x+2*h)+8*func(x+h)-8*func(x-h)+func(x-2*h))/(12*h)
+	# returns f'(x), via 5pt stencil, for grid-spacing h
+	return (-func(x+2*h)+8*func(x+h)-8*func(x-h)+func(x-2*h))/(12*h)
 
 def zero_pad(k, pk, nzeros=10):
 	kl = 10**(np.log10(k[0]) - np.arange(1, nzeros+1) * np.log10(k[1]/k[0]))[::-1]
 	ku = 10**(np.log10(k[-1]) + np.arange(1, nzeros+1) * np.log10(k[-1]/k[-2]))
 	p0 = np.zeros_like(ku)
 	k = np.concatenate((kl, k, ku))
-	pknew = []
-	for i in range(len(pk)):
-		pknew.append(np.concatenate((p0, pk[i], p0)))
-	pknew = np.array(pknew)
+	if pk.ndim == 2:
+		pknew = []
+		for i in range(len(pk)):
+			pknew.append(np.concatenate((p0, pk[i], p0)))
+		pknew = np.array(pknew)
+	else:
+		pknew = np.concatenate((p0, pk, p0))
 	return k, pknew
 
 def choose_h(f, nu, r_min, r_max):
@@ -36,9 +42,8 @@ def choose_h(f, nu, r_min, r_max):
 	return h_opt
 
 def choose_kpar_max(Pi):
-	pimax = np.abs(Pi).max()
-	cosine_zero = (pi / 2.) * (1. / pimax)
-	return cosine_zero * 1.3
+	cosine_zero = [pi * (24./2.) * (1. / abs(p)) for p in Pi]
+	return np.array(cosine_zero)
 
 def compute_Wz(z, nz1, nz2):
 	# Wz = [p^2 / X^2*X'] / int[p^2 / X^2*X' dz]

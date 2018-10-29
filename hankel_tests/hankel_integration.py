@@ -10,14 +10,15 @@ def setup(options):
 	in_section = options.get_string(option_section, 'in_section')
 	out_section = options.get_string(option_section, 'out_section')
 	bessel_nu = options.get_int(option_section, 'bessel_nu', default=2)
+	#mode = options.get_string(option_section, 'mode', default='3D')
 	stepsize_h = options.get_double(option_section, 'stepsize_h', default=0.)
-	r_min, r_max = [float(ir) for ir in options.get_string(option_section, 'r_lims', default='0.1, 60').strip(' ').split(',')]
+	r_min, r_max = [float(ir) for ir in options.get_string(option_section, 'r_lims', default='0.07, 80.').strip(' ').split(',')]
 	num_r = options.get_int(option_section, 'num_r', default=20)
 	abs_Pi_max = options.get_double(option_section, 'abs_Pi_max', default=60.)
 	num_Pi = options.get_int(option_section, 'num_Pi', default=30)
 	norm = options.get_string(option_section, 'norm', default='-1./(2*np.pi**2)')
 	nzeros = options.get_int(option_section, 'nzeros', default=10)
-	kpar_max = options.get_double(option_section, 'kpar_max', default=0.031)
+	kpar_max = options.get_double(option_section, 'kpar_max', default=0.)
 	f_kpar = options.get_double(option_section, 'f_kpar', default=1.)
 	f_kperp = options.get_double(option_section, 'f_kperp', default=1.)
 	intz = options.get_bool(option_section, 'intz', default=False)
@@ -65,17 +66,24 @@ def execute(block, config):
 		Pi = (Pi[1:] + Pi[:-1]) / 2.
 
 	kpar, kperp = k.copy(), k.copy()
+	#kperp = k.copy()
+	kpar = np.linspace(0, 8.*pi, 5000)
+
+	if cf.kpmax == 0:
+		# set kpar_max to capture 1 full oscillation in cos(Pi*kpar)
+		cf.kpmax = choose_kpar_max(Pi)
+	else:
+		kpar = k_scale_cuts(kpar, 0, cf.kpmax)
+
 	if cf.fkpar != 1:
-		kpar = upsample_k(kpar, cf.fkpar)
+		kpar = upsample_k(kpar, cf.fkpar, 'lin')
 	if cf.fkperp != 1:
 		kperp = upsample_k(kperp, cf.fkperp)
-	if cf.kpmax == 0:
-		# set kpar_max to be slightly larger than the first zero of cos(kpar * Pi_max)
-		cf.kpmax = choose_kpar_max(Pi)
-	kpar = k_scale_cuts(kpar, 0, cf.kpmax)
+
 	kparm, Pim = np.meshgrid(kpar, Pi)
 	xpar = kparm * Pim
 	kgrid = np.sqrt( np.add.outer(kperp**2., (xpar / Pim)**2.) )
+	#import pdb ; pdb.set_trace()
 
 	# prep integrations
 	if cf.h == 0:
@@ -87,7 +95,7 @@ def execute(block, config):
 			fpk = interp1d(k, pk[0], fill_value='extrapolate')
 			cf.h = choose_h(fpk, cf.nu, rp[0], rp[-1])
 			block.put('hankel', 'h', cf.h)
-			print('optimal hankel stepsize h determined = %.2f'%cf.h)
+			print('optimal hankel stepsize h determined = %f'%cf.h)
 	HT = hankel.HankelTransform(nu=cf.nu, h=cf.h)
 	xi = np.zeros([len(pk), len(Pi), len(rp)])
 
@@ -106,17 +114,21 @@ def execute(block, config):
 				continue
 
 		# build P(k) interpolator
-		PKinterp = interp1d(k, ipk, bounds_error=0, fill_value=0.)
+		PKinterp = interp1d(k, ipk, fill_value=0., bounds_error=0)
 		pkgrid = PKinterp(kgrid)
 
 		# integrate over k_parallel, divide by Pi for change of variables
 		kpar_integrand = np.cos(xpar) * pkgrid
 		kperp_integrand = np.zeros([len(kperp), len(Pi)])
 		for ip in range(len(Pi)):
-			kperp_integrand[:, ip] += simps(kpar_integrand[:, ip], x=xpar[ip], axis=1)
+			if hasattr(cf.kpmax, '__iter__'):
+				kpm = cf.kpmax[ip]
+				kperp_integrand[:, ip] += simps(kpar_integrand[:, ip, kpar<=kpm], x=xpar[ip, kpar<=kpm], axis=1)
+			else:
+				kperp_integrand[:, ip] += simps(kpar_integrand[:, ip], x=xpar[ip], axis=1)
 		kperp_integrand = kperp_integrand / Pi
 		# build interpolator
-		KPIinterp = interp2d(kperp, Pi, kperp_integrand.T)
+		KPIinterp = interp2d(kperp, Pi, kperp_integrand.T, fill_value=0., bounds_error=0.)
 
 		# integrate over k_perpendicular
 		def LookUp(kperp, pi):
@@ -143,7 +155,7 @@ def execute(block, config):
 		xi = xi / (1. + xi_gg)
 		block.put(cf.out_sec, 'xi_div', xi)
 
-	# sum over Pi & save -- any divisions (above) present henceforth
+	# sum over Pi & save -- any divisions (above) are present henceforth
 	xi_proj = np.trapz(xi, x=Pi, axis=1)
 	block.put(cf.out_sec, 'rp', rp)
 	block.put(cf.out_sec, 'pi', Pi)
