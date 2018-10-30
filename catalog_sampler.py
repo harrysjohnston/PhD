@@ -514,14 +514,14 @@ class RealCatalogue:
 			# write 4x wcorr-calls to .sh script, & another 4x if largePi testing
 			shell_script.append('')
 			outfile = combo[4]
-			shell_script.append( ( '/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0' %   
+			shell_script.append( ( '/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0' %
 									(files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile, nprocessors) )
 			)
 			shell_script.append('')
 			if large_pi:
 				outfile += '_largePi'
 				shell_script.append('')
-				shell_script.append( ( '/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 1 0' % 
+				shell_script.append( ( '/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 1 0' %
 									(files_path, combo[0], combo[1], combo[2], combo[3], rp_bins, rp_lims[0], rp_lims[1], los_bins, los_lim, outfile, nprocessors) )
 				)
 			shell_script.append('')
@@ -775,7 +775,20 @@ class RealCatalogue:
 
 		return None
 
-	def wcorr_jackknife(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi, densColours):
+	def run_treecorr(self, densf, shapesf, drandf, srandf, config, outfile, estim='PW1', np=16, **kwargs):
+		# config & kwargs to be constructed from command line args for the main script
+		import treecorr_3DCF
+		tcw = treecorr_3DCF.compute_w
+		config1 = config.copy()
+		config1['num_threads'] = np
+
+		r, wgp, wgx = tcw([densf, shapesf], [drandf, srandf], config1, estim, **kwargs)
+		# mimic BJ code output
+		one_col = np.ones_like(r, dtype=float)
+		out_arr = np.column_stack((r, one_col, one_col, wgp, wgx, one_col, one_col, one_col)) # need to include shot noise as second-to-last column
+		np.savetxt(join(files_path, outfile), out_arr)
+
+	def wcorr_jackknife(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi, densColours, treecorr=0, **kwargs):
 		# wcorr JK samples - this function gets called only for shapes samples
 		JKdir = join(patchDir,'JKsamples')
 		JKsamples = [x for x in listdir(JKdir) if x.startswith('JKsample') & x.endswith('.asc')]
@@ -808,19 +821,27 @@ class RealCatalogue:
 			rdCount = np.loadtxt(rdpath).shape[0]
 			jkCount = np.loadtxt(join(JKdir, jk)).shape[0]
 
-			if largePi:
-				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s_d %s %s %s %s %s %s %s %s %s_largePi %s 1 0'%(JKdir,jk,dCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,jk[:-4],nproc))
-				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s_largePi %s 1 0'%(JKdir,randjk,rdCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,'rand_'+jk[:-4],nproc))
-				real_out, rand_out = join(JKdir, 'wcorr_'+jk[:-4]+'_largePi.dat'), join(JKdir, 'wcorr_rand_'+jk[:-4]+'_largePi.dat')
+			if not treecorr:
+				if largePi:
+					os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s_d %s %s %s %s %s %s %s %s %s_largePi %s 1 0'%(JKdir,jk,dCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,jk[:-4],nproc))
+					os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s_largePi %s 1 0'%(JKdir,randjk,rdCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,'rand_'+jk[:-4],nproc))
+					real_out, rand_out = join(JKdir, 'wcorr_'+jk[:-4]+'_largePi.dat'), join(JKdir, 'wcorr_rand_'+jk[:-4]+'_largePi.dat')
 
-			else:
-				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s_d %s %s %s %s %s %s %s %s %s %s 0 0'%(JKdir,jk,dCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,jk[:-4],nproc))
-				os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(JKdir,randjk,rdCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,'rand_'+jk[:-4],nproc))
-				real_out, rand_out = join(JKdir, 'wcorr_'+jk[:-4]+'.dat'), join(JKdir, 'wcorr_rand_'+jk[:-4]+'.dat')
+				else:
+					os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s_d %s %s %s %s %s %s %s %s %s %s 0 0'%(JKdir,jk,dCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,jk[:-4],nproc))
+					os.system('/share/splinter/hj/PhD/CosmoFisherForecast/obstools/wcorr %s %s %s %s %s %s %s %s %s %s %s %s 0 0'%(JKdir,randjk,rdCount,jk,jkCount,rp_bins,rp_lims[0],rp_lims[1],los_bins,los_lim,'rand_'+jk[:-4],nproc))
+					real_out, rand_out = join(JKdir, 'wcorr_'+jk[:-4]+'.dat'), join(JKdir, 'wcorr_rand_'+jk[:-4]+'.dat')
 
-			realcorr, randcorr = np.loadtxt(real_out), np.loadtxt(rand_out)
-			realcorr[:, 3:5] -= randcorr[:, 3:5]
-			np.savetxt(real_out, realcorr)
+				realcorr, randcorr = np.loadtxt(real_out), np.loadtxt(rand_out)
+				realcorr[:, 3:5] -= randcorr[:, 3:5]
+				np.savetxt(real_out, realcorr)
+
+			elif treecorr:
+				# densf, shapesf, drandf, srandf, config, outfile,
+				# estim='PW1', np=16, **kwargs(nbins_rpar=30, random_oversampling=10., verbosity=1, load_RRs, save_RRs)
+				outf = (join(JKdir,'wcorr_'+jk[:-4]+'.dat'),
+						join(JKdir,'wcorr_'+jk[:-4]+'_largePi.dat')) [largePi]
+				run_treecorr(dpath, join(JKdir,jk), rdpath, rdpath, tc_config, outf, largePi=largePi, **tc3dcf_kwargs)
 
 			# clean up - if needing to analyse JKs, use arg 'makejk_only'- bypasses this function
 			os.system('rm %s'%rand_out) # random wcorr
@@ -1256,6 +1277,10 @@ if __name__ == "__main__":
 	type=int,
 	default=0,
 	help='1 = force jackknife patch weights to unity')
+	parser.add_argument(
+	'-treecorr',
+	type=str,
+	help='use TreeCorr to measure wg+ -- give path to a configuration file with sections for (i) TreeCorr config, and (ii) treecorr_3DCF script')
 	args = parser.parse_args()
 	SHIFT = args.SHIFT
 
@@ -1347,6 +1372,14 @@ if __name__ == "__main__":
 		sample_zs = sample_zs[8:]
 		samz_dict = dict(zip(samz_keys, sample_zs))
 		swot_z = swot_z[-2:]
+
+	if args.treecorr:
+		import configparser
+		cp = configparser.ConfigParser()
+		cp.read(args.treecorr)
+		top_tc_config = cp._sections
+	else:
+		top_tc_config= {}
 
 	if args.bootstrap or args.jackknife:
 		print('COMPUTING SAMPLE COVARIANCES...')
@@ -1451,7 +1484,7 @@ if __name__ == "__main__":
 					if args.makejk_only:
 						print('====================\t====================\t SKIPPING JACKKNIFE CORRELATIONS ====================\t====================\t')
 					else:
-						catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours)
+						catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 0, args.densColours, treecorr=args.treecorr, **top_tc_config)
 					catalog.jackknife(pDir, jkWeights_pop, error_scaling, 0)
 			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers.txt'), np.array(jknumbers), header=jkn_header, fmt='%i')
 
@@ -1528,7 +1561,7 @@ if __name__ == "__main__":
 					np.savetxt(join(catalog.new_root, 'jkWeights_%s_largePi.txt'%lab), jkWeights_pop, header='%s largePi\n%i samples'%(lab, len(jkWeights_pop)))
 					jknumbers.append(len(jkWeights_pop))
 					jkn_header += '%s\t'%lab
-					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours)
+					catalog.wcorr_jackknife(pDir, args.rpBins, args.rpLims, args.losBins, args.losLim, args.nproc, 1, args.densColours, treecorr=args.treecorr, **top_tc_config)
 					catalog.jackknife(pDir, jkWeights_pop, error_scaling, 1)
 			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers_largePi.txt'), np.array(jknumbers), header=jkn_header+'\nlargePi', fmt='%i')
 
@@ -1546,14 +1579,17 @@ if __name__ == "__main__":
 	for ac in adjusted_combos:
 		print(ac)
 
-	catalog.prep_wcorr(catalog.new_root, adjusted_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.largePi, args.nproc, args.play, 'real_wcorr')
+	if not args.treecorr:
+		catalog.prep_wcorr(catalog.new_root, adjusted_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.largePi, args.nproc, args.play, 'real_wcorr')
 
-	if args.wcorr:
-		print('QSUBBING REAL_WCORR..')
-		if args.play:
-			os.system(join(catalog.new_root, 'real_wcorr.sh'))
-		else:
-			os.system('qsub '+ join(catalog.new_root, 'real_wcorr.sh'))
+		if args.wcorr:
+			print('QSUBBING REAL_WCORR..')
+			if args.play:
+				os.system(join(catalog.new_root, 'real_wcorr.sh'))
+			else:
+				os.system('qsub '+ join(catalog.new_root, 'real_wcorr.sh'))
+	else:
+		assert args.Random != None, ("TreeCorr module requires randoms")
 
 	if args.Random != None:
 		catalog2 = RandomCatalogue(args.Random, args.densColours, args.SDSS, SHIFT=SHIFT)
@@ -1617,29 +1653,47 @@ if __name__ == "__main__":
 		for rc in rand_combos:
 			print(rc)
 
-		catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.largePi, args.nproc, args.play, 'rand_wcorr')
+		if args.treecorr:
+			for i in range(len(wcorr_combos)):
+				densf, dc, shapesf, sc, outf = wcorr_combos[i]
+				rdensf, rdc, rshapesf, rsc, routf = rand_combos[i]
+				# densf, shapesf, drandf, srandf, config, outfile,
+				# estim='PW1', np=16, **kwargs(nbins_rpar=30, random_oversampling=10., verbosity=1, load_RRs, save_RRs)
+				run_treecorr(densf, shapesf, rdensf, rshapesf, top_tc_config['tc_config'], outf, np=args.nproc, **top_tc_config['tc3dcf_kwargs'])
 
-		with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
 			if args.plot:
-				script.write('\n')
-				script.write(
-				'\npython /share/splinter/hj/PhD/catalog_sampler.py -Catalog %s -Path %s -plotNow 1 -chiSqu 0 -bootstrap %s -jackknife %s -SDSS %s'%(args.Catalog, catalog.new_root, args.bootstrap, args.jackknife, args.SDSS)
-				)
-				script.write('\n')
-
+					os.system(('python /share/splinter/hj/PhD/catalog_sampler.py -Catalog %s ' % args.Catalog+
+								'-Path %s -bootstrap %s -jackknife %s -SDSS %s '%(catalog.new_root, args.bootstrap, args.jackknife, args.SDSS)+
+								'-plotNow 1 -chiSqu 0'))
 			if args.make_shear:
-				script.write('\n')
-				script.write('\npython ShearResp.py %s %s' % (('-gama', '-sdss')[args.SDSS], catalog.new_root))
+				os.system('python ShearResp.py %s %s' % (('-gama', '-sdss')[args.SDSS], catalog.new_root))
 				if args.largePi:
-					script.write('\npython ShearResp.py %s %s -lpi 1' % (('-gama', '-sdss')[args.SDSS], catalog.new_root))
-				script.write('\n')
+					os.system('python ShearResp.py %s %s -lpi 1' % (('-gama', '-sdss')[args.SDSS], catalog.new_root))
 
-		if args.wcorr:
-			print('QSUBBING RANDOM_WCORR..')
-			if args.play:
-				os.system(join(catalog.new_root, 'rand_wcorr.sh'))
-			else:
-				os.system('qsub '+ join(catalog.new_root, 'rand_wcorr.sh'))
+		elif not args.treecorr:
+			catalog2.prep_wcorr(catalog.new_root, rand_combos, args.rpBins, args.rpLims, args.losBins, args.losLim, args.largePi, args.nproc, args.play, 'rand_wcorr')
+
+			with open(join(catalog.new_root, 'rand_wcorr.sh'), 'a') as script:
+				if args.plot:
+					script.write('\n')
+					script.write(
+					'\npython /share/splinter/hj/PhD/catalog_sampler.py -Catalog %s -Path %s -plotNow 1 -chiSqu 0 -bootstrap %s -jackknife %s -SDSS %s'%(args.Catalog, catalog.new_root, args.bootstrap, args.jackknife, args.SDSS)
+					)
+					script.write('\n')
+
+				if args.make_shear:
+					script.write('\n')
+					script.write('\npython ShearResp.py %s %s' % (('-gama', '-sdss')[args.SDSS], catalog.new_root))
+					if args.largePi:
+						script.write('\npython ShearResp.py %s %s -lpi 1' % (('-gama', '-sdss')[args.SDSS], catalog.new_root))
+					script.write('\n')
+
+			if args.wcorr:
+				print('QSUBBING RANDOM_WCORR..')
+				if args.play:
+					os.system(join(catalog.new_root, 'rand_wcorr.sh'))
+				else:
+					os.system('qsub '+ join(catalog.new_root, 'rand_wcorr.sh'))
 
 	import datetime
 	now = datetime.datetime.now()
