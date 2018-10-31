@@ -1,9 +1,12 @@
-from functions import *
-from progress.bar import ChargingBar as Bar
+from __future__ import division
+import numpy as np
+#from progress.bar import ChargingBar as Bar
+from tqdm import tqdm
 import treecorr
 import pickle
+midpoints = lambda x: (x[1:] + x[:-1]) / 2.
 
-def compute_w(dataf, randf, config, estimator, compensated=1, nbins_rpar=30, random_oversampling=10., verbosity=1, largePi=0, **kwargs):
+def compute_w(dataf, randf, config, estimator='PW1', compensated=1, nbins_rpar=30, random_oversampling=10., verbosity=1, largePi=0, **kwargs):
 	"""
 	dataf: paths to galaxy samples
 	randf: paths to random points corresponding to galaxy samples
@@ -14,9 +17,19 @@ def compute_w(dataf, randf, config, estimator, compensated=1, nbins_rpar=30, ran
 	assert estimator in ['PW1', 'PW2', 'AS', 'wgg'], "for IA: estimator must be 'PW1/2' (pair_weighted 1=RDs, 2=RRs norm) or 'AS' (average shear), for clustering: 'wgg'"
 	assert hasattr(dataf, '__iter__'), "dataf must be list/tuple of 2x paths; density, shapes for IA, or density1, density2 for clustering (these can be the same!)"
 	assert hasattr(randf, '__iter__'), "randf must be list/tuple of 2x paths for randoms corresponding to each of dataf (these can be the same!)"
+	nbins_rpar = int(nbins_rpar)
+	random_oversampling = float(random_oversampling)
+	verbosity = int(verbosity)
+	largePi = int(largePi)
 
 	if type(config) == str:
 		config = treecorr.read_config(config)
+	if config['file_type'] == 'ASCII':
+		config['ra_col'] =  int(config['ra_col'])
+		config['dec_col'] = int(config['dec_col'])
+		config['r_col'] =   int(config['r_col'])
+		config['g1_col'] =  int(config['g1_col'])
+		config['g2_col'] =  int(config['g2_col'])
 	config['verbose'] = verbosity
 
 	if not largePi:
@@ -47,8 +60,8 @@ def compute_w(dataf, randf, config, estimator, compensated=1, nbins_rpar=30, ran
 	rand1.w = np.array(np.random.rand(rand1.ntot) < f1, dtype=float)
 	rand2.w = np.array(np.random.rand(rand2.ntot) < f2, dtype=float)
 
-	bar = Bar('Correlating', max=len(Pi)-1)
-	for p in range(len(Pi)-1):
+	#bar = Bar('Correlating', max=len(Pi)-1)
+	for p in tqdm(range(len(Pi)-1), ascii=True, desc='Correlating'):
 
 		if largePi & any(abs(Pi[p:p+2]) < config['max_rpar']):
 			continue
@@ -71,7 +84,7 @@ def compute_w(dataf, randf, config, estimator, compensated=1, nbins_rpar=30, ran
 			elif estimator == 'AS':
 				norm = ng.weight # DDs
 
-			if compensated:
+			if int(compensated):
 				gt_3D[p] += -(ng.xi - rg.xi) / norm
 				gx_3D[p] += -(ng.xi_im - rg.xi_im) / norm
 			else:
@@ -99,8 +112,9 @@ def compute_w(dataf, randf, config, estimator, compensated=1, nbins_rpar=30, ran
 				xi, varxi = nn.calculateXi(rr, nr, rn)
 
 			wgg_3D[p] += xi
-		bar.next()
-	bar.finish()
+		#try: bar.next()
+		#except: pass
+	#bar.finish()
 
 	if corr == 'ng':
 		gt = np.trapz(gt_3D, x=midpoints(Pi), axis=0)

@@ -535,6 +535,35 @@ class RealCatalogue:
 		Write.close()
 		os.system('chmod +x %s'%File)
 
+	def plot_treecorr(self, path, largePi=0):
+		# needs to create output file in same format as below
+		# analytical error handling should be done beforehand
+		# need to think about how best to extract JK errors
+		outd = join(path, 'to_plot')
+		if not isdir(outd):
+			mkdir(outd)
+
+		for label in self.labels:
+			wlabel = label.split('_')[0] + '_vs_' + label
+			wcorrf = join(path, 'wcorr_' + wlabel + '.dat')
+			jkf = join(path, 'JKerrs_' + label)
+			if largePi:
+				jkf += '_largePi'
+			outf = join(outd, wlabel)
+
+			try:
+				rp, wp, wx, werr = np.loadtxt(wcorrf, usecols=(0, 3, 4, 6)).T
+				ones = np.ones_like(rp, dtype=float)
+				try:
+					jkp, jkx = np.loadtxt(jkf).T
+				except:
+					jkp = jkx = ones
+				data = np.column_stack((rp, wp, ones, jkp, wx, ones, jkx, werr))
+				ascii.write(data, outf, delimiter='\t', overwrite=1,
+							names=['r_p', 'wg+', 'BT+err', 'JK+err', 'wgx', 'BTxerr', 'JKxerr', 'analyticerrs'])
+			except IOError:
+				continue
+
 	def plot_wcorr(self, files_path, wcorrIDs, BT, JK, largePi):
 		wcorrOutputs = []
 		rand_wcorrOutputs = []
@@ -775,20 +804,20 @@ class RealCatalogue:
 
 		return None
 
-	def run_treecorr(self, densf, shapesf, drandf, srandf, config, outfile, estim='PW1', np=16, **kwargs):
-		# config & kwargs to be constructed from command line args for the main script
+	def run_treecorr(self, densf, shapesf, drandf, srandf, config, outfile, nproc=16, **kwargs):
+		# config & kwargs constructed from command line args for the main script
 		import treecorr_3DCF
 		tcw = treecorr_3DCF.compute_w
 		config1 = config.copy()
-		config1['num_threads'] = np
+		config1['num_threads'] = nproc
 
-		r, wgp, wgx = tcw([densf, shapesf], [drandf, srandf], config1, estim, **kwargs)
+		r, wgp, wgx = tcw([densf, shapesf], [drandf, srandf], config1, **kwargs)
 		# mimic BJ code output
 		one_col = np.ones_like(r, dtype=float)
 		out_arr = np.column_stack((r, one_col, one_col, wgp, wgx, one_col, one_col, one_col)) # need to include shot noise as second-to-last column
-		np.savetxt(join(files_path, outfile), out_arr)
+		np.savetxt(outfile, out_arr)
 
-	def wcorr_jackknife(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi, densColours, treecorr=0, **kwargs):
+	def wcorr_jackknife(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi, densColours, treecorr=None, **kwargs):
 		# wcorr JK samples - this function gets called only for shapes samples
 		JKdir = join(patchDir,'JKsamples')
 		JKsamples = [x for x in listdir(JKdir) if x.startswith('JKsample') & x.endswith('.asc')]
@@ -841,7 +870,7 @@ class RealCatalogue:
 				# estim='PW1', np=16, **kwargs(nbins_rpar=30, random_oversampling=10., verbosity=1, load_RRs, save_RRs)
 				outf = (join(JKdir,'wcorr_'+jk[:-4]+'.dat'),
 						join(JKdir,'wcorr_'+jk[:-4]+'_largePi.dat')) [largePi]
-				run_treecorr(dpath, join(JKdir,jk), rdpath, rdpath, tc_config, outf, largePi=largePi, **tc3dcf_kwargs)
+				self.run_treecorr(dpath, join(JKdir,jk), rdpath, rdpath, tc_config, outf, **tc3dcf_kwargs)
 
 			# clean up - if needing to analyse JKs, use arg 'makejk_only'- bypasses this function
 			os.system('rm %s'%rand_out) # random wcorr
@@ -1280,7 +1309,7 @@ if __name__ == "__main__":
 	parser.add_argument(
 	'-treecorr',
 	type=str,
-	help='use TreeCorr to measure wg+ -- give path to a configuration file with sections for (i) TreeCorr config, and (ii) treecorr_3DCF script')
+	help='use TreeCorr to measure wg+ -- give path to a configuration file with sections for (i) TreeCorr config, and (ii) treecorr_3DCF script kwargs')
 	args = parser.parse_args()
 	SHIFT = args.SHIFT
 
@@ -1292,7 +1321,12 @@ if __name__ == "__main__":
 
 	catalog = RealCatalogue(args.Catalog, args.DEIMOS, args.rmagCut, args.SDSS, other=args.other, radians=args.radians, cols=args.cols, largePi=args.largePi, MICEdensity=args.MICEdens, SHIFT=SHIFT, PLOTNOW=args.plotNow)
 
-	if args.plotNow:
+	if args.plotNow & (args.treecorr is not None):
+		print('PLOTTING TREECORR')
+		catalog.plot_treecorr(args.Path, largePi=args.largePi)
+		sys.exit()
+
+	elif args.plotNow:
 		# reduce & save data files, returning filename-list
 		print('PLOTTING')
 		ldir = listdir(args.Path)
@@ -1378,8 +1412,15 @@ if __name__ == "__main__":
 		cp = configparser.ConfigParser()
 		cp.read(args.treecorr)
 		top_tc_config = cp._sections
+		top_tc_config['tc_config']['min_sep'] = args.rpLims[0]
+		top_tc_config['tc_config']['max_sep'] = args.rpLims[1]
+		top_tc_config['tc_config']['nbins'] = args.rpBins
+		top_tc_config['tc_config']['min_rpar'] = -args.losLim
+		top_tc_config['tc_config']['max_rpar'] = args.losLim
+		top_tc_config['tc3dcf_kwargs']['nbins_rpar'] = args.losBins * 2
+		top_tc_config['tc3dcf_kwargs']['largePi'] = args.largePi
 	else:
-		top_tc_config= {}
+		top_tc_config = {}
 
 	if args.bootstrap or args.jackknife:
 		print('COMPUTING SAMPLE COVARIANCES...')
@@ -1654,17 +1695,22 @@ if __name__ == "__main__":
 			print(rc)
 
 		if args.treecorr:
-			for i in range(len(wcorr_combos)):
-				densf, dc, shapesf, sc, outf = wcorr_combos[i]
+			for i in range(len(adjusted_combos)):
+				densf, dc, shapesf, sc, outf = adjusted_combos[i]
 				rdensf, rdc, rshapesf, rsc, routf = rand_combos[i]
+				densf = join(catalog.new_root, densf)
+				shapesf = join(catalog.new_root, shapesf)
+				rdensf = join(catalog.new_root, rdensf)
+				rshapesf = join(catalog.new_root, rshapesf)
+				outf = join(catalog.new_root, 'wcorr_'+outf+'.dat')
 				# densf, shapesf, drandf, srandf, config, outfile,
-				# estim='PW1', np=16, **kwargs(nbins_rpar=30, random_oversampling=10., verbosity=1, load_RRs, save_RRs)
-				run_treecorr(densf, shapesf, rdensf, rshapesf, top_tc_config['tc_config'], outf, np=args.nproc, **top_tc_config['tc3dcf_kwargs'])
+				# estim='PW1', np=16, **kwargs(nbins_rpar=30, random_oversampling=10., verbosity=1, {load_RRs, save_RRs -- for PW2 only})
+				catalog.run_treecorr(densf, shapesf, rdensf, rshapesf, top_tc_config['tc_config'], outf, np=args.nproc, **top_tc_config['tc3dcf_kwargs'])
 
 			if args.plot:
-					os.system(('python /share/splinter/hj/PhD/catalog_sampler.py -Catalog %s ' % args.Catalog+
-								'-Path %s -bootstrap %s -jackknife %s -SDSS %s '%(catalog.new_root, args.bootstrap, args.jackknife, args.SDSS)+
-								'-plotNow 1 -chiSqu 0'))
+				os.system(('python /share/splinter/hj/PhD/catalog_sampler.py -Catalog %s '%args.Catalog +
+							'-Path %s -bootstrap %s -jackknife %s -SDSS %s '%(catalog.new_root, args.bootstrap, args.jackknife, args.SDSS) +
+							'-treecorr %s -plotNow 1 -chiSqu 0' % args.treecorr))
 			if args.make_shear:
 				os.system('python ShearResp.py %s %s' % (('-gama', '-sdss')[args.SDSS], catalog.new_root))
 				if args.largePi:
