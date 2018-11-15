@@ -246,7 +246,8 @@ class RealCatalogue:
 		if (not self.SDSS) & ('RankBCG' in self.data.columns.names):
 			BCGcut = self.data[self.headers['RankBCG']] == 1
 			SATcut = ~BCGcut
-			BCG_dc = BCG_sc = np.ones_like(BCGcut, dtype=bool)
+			BCG_dc = np.ones_like(BCGcut, dtype=bool)
+			BCG_sc = np.ones_like(BCGcut, dtype=bool)
 			BCGargs = (BCGshap, BCGdens)
 			if BCGdens == 1:
 				BCG_dc &= BCGcut
