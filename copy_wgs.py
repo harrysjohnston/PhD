@@ -13,12 +13,12 @@ if __name__ == '__main__':
 	parser.add_argument(
 		'-gama',
 		type=str,
-		default=PHD + "Wcorr_GAMA_final_z0.26_c0.66/",
+		default=PHD + "Wcorr_GAMA_TC_PW1_z0.26_c0.66/",
 		help='path to GAMA Wcorr directory')
 	parser.add_argument(
 		'-sdss',
 		type=str,
-		default=PHD + "Wcorr_SDSS_final_c0.66/",
+		default=PHD + "Wcorr_SDSS_TC_PW1_c0.66/",
 		help='path to SDSS Wcorr directory')
 	parser.add_argument(
 		'-do_gama',
@@ -65,15 +65,15 @@ if __name__ == '__main__':
 	#HH = 0
 	HH = args.hh
 	if HH:
-		gama = PHD + "Wcorr_HH_GAMA_allz/"
-		sdss = PHD + "Wcorr_HH_SDSS_allz/"
+		gama = PHD + "Wcorr_GAMA_TC_PW1_HH_allz/"
+		sdss = PHD + "Wcorr_SDSS_TC_PW1_HH_allz/"
 
 	# largePi
 	#largePi = 1
 	largePi = args.lpi
 	if largePi:
-		gama = PHD + "Wcorr_GAMA_largePi_final_z0.26_c0.66/"
-		sdss = PHD + "Wcorr_SDSS_largePi_final_c0.66/"
+		gama = PHD + "Wcorr_GAMA_largePi_TCPW1_z0.26_c0.66/"
+		sdss = PHD + "Wcorr_SDSS_largePi_TCPW1_c0.66/"
 
 	# COPY WG+/x FILES FROM GAMA AND/OR SDSS OUTPUT DIRS
 	#do_gama = 1
@@ -103,6 +103,7 @@ if __name__ == '__main__':
 		if largePi:
 			files['wgp_'+k] += '_largePi'
 			files['covar_wgp_'+k] += '_largePi'
+			#print('NOT APPENDING FILENAMES WITH "_largePi"')
 
 		files['wgg_'+k] = 'wgg_%s_'%clus_prefs[k] + file_names[k] + '_UnMasked'
 		files['covar_wgg_'+k] = 'wggJK_covar_%s_'%clus_prefs[k] + file_names[k] + '_UnMasked'

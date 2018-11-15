@@ -537,8 +537,6 @@ class RealCatalogue:
 
 	def plot_treecorr(self, path, largePi=0):
 		# needs to create output file in same format as below
-		# analytical error handling should be done beforehand
-		# need to think about how best to extract JK errors
 		outd = join(path, 'to_plot')
 		if not isdir(outd):
 			mkdir(outd)
@@ -549,6 +547,7 @@ class RealCatalogue:
 			jkf = join(path, 'JKerrs_' + label)
 			if largePi:
 				jkf += '_largePi'
+				wlabel += '_largePi'
 			outf = join(outd, wlabel)
 
 			try:
@@ -804,17 +803,16 @@ class RealCatalogue:
 
 		return None
 
-	def run_treecorr(self, densf, shapesf, drandf, srandf, config, outfile, nproc=16, **kwargs):
+	def run_treecorr(self, densf, shapesf, drandf, srandf, config, outfile, **kwargs):
 		# config & kwargs constructed from command line args for the main script
 		import treecorr_3DCF
 		tcw = treecorr_3DCF.compute_w
 		config1 = config.copy()
-		config1['num_threads'] = nproc
 
-		r, wgp, wgx = tcw([densf, shapesf], [drandf, srandf], config1, **kwargs)
+		r, wgp, wgx, err = tcw([densf, shapesf], [drandf, srandf], config1, **kwargs)
 		# mimic BJ code output
 		one_col = np.ones_like(r, dtype=float)
-		out_arr = np.column_stack((r, one_col, one_col, wgp, wgx, one_col, one_col, one_col)) # need to include shot noise as second-to-last column
+		out_arr = np.column_stack((r, one_col, one_col, wgp, wgx, one_col, err, one_col)) # need to include shot noise as second-to-last column
 		np.savetxt(outfile, out_arr)
 
 	def wcorr_jackknife(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi, densColours, treecorr=None, **kwargs):
@@ -870,10 +868,12 @@ class RealCatalogue:
 				# estim='PW1', np=16, **kwargs(nbins_rpar=30, random_oversampling=10., verbosity=1, load_RRs, save_RRs)
 				outf = (join(JKdir,'wcorr_'+jk[:-4]+'.dat'),
 						join(JKdir,'wcorr_'+jk[:-4]+'_largePi.dat')) [largePi]
-				self.run_treecorr(dpath, join(JKdir,jk), rdpath, rdpath, tc_config, outf, **tc3dcf_kwargs)
+				print('%i / %i' % (i+1, len(JKsamples)))
+				self.run_treecorr(dpath, join(JKdir,jk), rdpath, rdpath, kwargs['tc_config'], outf, **kwargs['tc3dcf_kwargs'])
 
 			# clean up - if needing to analyse JKs, use arg 'makejk_only'- bypasses this function
-			os.system('rm %s'%rand_out) # random wcorr
+			if not treecorr:
+				os.system('rm %s'%rand_out) # random wcorr
 			os.system('rm %s_d'%join(JKdir, jk)) # copied density JK sample
 			os.system('rm %s'%join(JKdir, randjk)) # copied random JK sample
 			os.system('rm %s'%join(JKdir, jk)) # shapes JK sample
@@ -1417,6 +1417,7 @@ if __name__ == "__main__":
 		top_tc_config['tc_config']['nbins'] = args.rpBins
 		top_tc_config['tc_config']['min_rpar'] = -args.losLim
 		top_tc_config['tc_config']['max_rpar'] = args.losLim
+		top_tc_config['tc_config']['num_threads'] = args.nproc
 		top_tc_config['tc3dcf_kwargs']['nbins_rpar'] = args.losBins * 2
 		top_tc_config['tc3dcf_kwargs']['largePi'] = args.largePi
 	else:

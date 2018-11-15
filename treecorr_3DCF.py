@@ -1,5 +1,6 @@
 from __future__ import division
 import numpy as np
+from scipy.integrate import simps
 #from progress.bar import ChargingBar as Bar
 from tqdm import tqdm
 import treecorr
@@ -14,6 +15,7 @@ def compute_w(dataf, randf, config, estimator='PW1', compensated=1, nbins_rpar=3
 	estimator: 'PW1', 'PW2', 'AS' or 'wgg' to specify correlation & estimator
 	nbins_rpar: number of line-of-sight bins for 3D correlation function -- specify limits in config arg
 	"""
+
 	assert estimator in ['PW1', 'PW2', 'AS', 'wgg'], "for IA: estimator must be 'PW1/2' (pair_weighted 1=RDs, 2=RRs norm) or 'AS' (average shear), for clustering: 'wgg'"
 	assert hasattr(dataf, '__iter__'), "dataf must be list/tuple of 2x paths; density, shapes for IA, or density1, density2 for clustering (these can be the same!)"
 	assert hasattr(randf, '__iter__'), "randf must be list/tuple of 2x paths for randoms corresponding to each of dataf (these can be the same!)"
@@ -42,6 +44,7 @@ def compute_w(dataf, randf, config, estimator='PW1', compensated=1, nbins_rpar=3
 		corr = 'ng'
 		gt_3D = np.zeros([len(Pi)-1, config['nbins']])
 		gx_3D = np.zeros([len(Pi)-1, config['nbins']])
+		varg_3D = np.zeros([len(Pi)-1, config['nbins']])
 	elif estimator == 'wgg':
 		corr = 'nn'
 		wgg_3D = np.zeros([len(Pi)-1, config['nbins']])
@@ -51,16 +54,16 @@ def compute_w(dataf, randf, config, estimator='PW1', compensated=1, nbins_rpar=3
 	config_r = config.copy()
 	config_r['flip_g1'] = False
 	config_r['flip_g2'] = False
-	data1 = treecorr.Catalog(dataf[0], config)
-	data2 = treecorr.Catalog(dataf[1], config)
+	data1 = treecorr.Catalog(dataf[0], config) # 1 = density/lenses
+	data2 = treecorr.Catalog(dataf[1], config) # 2 = shapes
 	rand1 = treecorr.Catalog(randf[0], config_r, is_rand=1)
 	rand2 = treecorr.Catalog(randf[1], config_r, is_rand=1)
 	f1 = data1.ntot * random_oversampling / float(rand1.ntot)
 	f2 = data2.ntot * random_oversampling / float(rand2.ntot)
 	rand1.w = np.array(np.random.rand(rand1.ntot) < f1, dtype=float)
 	rand2.w = np.array(np.random.rand(rand2.ntot) < f2, dtype=float)
+	varg = treecorr.calculateVarG(data2)
 
-	#bar = Bar('Correlating', max=len(Pi)-1)
 	for p in tqdm(range(len(Pi)-1), ascii=True, desc='Correlating'):
 
 		if largePi & any(abs(Pi[p:p+2]) < config['max_rpar']):
@@ -70,28 +73,34 @@ def compute_w(dataf, randf, config, estimator='PW1', compensated=1, nbins_rpar=3
 		conf_pi['min_rpar'] = Pi[p]
 		conf_pi['max_rpar'] = Pi[p+1]
 
-		# HOW to handle shot-noise errors?
 		if corr == 'ng':
 			ng = treecorr.NGCorrelation(conf_pi)
 			rg = treecorr.NGCorrelation(conf_pi)
 			ng.process_cross(data1, data2)
 			rg.process_cross(rand1, data2)
 
-			if estimator == 'PW1':
-				norm = rg.weight * data1.ntot / rand1.w.sum() # RDs
-			if estimator == 'PW2':
-				norm = get_RRs(rand1, rand2, conf_pi, **kwargs) * data1.ntot * data2.ntot / (rand1.w.sum() * rand2.w.sum()) # RRs
-			elif estimator == 'AS':
-				norm = ng.weight # DDs
+			if estimator == 'PW1': # RDs norm
+				f = data1.ntot / rand1.w.sum()
+				norm1 = rg.weight * f
+				norm2 = rg.weight
+			if estimator == 'PW2': # RRs norm
+				RRs = get_RRs(rand1, rand2, conf_pi, **kwargs)
+				f1 = data1.ntot / rand1.w.sum()
+				f2 = data2.ntot / rand2.w.sum()
+				norm1 = RRs * f1 * f2
+				norm2 = RRs * f2
+			elif estimator == 'AS': # DDs norm
+				norm1 = ng.weight
+				norm2 = rg.weight
 
 			if int(compensated):
-				gt_3D[p] += -(ng.xi - rg.xi) / norm
-				gx_3D[p] += -(ng.xi_im - rg.xi_im) / norm
+				gt_3D[p] += (ng.xi / norm1) - (rg.xi / norm2)
+				gx_3D[p] += (ng.xi_im / norm1) - (rg.xi_im / norm2)
+				varg_3D[p] += (varg / norm1) + (varg / norm2)
 			else:
-				gt_3D[p] += -ng.xi / norm
-				gx_3D[p] += -ng.xi_im / norm
-			#gt_3D[p] += -rg.xi / norm
-			#gx_3D[p] += -rg.xi_im / norm
+				gt_3D[p] += ng.xi / norm1
+				gx_3D[p] += ng.xi_im / norm1
+				varg_3D[p] += varg / norm1
 
 		elif corr == 'nn':
 			nn = treecorr.NNCorrelation(conf_pi)
@@ -112,17 +121,18 @@ def compute_w(dataf, randf, config, estimator='PW1', compensated=1, nbins_rpar=3
 				xi, varxi = nn.calculateXi(rr, nr, rn)
 
 			wgg_3D[p] += xi
-		#try: bar.next()
-		#except: pass
-	#bar.finish()
 
 	if corr == 'ng':
-		gt = np.trapz(gt_3D, x=midpoints(Pi), axis=0)
-		gx = np.trapz(gx_3D, x=midpoints(Pi), axis=0)
+		#gt = np.trapz(gt_3D, x=midpoints(Pi), axis=0)
+		#gx = np.trapz(gx_3D, x=midpoints(Pi), axis=0)
+		#gt = simps(gt_3D, x=midpoints(Pi), axis=0)
+		gt = np.sum(gt_3D * (Pi[1] - Pi[0]), axis=0)
+		gx = np.sum(gx_3D * (Pi[1] - Pi[0]), axis=0)
+		varg = np.sum(varg_3D, axis=0)
 		r = ng.rnom
-		return r, gt, gx
+		return r, gt, gx, varg**0.5
 	elif corr == 'nn':
-		wgg = np.trapz(wgg_3D, x=midpoints(Pi), axis=0)
+		wgg = np.sum(wgg_3D * (Pi[1] - Pi[0]), axis=0)
 		r = nn.rnom
 		return r, wgg
 
