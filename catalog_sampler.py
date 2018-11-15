@@ -244,16 +244,18 @@ class RealCatalogue:
 		print('bitmask cut [unique]: \t', np.unique(bitmask_cut))
 
 		if (not self.SDSS) & ('RankBCG' in self.data.columns.names):
-			BCGcut = np.where(self.data[self.headers['RankBCG']]==1,True,False)
-			BCG_dc = [True]*len(self.data)
-			BCG_sc = BCG_dc
-			BCGargs = [0,0]
-			if BCGdens:
+			BCGcut = self.data[self.headers['RankBCG']] == 1
+			SATcut = ~BCGcut
+			BCG_dc = BCG_sc = np.ones_like(BCGcut, dtype=bool)
+			BCGargs = (BCGshap, BCGdens)
+			if BCGdens == 1:
 				BCG_dc &= BCGcut
-				BCGargs[1] = 1
-			if BCGshap:
+			elif BCGdens == 2:
+				BCG_dc &= SATcut
+			if BCGshap == 1:
 				BCG_sc &= BCGcut
-				BCGargs[0] = 1
+			elif BCGshap == 2:
+				BCG_sc &= SATcut
 		else:
 			BCG_dc = BCG_sc = np.ones_like(bitmask_cut, dtype=bool)
 			BCGargs = (0, 0)
@@ -1160,12 +1162,12 @@ if __name__ == "__main__":
 	default=4)
 	parser.add_argument(
 	'-BCGdens',
-	help='select only BCGs for real density samples (1) or not (0), defaults to 0',
+	help='1 = take BCGs only for density // 0 = take all galaxies for density // 2 = take satellites only for density',
 	type=int,
 	default=0)
 	parser.add_argument(
 	'-BCGshap',
-	help='select only BCGs for shapes samples (1) or not (0), defaults to 0',
+	help='1 = take BCGs only for shapes // 0 = take all galaxies for shapes // 2 = take satellites only for shapes',
 	type=int,
 	default=0)
 	parser.add_argument(
