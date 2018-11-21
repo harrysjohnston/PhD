@@ -84,7 +84,8 @@ class RealCatalogue:
 		if not PLOTNOW:
 			Mr = data[self.headers['absmag_r']]
 			Mr = np.where(fs >= 1., Mr - 2.5*np.log10(fs), Mr)
-			data = data[Mr < mc]
+			if mc is not None:
+				data = data[Mr < mc]
 
 			if not self.other:
 				print('cutting 0.02 < z < 0.5 randoms cannot extend this near, and GAMA too sparse after z=0.5')
@@ -1208,9 +1209,8 @@ if __name__ == "__main__":
 	default=150.)
 	parser.add_argument(
 	'-rmagCut',
-	help='R-band magnitude above which to exclude faint sources, defaults to 0',
-	type=np.float32,
-	default=0)
+	help='R-band magnitude above which to exclude faint sources, defaults is None -- no cut',
+	type=np.float32)
 	parser.add_argument(
 	'-densColours',
 	help='use redshift&colour-cut samples as position samples for correlations (1), or just redshift-cut samples (0), defaults to 1',
