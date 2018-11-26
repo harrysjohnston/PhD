@@ -1432,7 +1432,7 @@ if __name__ == "__main__":
 
 			# jkData.shape = (10 subsamples, N patches/cubes)
 			# random_cutter = N_patch array of functions, each to be applied to (ra, dec, z) of randoms
-			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=0, bitmaskCut=args.bitmaskCut, occ_thresh=args.occ_thresh, SHIFT=SHIFT)
+			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=(args.SDSS | args.other), do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=0, bitmaskCut=args.bitmaskCut, occ_thresh=args.occ_thresh, SHIFT=SHIFT)
 			print('jkData: ', jkData.shape)
 			print('jkWeights: ', jkWeights.shape, '\n', jkWeights)
 			print('=======================\t=======================\terror_scaling: ', error_scaling)
@@ -1499,11 +1499,11 @@ if __name__ == "__main__":
 			gc.collect()
 			if args.densColours:
 				for radians_bool, paths_key in [(1, 'all'), (0, 'swot-all')]:
-					ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=radians_bool, save_jks=1, jk_randoms=1, patch_str='patch', paths=paths_key, largePi=0, sdss=args.SDSS, ccut=args.cCut)
+					ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=radians_bool, save_jks=1, jk_randoms=1, patch_str='patch', paths=paths_key, largePi=0, sdss=(args.SDSS | args.other), ccut=args.cCut)
 					gc.collect()
 			else:
 				for radians_bool, paths_key in [(1, 'dc0'), (0, 'swot-dc0')]:
-					ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=radians_bool, save_jks=1, jk_randoms=1, patch_str='patch', paths=paths_key, largePi=0, sdss=args.SDSS, ccut=args.cCut)
+					ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=radians_bool, save_jks=1, jk_randoms=1, patch_str='patch', paths=paths_key, largePi=0, sdss=(args.SDSS | args.other), ccut=args.cCut)
 					gc.collect()
 				#ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=1, jk_randoms=1, patch_str='patch', paths='all', largePi=0, sdss=args.SDSS, ccut=args.cCut)
 				#gc.collect()
@@ -1534,7 +1534,7 @@ if __name__ == "__main__":
 			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers.txt'), np.array(jknumbers), header=jkn_header, fmt='%i')
 
 		if args.largePi:
-			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=args.SDSS, do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut, SHIFT=SHIFT)
+			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=(args.SDSS | args.other), do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut, SHIFT=SHIFT)
 			Njkregions = len(jkData[0])
 
 			# read & downsample randoms, for JK trimming
@@ -1590,9 +1590,9 @@ if __name__ == "__main__":
 
 			# no swot-files for largePi - can't set lower Pi-limit
 			if args.densColours:
-				ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=1, sdss=args.SDSS, ccut=args.cCut)
+				ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=0, jk_randoms=1, patch_str='patch', paths='all', largePi=1, sdss=(args.SDSS | args.other), ccut=args.cCut)
 			else:
-				ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=1, jk_randoms=1, patch_str='patch', paths='dc0', largePi=1, sdss=args.SDSS, ccut=args.cCut)
+				ds_jkfunc(catalog.new_root, random_cutter=random_cut_bool, empty_patches=skinny_patch_cuts, randoms=jkrandoms, radians=1, save_jks=1, jk_randoms=1, patch_str='patch', paths='dc0', largePi=1, sdss=(args.SDSS | args.other), ccut=args.cCut)
 
 			jknumbers, jkn_header = [], ''
 			for i, lab in enumerate(catalog.labels[:4]):
