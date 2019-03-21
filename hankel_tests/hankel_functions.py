@@ -1,21 +1,40 @@
 from __future__ import print_function, division
 import numpy as np
-from numpy import pi, log10
+from numpy import pi, log10, exp
 from scipy.interpolate import interp1d, interp2d
-from scipy.integrate import simps
+from scipy.integrate import quad
 import hankel
 from hankel import get_h
 from astropy.cosmology import FlatLambdaCDM as FLCDM
 cosmo = FLCDM(Om0=0.25, H0=70, Ob0=0.044)
 
+def prep_kpar_integrand(kpar, kperp, Pi):
+	karg = np.sqrt(np.add.outer(kperp**2, kpar**2))
+	kparm, Pim = np.meshgrid(kpar, Pi)
+	cosine = np.cos(kparm * Pim)
+	return karg, cosine
+
+def make_kpar_integrand_2d(k, pk, karg, cosine):
+	P = interp1d(k, pk, fill_value='extrapolate', bounds_error=0)
+	return P(karg)[:, :, np.newaxis] * cosine.T
+
+def make_kpar_integrand_1d(k, pk, kperp):#, pi):
+	P = interp1d(k, pk, fill_value='extrapolate', bounds_error=0)
+	def make_func(kpar):
+		kmode = (kperp**2 + kpar**2)**0.5
+		return P(kmode)# * np.cos(kpar*pi)
+	return make_func
+
 def k_scale_cuts(kx, low, high):
 	return kx[(kx >= low) & (kx <= high)]
 
-def upsample_k(kx, factor, spacing='log'):
+def upsample_k(kx, factor, spacing='log', n=None):
+	if n is None:
+		n = int(factor * len(kx))
 	if spacing == 'log':
-		return np.logspace(np.log10(kx.min()), np.log10(kx.max()), int(factor * len(kx)))
+		return np.logspace(np.log10(kx.min()), np.log10(kx.max()), n)
 	if spacing == 'lin':
-		return np.linspace(kx.min(), kx.max(), int(factor * len(kx)))
+		return np.linspace(kx.min(), kx.max(), n)
 
 def fivept_stencil(func, x, h):
 	# returns f'(x), via 5pt stencil, for grid-spacing h
@@ -42,7 +61,8 @@ def choose_h(f, nu, r_min, r_max):
 	return h_opt
 
 def choose_kpar_max(Pi):
-	cosine_zero = [pi * (24./2.) * (1. / abs(p)) for p in Pi]
+	#cosine_zero = [pi * (1. / abs(2.*p)) for p in Pi]
+	cosine_zero = [np.inf for p in Pi]
 	return np.array(cosine_zero)
 
 def compute_Wz(z, nz1, nz2):
@@ -52,7 +72,7 @@ def compute_Wz(z, nz1, nz2):
 	pz2 = nz2 / nz2.sum()
 	assert pz1.shape == z.shape, "p(z) vs. z mismatch"
 	assert pz2.shape == z.shape, "p(z) vs. z mismatch"
-	# compute X(z) = comoving coordiante
+	# compute X(z) = comoving coordinate
 	chiz = lambda x: cosmo.comoving_distance(x) # h (hubble parameter) cancels
 	X = chiz(z).value
 	Xsq = X**2

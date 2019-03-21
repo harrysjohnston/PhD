@@ -4,6 +4,8 @@ from cosmosis.datablock import names, option_section
 #import matplotlib.pyplot as plt
 #import matplotlib.colors as colors
 from argparse import Namespace
+from time import time
+import os
 
 def setup(options):
 # FOR MAIN ANALYSIS, NEED TO INCLUDE APPLICATION OF COLOUR_SPEC A_IA
@@ -16,6 +18,7 @@ def setup(options):
 	num_r = options.get_int(option_section, 'num_r', default=20)
 	abs_Pi_max = options.get_double(option_section, 'abs_Pi_max', default=60.)
 	num_Pi = options.get_int(option_section, 'num_Pi', default=30)
+	Pisymm = options.get_bool(option_section, 'Pisymm', default=True)
 	norm = options.get_string(option_section, 'norm', default='-1./(2*np.pi**2)')
 	nzeros = options.get_int(option_section, 'nzeros', default=10)
 	kpar_max = options.get_double(option_section, 'kpar_max', default=0.)
@@ -38,6 +41,7 @@ def setup(options):
 		'num_r':num_r,
 		'abs_Pi_max':abs_Pi_max,
 		'num_Pi':num_Pi,
+		'Pisymm':Pisymm,
 		'norm':norm,
 		'nzeros':nzeros,
 		'kpmax':kpar_max,
@@ -59,18 +63,44 @@ def execute(block, config):
 	if cf.nzeros != 0:
 		k, pk = zero_pad(k, pk, nzeros=cf.nzeros)
 
+	# prep integrator
+	if cf.h == 0:
+		if block.has_value('hankel', 'h'):
+			cf.h = block['hankel', 'h']
+		else:
+			# try to optimise step-size h
+			# this method is NOT always reliable, or even good...
+			fpk = interp1d(k, pk[0], fill_value=0., bounds_error=0)
+			cf.h = choose_h(fpk, cf.nu, cf.r_min, cf.r_max)
+			block.put('hankel', 'h', cf.h)
+			print('optimal hankel stepsize h determined = %f'%cf.h)
+	HT = hankel.HankelTransform(nu=cf.nu, h=cf.h)#, N=10000)
+
+	if cf.intz:
+		# compute redshift weight-fn, skip W(z) = 0 loops
+		nz1 = block[cf.nz_sec, 'nofz_shapes']
+		nz2 = block[cf.nz_sec, 'nofz_density']
+		nz_z = block[cf.nz_sec, 'z']
+		W = compute_Wz(nz_z, nz1, nz2)
+		#W = np.interp(z, nz_z, W)
+
 	# define real- & fourier-space boundaries
 	rp = np.logspace(log10(cf.r_min), log10(cf.r_max), cf.num_r)
-	Pi = np.linspace(-cf.abs_Pi_max, cf.abs_Pi_max, cf.num_Pi)
-	if any(Pi == 0):
-		Pi = (Pi[1:] + Pi[:-1]) / 2.
+	Pi = np.linspace(-cf.abs_Pi_max, cf.abs_Pi_max, cf.num_Pi+1)
+	Pi = (Pi[1:] + Pi[:-1]) / 2.
+	if cf.Pisymm:
+		Pi = Pi[len(Pi)/2:]
 
 	kpar, kperp = k.copy(), k.copy()
-	#kperp = k.copy()
-	kpar = np.linspace(0, 8.*pi, 5000)
+	#kpar = upsample_k(kpar, 1, 'lin', n=4e4)
+	kperp = k_scale_cuts(kperp, 1e-3, 1e5)
+	kperp = upsample_k(kperp, 1, n=500)
+	kpar = upsample_k(kpar, 1, n=500)
+	#kpar = upsample_k(kpar, 1, 'lin', n=2**16 + 1)
+	#kgrid, cosine = prep_kpar_integrand(kpar, kperp, Pi)
 
 	if cf.kpmax == 0:
-		# set kpar_max to capture 1 full oscillation in cos(Pi*kpar)
+		# set kpar_max = inf
 		cf.kpmax = choose_kpar_max(Pi)
 	else:
 		kpar = k_scale_cuts(kpar, 0, cf.kpmax)
@@ -80,31 +110,7 @@ def execute(block, config):
 	if cf.fkperp != 1:
 		kperp = upsample_k(kperp, cf.fkperp)
 
-	kparm, Pim = np.meshgrid(kpar, Pi)
-	xpar = kparm * Pim
-	kgrid = np.sqrt( np.add.outer(kperp**2., (xpar / Pim)**2.) )
-	#import pdb ; pdb.set_trace()
-
-	# prep integrations
-	if cf.h == 0:
-		if block.has_value('hankel', 'h'):
-			cf.h = block['hankel', 'h']
-		else:
-			# try to optimise step-size h
-			# this method is NOT always reliable, or even good...
-			fpk = interp1d(k, pk[0], fill_value='extrapolate')
-			cf.h = choose_h(fpk, cf.nu, rp[0], rp[-1])
-			block.put('hankel', 'h', cf.h)
-			print('optimal hankel stepsize h determined = %f'%cf.h)
-	HT = hankel.HankelTransform(nu=cf.nu, h=cf.h)
 	xi = np.zeros([len(pk), len(Pi), len(rp)])
-
-	if cf.intz:
-		# compute redshift weight-fn, skip W(z) = 0 loops
-		nz1 = block[cf.nz_sec, 'nofz_shapes']
-		nz2 = block[cf.nz_sec, 'nofz_density']
-		W = compute_Wz(z, nz1, nz2)
-
 	# looping over redshifts
 	for iz, ipk in enumerate(pk):
 		# if W(z) == 0; skip
@@ -112,39 +118,71 @@ def execute(block, config):
 			if W[iz] == 0:
 				xi[iz] = np.zeros_like(xi[0])
 				continue
-
-		# build P(k) interpolator
-		PKinterp = interp1d(k, ipk, fill_value=0., bounds_error=0)
-		pkgrid = PKinterp(kgrid)
-
-		# integrate over k_parallel, divide by Pi for change of variables
-		kpar_integrand = np.cos(xpar) * pkgrid
-		kperp_integrand = np.zeros([len(kperp), len(Pi)])
-		for ip in range(len(Pi)):
-			if hasattr(cf.kpmax, '__iter__'):
-				kpm = cf.kpmax[ip]
-				kperp_integrand[:, ip] += simps(kpar_integrand[:, ip, kpar<=kpm], x=xpar[ip, kpar<=kpm], axis=1)
 			else:
-				kperp_integrand[:, ip] += simps(kpar_integrand[:, ip], x=xpar[ip], axis=1)
-		kperp_integrand = kperp_integrand / Pi
+				print('z=%.2f'%z[iz])
+
+		ti = time()
+		#os.system('rm /share/data1/hj/millennium/hankel_tests/order%s_Pi*_curve.txt'%cf.nu)
+			#tk1 = time()
+
+		for ip, pi in enumerate(Pi):
+			#fname = '/share/data1/hj/millennium/hankel_tests/order%s_Pi%i_curve.txt'%(cf.nu,pi)
+			Ptilde_kperp = []
+			for ikpp, kpp in enumerate(kperp):
+				#tp1 = time()
+				kpar_integrand = make_kpar_integrand_1d(k, ipk, kpp)#, pi)
+				Ptilde, err = quad(kpar_integrand, 0., np.inf, weight='cos', wvar=pi)#, points=np.arange(100000)[1:]/(pi*2.))#, full_output=1)
+				#f = lambda kpp_: interp1d(k, ipk, fill_value=0., bounds_error=0)(kpp_) * Ptilde
+				#with open(fname, 'a') as scr:
+				#	scr.write('%f\t%f\n'%(kpp, Ptilde))
+				Ptilde_kperp.append(Ptilde)
+
+			Ptilde_kperp = np.array(Ptilde_kperp)
+			f = interp1d(kperp, Ptilde_kperp, fill_value='extrapolate', bounds_error=0)
+			xi[iz, ip] += HT.transform(f, rp, ret_err=False)
+				#tp2 = time() - tp1
+				#print '{kperp}Pi-loop time: ', tp2
+			#tk2 = time() - tk1
+			#print 'kperp-loop time: %.3f'%tk2, '-> ~%.1f for %s kperp values'%(tk2*len(kperp), len(kperp))
+		#ttot = time() - ti
+		#print 'total integration time: %.3f'%ttot
+				
+
+#		ti = time() ; ttot = 0.
+#		kpar_integrand = make_kpar_integrand_2d(k, ipk, *kpar_integrand_args)
+#		tf = time() ; ttot += tf - ti
+#		print('time to compute kpar_integrand: %.3f'%(tf-ti))
+#		kperp_integrand = np.trapz(kpar_integrand, x=kpar, axis=1)
+#		ti = tf ; tf = time() ; ttot += tf - ti
+#		print('time to compute (trapz) kperp_integrand: %.3f'%(tf-ti))
+
 		# build interpolator
-		KPIinterp = interp2d(kperp, Pi, kperp_integrand.T, fill_value=0., bounds_error=0.)
+		#KPIinterp = interp2d(kperp, Pi, kperp_integrand.T, fill_value=0., bounds_error=0.)
 
 		# integrate over k_perpendicular
-		def LookUp(kperp, pi):
-			if kperp.ndim == 2:
-				# hankel module may want to pass 2darray with shape = (rp-out, kperp-in)
-				return np.array([KPIinterp(kpi, pi) for kpi in kperp]).squeeze()
-			else:
-				return KPIinterp(kperp, pi)
-
-		for ip in range(len(Pi)):
-			f = lambda kperp: LookUp(kperp, Pi[ip])
-			xi[iz, ip] += HT.transform(f, rp, ret_err=False)
+#		def LookUp(kperp, pi):
+#			if kperp.ndim == 2:
+#				# hankel module may want to pass
+#				# 2darray with shape = (rp-out, kperp-in)
+#				return np.array([KPIinterp(kpi, pi) for kpi in kperp]).squeeze()
+#			else:
+#				return KPIinterp(kperp, pi)
+#
+#		#for ip in range(len(Pi)):
+#			f = lambda kperp: LookUp(kperp, pi)
+#			xi[iz, ip] += HT.transform(f, rp, ret_err=False)
+#
+#		ti = tf ; tf = time() ; ttot += tf - ti
+#		print('time to hankel transform xi-per-Pi: %.3f'%(tf-ti))
+#		print('total per z-loop: %.3f'%ttot)
 
 	# save 3D correlation function to block
 	norm = eval(cf.norm)
-	xi *= norm
+	xi *= norm# / rpow
+	if cf.Pisymm:
+		xi_negPi = xi.copy()
+		xi = np.concatenate((xi[:, ::-1], xi_negPi), axis=1)
+		Pi = np.concatenate((-Pi[::-1], Pi))
 	block.put(cf.out_sec, 'xi', xi)
 
 	# divide CF by 1+xi_gg clustering CF, if appl.
