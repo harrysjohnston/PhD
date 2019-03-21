@@ -57,6 +57,7 @@ class RealCatalogue:
 		self.other = other
 
 		if cols!=None:
+			self.cols = cols
 			if DEI:
 				self.headers = dict( zip( GAMAheads, cols ) )
 			if SDSS:
@@ -246,18 +247,25 @@ class RealCatalogue:
 
 		if (not self.SDSS) & ('RankBCG' in self.data.columns.names):
 			BCGcut = self.data[self.headers['RankBCG']] == 1
-			SATcut = ~BCGcut
+			BCGFcut = self.data[self.headers['RankBCG']] <= 1
+			SATcut = self.data[self.headers['RankBCG']] > 1
 			BCG_dc = np.ones_like(BCGcut, dtype=bool)
 			BCG_sc = np.ones_like(BCGcut, dtype=bool)
 			BCGargs = (BCGshap, BCGdens)
+
 			if BCGdens == 1:
 				BCG_dc &= BCGcut
 			elif BCGdens == 2:
 				BCG_dc &= SATcut
+			elif BCGdens == 3:
+				BCG_dc &= BCGFcut
+
 			if BCGshap == 1:
 				BCG_sc &= BCGcut
 			elif BCGshap == 2:
 				BCG_sc &= SATcut
+			elif BCGshap == 3:
+				BCG_sc &= BCGFcut
 		else:
 			BCG_dc = BCG_sc = np.ones_like(bitmask_cut, dtype=bool)
 			BCGargs = (0, 0)
@@ -813,10 +821,10 @@ class RealCatalogue:
 		tcw = treecorr_3DCF.compute_w
 		config1 = config.copy()
 
-		r, wgp, wgx, err = tcw([densf, shapesf], [drandf, srandf], config1, **kwargs)
+		r, wgp, wgx, err, npair = tcw([densf, shapesf], [drandf, srandf], config1, **kwargs)
 		# mimic BJ code output
 		one_col = np.ones_like(r, dtype=float)
-		out_arr = np.column_stack((r, one_col, one_col, wgp, wgx, one_col, err, one_col)) # need to include shot noise as second-to-last column
+		out_arr = np.column_stack((r, one_col, one_col, wgp, wgx, one_col, err, npair))
 		np.savetxt(outfile, out_arr)
 
 	def wcorr_jackknife(self, patchDir, rp_bins, rp_lims, los_bins, los_lim, nproc, largePi, densColours, treecorr=None, **kwargs):
@@ -1164,12 +1172,12 @@ if __name__ == "__main__":
 	default=4)
 	parser.add_argument(
 	'-BCGdens',
-	help='1 = take BCGs only for density // 0 = take all galaxies for density // 2 = take satellites only for density',
+	help='1 = take BCGs only for density // 0 = take all galaxies for density // 2 = take satellites only for density // 3 = take BCG+Field galaxies for density',
 	type=int,
 	default=0)
 	parser.add_argument(
 	'-BCGshap',
-	help='1 = take BCGs only for shapes // 0 = take all galaxies for shapes // 2 = take satellites only for shapes',
+	help='1 = take BCGs only for shapes // 0 = take all galaxies for shapes // 2 = take satellites only for shapes // 3 = take BCG+Field galaxies for shapes',
 	type=int,
 	default=0)
 	parser.add_argument(
@@ -1432,7 +1440,7 @@ if __name__ == "__main__":
 
 			# jkData.shape = (10 subsamples, N patches/cubes)
 			# random_cutter = N_patch array of functions, each to be applied to (ra, dec, z) of randoms
-			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=(args.SDSS | args.other), do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=0, bitmaskCut=args.bitmaskCut, occ_thresh=args.occ_thresh, SHIFT=SHIFT)
+			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=(args.SDSS | args.other), do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=0, bitmaskCut=args.bitmaskCut, occ_thresh=args.occ_thresh, SHIFT=SHIFT, cols=catalog.cols[:3])
 			print('jkData: ', jkData.shape)
 			print('jkWeights: ', jkWeights.shape, '\n', jkWeights)
 			print('=======================\t=======================\terror_scaling: ', error_scaling)
@@ -1441,7 +1449,11 @@ if __name__ == "__main__":
 			jkrandoms = ds.read_randoms(args.Random)[:, :3]
 
 			if args.SDSS:
-				rand_colour = fits.open(args.Random)[1].data['color']
+				try:
+					rand_colour = fits.open(args.Random)[1].data['color']
+				except KeyError:
+					print("no randoms colour column -- skipping cut")
+					rand_colour = np.ones_like(jkrandoms.T[0])
 				jkrandoms = np.column_stack(( jkrandoms, rand_colour ))
 
 			if (not args.SDSS) & SHIFT:
@@ -1451,7 +1463,7 @@ if __name__ == "__main__":
 				shifted_dec = np.where(G12, shifted_dec + 1, shifted_dec)
 				jkrandoms[:, 1] = shifted_dec
 
-			zlabel = ('Z_TONRY', 'z')[args.SDSS]
+			zlabel = catalog.cols[2]
 			sample_z = catalog.data[zlabel]
 			print('INITIAL jackknife random downsampling..')
 			jkrandoms = ds.downsample(jkrandoms, sample_z, 1, 20) # 1 bin, target 20x real density
@@ -1534,14 +1546,18 @@ if __name__ == "__main__":
 			np.savetxt(join(catalog.new_root, 'JK_subsample_numbers.txt'), np.array(jknumbers), header=jkn_header, fmt='%i')
 
 		if args.largePi:
-			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=(args.SDSS | args.other), do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut, SHIFT=SHIFT)
+			jkData, jkWeights, error_scaling, random_cutter = jk3d.resample_data(catalog.data, catalog.samplecuts, patchside=args.patchSize, zcut=args.zCut, do_sdss=(args.SDSS | args.other), do_3d=args.jk3d, cube_zdepth=args.cubeZdepth, largePi=1, bitmaskCut=args.bitmaskCut, SHIFT=SHIFT, cols=catalog.cols[:3])
 			Njkregions = len(jkData[0])
 
 			# read & downsample randoms, for JK trimming
 			jkrandoms = ds.read_randoms(args.Random)[:, :3]
 
 			if args.SDSS:
-				rand_colour = fits.open(args.Random)[1].data['color']
+				try:
+					rand_colour = fits.open(args.Random)[1].data['color']
+				except KeyError:
+					print("no randoms colour column -- skipping cut")
+					rand_colour = np.ones_like(jkrandoms.T[0])
 				jkrandoms = np.column_stack(( jkrandoms, rand_colour ))
 
 			if (not args.SDSS) & SHIFT:
@@ -1551,7 +1567,7 @@ if __name__ == "__main__":
 				shifted_dec = np.where(G12, shifted_dec + 1, shifted_dec)
 				jkrandoms[:, 1] = shifted_dec
 
-			zlabel = ('Z_TONRY', 'z')[args.SDSS]
+			zlabel = catalog.cols[2]
 			sample_z = catalog.data[zlabel]
 			print('INITIAL jackknife random downsampling..')
 			jkrandoms = ds.downsample(jkrandoms, sample_z, 1, 20) # 1 bin, target 20x real density
@@ -1651,7 +1667,11 @@ if __name__ == "__main__":
 				acC = args.cCut # conditional below does not work unless renaming args.cCut...
 				if args.densColours & (acC != None):
 					# apply colour cut to SDSS randoms - creates much better n(z) wrt real samples
-					r_redcut = np.array(catalog2.data['color'] > args.cCut)
+					try:
+						r_redcut = np.array(catalog2.data['color'] > args.cCut)
+					except KeyError:
+						print("no colour column in randoms -- not cutting!")
+						r_redcut = np.ones_like(randoms_3col.T[0])
 					if samz_k.endswith('r'):
 						r_3cols = randoms_3col[ r_redcut ]
 					elif samz_k.endswith('b'):

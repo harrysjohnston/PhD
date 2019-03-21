@@ -157,10 +157,8 @@ def unit_check(cat, give_back='degrees', tag=''):
 
 def downsample(randoms, sample_z, nbin=1, target_nz=10):
 	# downsample artificial randoms to match mocks' N(z)
-	if all(sample_z < 1.):
-		assert all(randoms.T[2] < 1.), 'RANDOMS vs. REALS z/chi mismatched! Patches in REDSHIFT'
-	else:
-		assert (not all(randoms.T[2] < 1.)), 'RANDOMS vs. REALS z/chi mismatched! Patches in COMOVING'
+	assert abs(randoms.T[2].max() - sample_z.max()) < sample_z.max(), "redshift/comoving distance mismatch! randoms.max() = %g, reals.max() = %g"%(randoms.T[2].max(), sample_z.max())
+	#import pdb ; pdb.set_trace()
 
 	# trim edges of z-distn
 	random_z = randoms[:,2]
@@ -255,7 +253,7 @@ def make_jks(wdir, randoms=None, random_cutter=None, empty_patches=None, radians
 
 	samples = pathdict[paths]
 	_randoms_ = randoms.copy()
-	if (paths not in ['swot-all', 'swot-dc0']) & (all(_randoms_.T[2] <= 1.)):
+	if (paths not in ['swot-all', 'swot-dc0']) & (all(_randoms_.T[2] <= 2.)):
 		print('converting random redshifts to comoving distances [Mpc/h]..')
 		_randoms_[:,2] = MICEcosmo.comoving_distance(_randoms_.T[2]) * 0.7 # * h
 

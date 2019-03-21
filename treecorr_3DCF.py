@@ -45,6 +45,7 @@ def compute_w(dataf, randf, config, estimator='PW1', compensated=1, nbins_rpar=3
 		gt_3D = np.zeros([len(Pi)-1, config['nbins']])
 		gx_3D = np.zeros([len(Pi)-1, config['nbins']])
 		varg_3D = np.zeros([len(Pi)-1, config['nbins']])
+		npair_3D = np.zeros([len(Pi)-1, config['nbins']])
 	elif estimator == 'wgg':
 		corr = 'nn'
 		wgg_3D = np.zeros([len(Pi)-1, config['nbins']])
@@ -97,10 +98,12 @@ def compute_w(dataf, randf, config, estimator='PW1', compensated=1, nbins_rpar=3
 				gt_3D[p] += (ng.xi / norm1) - (rg.xi / norm2)
 				gx_3D[p] += (ng.xi_im / norm1) - (rg.xi_im / norm2)
 				varg_3D[p] += (varg / norm1) + (varg / norm2)
+				npair_3D[p] += ng.npairs
 			else:
 				gt_3D[p] += ng.xi / norm1
 				gx_3D[p] += ng.xi_im / norm1
 				varg_3D[p] += varg / norm1
+				npair_3D[p] += ng.npairs
 
 		elif corr == 'nn':
 			nn = treecorr.NNCorrelation(conf_pi)
@@ -129,8 +132,9 @@ def compute_w(dataf, randf, config, estimator='PW1', compensated=1, nbins_rpar=3
 		gt = np.sum(gt_3D * (Pi[1] - Pi[0]), axis=0)
 		gx = np.sum(gx_3D * (Pi[1] - Pi[0]), axis=0)
 		varg = np.sum(varg_3D, axis=0)
+		npair = np.sum(npair_3D, axis=0)
 		r = ng.rnom
-		return r, gt, gx, varg**0.5
+		return r, gt, gx, varg**0.5, npair
 	elif corr == 'nn':
 		wgg = np.sum(wgg_3D * (Pi[1] - Pi[0]), axis=0)
 		r = nn.rnom

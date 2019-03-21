@@ -42,8 +42,8 @@ def betwixt((re1,re2,de1,de2,ze1,ze2)):
 		return (ra>=re1)&(ra<=re2)&(dec>=de1)&(dec<=de2)&(z>=ze1)&(z<=ze2)
 	return make_cut
 
-def resample_data(fitsdata, sample_cuts, patchside=6, zcut=None, do_sdss=0, do_3d=1, cube_zdepth=150, largePi=0, mice=0, bitmaskCut=None, occ_thresh=0.67, mask_path='/share/splinter/hj/PhD/pixel_weights.fits', SHIFT=0):
-	resampler = resampleTools(fitsdata, patchside, zcut, do_sdss, do_3d, sample_cuts, cube_zdepth=cube_zdepth, largePi=largePi, mice=mice)
+def resample_data(fitsdata, sample_cuts, patchside=6, zcut=None, do_sdss=0, do_3d=1, cube_zdepth=150, largePi=0, mice=0, bitmaskCut=None, occ_thresh=0.67, mask_path='/share/splinter/hj/PhD/pixel_weights.fits', SHIFT=0, cols=None):
+	resampler = resampleTools(fitsdata, patchside, zcut, do_sdss, do_3d, sample_cuts, cube_zdepth=cube_zdepth, largePi=largePi, mice=mice, cols=cols)
 
 	# identify masked pixel coordinates
 	# lostpix_coords = resampler.find_lostpixels(bitmaskCut)
@@ -106,8 +106,11 @@ def resample_data(fitsdata, sample_cuts, patchside=6, zcut=None, do_sdss=0, do_3
 	return cubeData, cube_weights, error_scaling, random_cutter
 
 class resampleTools:
-	def __init__(self, fitsdata, patchside, zcut, do_sdss, do_3d, sample_cuts, cube_zdepth=150, largePi=0, mice=0):
-		self.cols = [ ['RA_GAMA', 'DEC_GAMA', 'Z_TONRY'], ['ra', 'dec', 'z'] ] [do_sdss]
+	def __init__(self, fitsdata, patchside, zcut, do_sdss, do_3d, sample_cuts, cube_zdepth=150, largePi=0, mice=0, cols=None):
+		if cols is None:
+			self.cols = [ ['RA_GAMA', 'DEC_GAMA', 'Z_TONRY'], ['ra', 'dec', 'z'] ] [do_sdss]
+		else:
+			self.cols = cols
 		self.ranges = [ [ (i, j, -3., 3., 0., 0.6) for i,j in [ (129.,141.), (174.,186.), (211.5,223.5) ] ], None ] [do_sdss]
 		self.data = fitsdata
 		self.zcut = zcut
@@ -239,7 +242,7 @@ class resampleTools:
 			patch_pixel_weights = np.zeros( [patch_idx.shape[0], len(pixel_coords)] )
 			patch_pixel_count = np.empty( patch_idx.shape[0] )
 		for c, (i,j) in enumerate(patch_idx):
-			edges = redg[i], redg[i+1], dedg[j], dedg[j+1], 0., 0.6
+			edges = redg[i], redg[i+1], dedg[j], dedg[j+1], 0., 2.
 			cut = betwixt(edges) # returns function cut(), which takes ra,dec,z and returns boolean array
 			patch_cuts[c] = cut(ra,dec,z)
 			if gama:
