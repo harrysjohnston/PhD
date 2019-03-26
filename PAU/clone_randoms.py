@@ -13,8 +13,12 @@ pchoice = np.random.choice
 cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
 interp1d_ = lambda x, xx, xy: interp1d(xx, xy, bounds_error=0, fill_value=-99.)(x)
 
-def dmax(lim, M, ceiling=np.inf):
+def dmax(lim, M_, ceiling=np.inf, hcorr=None):
 	# maximum distance of absolute M galaxy in Mpc, given apparent mag lim
+	if hcorr is not None:
+		M = M_ + hcorr
+	else:
+		M = M_.copy()
 	dist = 10. ** (0.2 * (lim - M + 5.)) # parsecs
 	dist /= 1e6
 	bad_M = (M < -30.) | (M > -10.) # conservative removal of non-galaxy objects
@@ -29,7 +33,7 @@ def get_zmax_hdu(cat, mcol, mlim, zcol, ceiling=None):
 	print '\t"%s" at limit: %s' % (mcol, mlim)
 	# calculate maximum distance to each galaxy
 	mag = cat[mcol]
-	max_distance = dmax(mlim, mag)
+	max_distance = dmax(mlim, mag)#, hcorr=-5*log10(0.7))
 	max_redshift = np.zeros_like(max_distance)
 	mask = max_distance > 0
 	# interpolate these onto the maximum redshift at which the object would be observed
@@ -91,7 +95,8 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zg=None, Pz=None, zlims=None):
 		Nrand_maxcol = np.array(list(maxcol) * Nrand)
 		Nrand_idcol = np.array(list(idcol) * Nrand)
 		ddraw = np.random.power(3, Ngal * Nrand) * Nrand_maxcol * u.Mpc
-		ddraw = np.where(ddraw > dceil, -99., ddraw)
+		#ddraw = np.where(ddraw > dceil, -99., ddraw)
+		ddraw = ddraw.value
 		mask = ddraw > 0
 		#zmin = z_at_value(cosmo.comoving_distance, ddraw[mask].min())
 		#zmax = z_at_value(cosmo.comoving_distance, ddraw[mask].max())
@@ -157,8 +162,13 @@ def main(args):
 			for mcol, mlim in zip(args.magcols, args.maglims):
 				maxcol = cat[mcol+'_fl%.1f_dmax'%mlim]
 				randoms_id_z = clone_galaxies(idcol, maxcol, args.Nrand, zg=zg, Pz=Pz, zlims=args.zlims)
+				zmin, zmax = 0., randoms_id_z[:, 1].max()
+				zgrid = np.linspace(zmin, zmax, 100)
+				dgrid = cosmo.comoving_distance(zgrid)
+				randoms_comoving = interp1d_(randoms_id_z[:, 1], zgrid, dgrid)
 				random_cols.append(fitscol(array=randoms_id_z[:, 0], name=mcol+'_cloneID', format='K'))
 				random_cols.append(fitscol(array=randoms_id_z[:, 1], name=mcol+'_cloneZ', format='D'))
+				random_cols.append(fitscol(array=randoms_comoving, name=mcol+'_cloneComovingDist', format='D'))
 
 			# save randoms catalogue with galaxy IDs and redshifts for selection
 			random_cols = fits.ColDefs(random_cols)
