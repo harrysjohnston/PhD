@@ -41,8 +41,8 @@ for i in range(len(sels)):
 
 	lab = '%s: %s'%(i+1, labs[i])
 	rlab = 'randoms %s'%(i+1)
-	h = myhist(scat[zcol], ls='--', lw=1.6, label=lab, bins=nbin)
-	myhist(rcat[magcol+'_cloneZ'], lw=1.2, label=rlab, color=h[-1][0].get_edgecolor())
+	h = myhist(scat[zcol], ls=':', lw=1.6, label=lab, bins=nbin)
+	myhist(rcat[magcol+'_cloneZ'], lw=0.8, label=rlab, color=h[-1][0].get_edgecolor())
 
 plt.xlim(-0.03, zmax)
 plt.legend(fontsize=14, frameon=0)
