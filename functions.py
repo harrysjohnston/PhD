@@ -67,18 +67,25 @@ sys.path.append("/share/splinter/hj/PhD/")
 sys.path.append("/share/splinter/hj/PhD/KiDS_PhotometricClustering")
 sys.path.append("/share/splinter/hj/PhD/KiDS_PhotometricClustering/Randoms")
 sys.path.append("/share/splinter/hj/PhD/cosmosis/modules/euclid_ias/")
+sys.path.append("~/PhD/")
+sys.path.append("~/PhD/PAU")
+sys.path.append("~/PhD/KiDS_PhotometricClustering")
+sys.path.append("~/PhD/KiDS_PhotometricClustering/Randoms")
 import skyknife
-import MCplotter as mcp
-import MakeRandoms as MR
-import Clustering_plotter as clp
-from smail_pz_func import *
-import kdestats as kde
-import catalog_sampler as CS
-import jackknife3d as jk3d
-import downsampler as ds
-import compare_coords as cc # plot3dhist() and plot3dims() - each takes 3x 2darray catalogs eg. shapes, dens, randoms.
-				# expand to take *args?
-ds_jkfunc = ds.make_jks
+try:
+	import MCplotter as mcp
+	import MakeRandoms as MR
+	import Clustering_plotter as clp
+	from smail_pz_func import *
+	import kdestats as kde
+	import catalog_sampler as CS
+	import jackknife3d as jk3d
+	import downsampler as ds
+	import compare_coords as cc # plot3dhist() and plot3dims() - each takes 3x 2darray catalogs eg. shapes, dens, randoms.
+					# expand to take *args?
+	ds_jkfunc = ds.make_jks
+except:
+	pass
 frac = lambda x: np.sum(x)/np.float32(len(x))
 minmax = lambda x: (x.min(), x.max())
 midpoints = lambda x: (x[1:] + x[:-1]) / 2.
