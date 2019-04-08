@@ -10,13 +10,13 @@ if len(sys.argv[1:]) < 4:
 
 cat = fopen(sys.argv[1])
 mcol = sys.argv[2]
-zcol = sys.argv[3]
-mlim = sys.argv[4]
+mlim = sys.argv[3]
+zcol = cat[sys.argv[4]]
 
 d = cosmo.comoving_distance(zcol)
 dm = cat['%s_fl%s_dmax'%(mcol, mlim)]
 zm = cat['%s_fl%s_zmax'%(mcol, mlim)]
-mask = (dm > 0)& (zm > 0)
+mask = (dm > 0) & (zm > 0)
 f, ax = plt.subplots()
 axx = ax.twinx()
 #axy = ax.twiny()
@@ -31,8 +31,8 @@ ax.set_xlabel('$d_{max}$')
 plt.tight_layout()
 myhist(d, histtype='bar', alpha=0.5, normed=0)
 plt.sca(axx)
-dl = np.sort(dm[(dm < d.max()*3.)])
+dl = np.sort(dm[(dm < (d.max().value)*3.)])
 plt.plot(dl, (dl/dl.max())**2., 'r:')
-plt.xlim(None, d.max()*3.)
+plt.xlim(None, d.max().value*3.)
 
 

@@ -15,22 +15,24 @@ magcol = sys.argv[4]
 idcol = sys.argv[5]
 
 hargs = {'alpha':0.2, 'normed':1}#, 'bins':'auto'}
-cmask = cat[magcol] > -30
-rmask = rand[magcol+'_cloneZ'] > 0
+cmask = (cat[magcol] > -30) & (cat[zcol] > 0.02)
+rmask = rand[magcol+'_cloneZ'] > 0.02
 
 sels = [(-19 < cat[magcol]) & (cat[magcol] < -18.9) & cmask,
-		(-21 < cat[magcol]) & (cat[magcol] < -20.9) & cmask,
-		(cat[magcol] > -16) & cmask]
-labs = ['$-18 < M < -17.9$',
+		(-22 < cat[magcol]) & (cat[magcol] < -21.9) & cmask,
+		(cat[magcol] > -17) & cmask]
+labs = ['$-19 < M < -18.9$',
 		'$-21 < M < -20.9$',
-		'$M > -16$']
+		'$-17 < M$']
 #labs = ['M bin %s'%(i+1) for i in range(len(sels))]
+#sels = [cmask]
+#labs = ['all']
 if cat[zcol].max() > 1.2:
 	zmax = 1.25
 else:
 	zmax = cat[zcol].max()
-nbin = np.linspace(0, zmax, 50)
-f, ax = plt.subplots()
+nbin = np.linspace(0, zmax, 100)
+f, ax = plt.subplots(figsize=(10,8))
 plt.hist(cat[zcol][cmask], bins=nbin, **hargs)
 plt.hist(rand[magcol+'_cloneZ'][rmask], bins=nbin, **hargs)
 
@@ -41,8 +43,10 @@ for i in range(len(sels)):
 
 	lab = '%s: %s'%(i+1, labs[i])
 	rlab = 'randoms %s'%(i+1)
-	h = myhist(scat[zcol], ls=':', lw=1.6, label=lab, bins=nbin)
-	myhist(rcat[magcol+'_cloneZ'], lw=0.8, label=rlab, color=h[-1][0].get_edgecolor())
+	h = myhist(scat[zcol], bins=nbin,
+				ls=':', lw=1.6, label=lab)
+	myhist(rcat[magcol+'_cloneZ'], bins=nbin,
+			lw=0.8, label=rlab, color=h[-1][0].get_edgecolor())
 
 plt.xlim(-0.03, zmax)
 plt.legend(fontsize=14, frameon=0)

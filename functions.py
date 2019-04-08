@@ -7,23 +7,27 @@ try:
 	#ipython.magic("autoreload 2")
 except:
 	print(' -- failed to import ipython --')
+import os
 import pickle
 import numpy as np
 import healpy as hp
 import scipy
 import scipy.interpolate as scint
 import scipy.stats as stats
+import pandas as pd
+from numpy import log10, log
 from scipy.interpolate import interp1d, interp2d
 from scipy.optimize import curve_fit
 norm = stats.norm
-import pandas as pd
 from astropy.io import fits, ascii
+fitscol = fits.Column
 from astropy.table import Table
 from astropy import cosmology
+from astropy import units as u
 from astropy.cosmology import FlatLambdaCDM as FLCDM
 MICEcosmo = FLCDM(Om0=0.25, H0=70, Ob0=0.044)
+cosmo = FLCDM(Om0=0.3, H0=70)
 cMpc = MICEcosmo.comoving_distance
-import os
 from os import listdir, mkdir
 from os.path import join, isdir, basename, normpath, dirname
 def phd():

@@ -4,56 +4,93 @@ from astropy.cosmology import FlatLambdaCDM, z_at_value
 from functions import fit_smail
 from tqdm import tqdm
 from numpy import log10
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, interp2d
 import astropy.units as u
 import numpy as np
+import pandas as pd
 import argparse
 fitscol = fits.Column
 pchoice = np.random.choice
 cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
 interp1d_ = lambda x, xx, xy: interp1d(xx, xy, bounds_error=0, fill_value=-99.)(x)
+#def dmax(lim, M_, ceiling=np.inf, Mcorr=None):
+#	# maximum distance of absolute M galaxy in Mpc, given apparent mag lim
+#	if Mcorr is not None:
+#		M = M_ + Mcorr
+#	else:
+#		M = M_.copy()
+#	dist = 10. ** (0.2 * (lim - M + 5.)) # parsecs
+#	dist /= 1e6
+#	bad_M = (M < -30.) | (M > -10.) # conservative removal of non-galaxy objects
+#	dist = np.where(bad_M, -99., dist)
+#	try:
+#		dist = np.where(dist > ceiling, ceiling, dist)
+#	except:
+#		dist = np.where(dist > ceiling.value, ceiling.value, dist)
+#	return dist
+#
+#def get_zmax_hdu(cat, mcol, mlim, zcol, ceiling=None, kcorrs=None):
+#	print '\t"%s" at limit: %s' % (mcol, mlim)
+#
+#	# calculate maximum distance to each galaxy
+#	mag = cat[mcol]
+#	if kcorrs is None:
+#		kcorr = np.zeros_like(mag)
+#	else:
+#		kcorr = cat[kcorrs]
+#		print '\t"%s" correction: mean mag %.2f -> %.2f' % (kcorrs, mag.mean(), (mag-kcorr).mean())
+#	max_distance = dmax(mlim, mag, Mcorr=-kcorr) #, Mcorr=-5*log10(0.7)) for a cosmolgy-correction
+#	max_redshift = np.zeros_like(max_distance)
+#	mask = max_distance > 0
+#
+#	# interpolate these onto the maximum redshift at which the object would be observed
+#	zmin, zmax = 0., 6.
+#	z_grid = np.linspace(zmin, zmax, 100)
+#	distance_grid = cosmo.comoving_distance(z_grid)
+#	max_redshift[mask] = interp1d_(max_distance[mask], distance_grid, z_grid)
+#	max_redshift[~mask] = -99.
+#	max_distance[~mask] = -99.
+#	zmax_colname = mcol+'_fl%.1f_zmax'%mlim
+#	dmax_colname = mcol+'_fl%.1f_dmax'%mlim
+#	max_cols = [fitscol(array=max_redshift, format='D', name=zmax_colname),
+#				fitscol(array=max_distance, format='D', name=dmax_colname)]
+#	# create fits table from new+old columns
+#	for col in max_cols:
+#		if col.name in cat.columns.names:
+#			cat.columns.del_col(col.name)
+#	max_cols = fits.ColDefs(max_cols)
+#	hdu = fits.BinTableHDU.from_columns(max_cols + cat.columns)
+#	return hdu
 
-def dmax(lim, M_, ceiling=np.inf, hcorr=None):
-	# maximum distance of absolute M galaxy in Mpc, given apparent mag lim
-	if hcorr is not None:
-		M = M_ + hcorr
+
+def find_M_crossing(M_, fluxlimit, kcorrs, Mgrid=0):
+	print '\tk-correcting for M(z)..'
+	# define analytical absolute flux-limit
+	Mlim_z = lambda z: fluxlimit - 5.*log10(cosmo.comoving_distance(z).value * 1e6 / 10.)
+
+	# apply k-corrections to get M(z) per galaxy
+	zgrid = np.unique(kcorrs['z'])
+	kmatrix = np.zeros([len(zgrid), len(M_)])
+	for i, zpoint in enumerate(zgrid):
+		maggy_ratio = kcorrs['maggy_ratio'][np.where(kcorrs['z'] == zpoint)[0]].values
+		kcorrection = -2.5 * log10(maggy_ratio)
+		kmatrix[i] += kcorrection
+	Mmatrix = kmatrix + M_
+
+	# interpolate onto a finer redshift grid and find the
+	# redshift intersection of M(z) and the flux-limit
+	print '\tfinding flux-limit intersection..'
+	fine_zgrid = np.linspace(0.001, zgrid[-1], 10*len(zgrid))
+	fine_Mmatrix = interp1d(zgrid, Mmatrix, axis=0)(fine_zgrid)
+	Mlim = Mlim_z(fine_zgrid)
+	Mz_minus_Mlim = (fine_Mmatrix.T - Mlim).T
+	minima = fine_zgrid[np.argmin(abs(Mz_minus_Mlim), axis=0)]
+
+	print '\tdone.'
+	if Mgrid:
+		return fine_Mmatrix, fine_zgrid
 	else:
-		M = M_.copy()
-	dist = 10. ** (0.2 * (lim - M + 5.)) # parsecs
-	dist /= 1e6
-	bad_M = (M < -30.) | (M > -10.) # conservative removal of non-galaxy objects
-	dist = np.where(bad_M, -99., dist)
-	try:
-		dist = np.where(dist > ceiling, ceiling, dist)
-	except:
-		dist = np.where(dist > ceiling.value, ceiling.value, dist)
-	return dist
-
-def get_zmax_hdu(cat, mcol, mlim, zcol, ceiling=None):
-	print '\t"%s" at limit: %s' % (mcol, mlim)
-	# calculate maximum distance to each galaxy
-	mag = cat[mcol]
-	max_distance = dmax(mlim, mag)#, hcorr=-5*log10(0.7))
-	max_redshift = np.zeros_like(max_distance)
-	mask = max_distance > 0
-	# interpolate these onto the maximum redshift at which the object would be observed
-	zmin, zmax = 0., 6.
-	z_grid = np.linspace(zmin, zmax, 100)
-	distance_grid = cosmo.comoving_distance(z_grid)
-	max_redshift[mask] = interp1d_(max_distance[mask], distance_grid, z_grid)
-	max_redshift[~mask] = -99.
-	max_distance[~mask] = -99.
-	zmax_colname = mcol+'_fl%.1f_zmax'%mlim
-	dmax_colname = mcol+'_fl%.1f_dmax'%mlim
-	max_cols = [fitscol(array=max_redshift, format='D', name=zmax_colname),
-				fitscol(array=max_distance, format='D', name=dmax_colname)]
-	# create fits table from new+old columns
-	for col in max_cols:
-		if col.name in cat.columns.names:
-			cat.columns.del_col(col.name)
-	max_cols = fits.ColDefs(max_cols)
-	hdu = fits.BinTableHDU.from_columns(max_cols + cat.columns)
-	return hdu
+		return minima
 
 def clone_galaxies(idcol, maxcol, Nrand=10, zg=None, Pz=None, zlims=None):
 	# take arrays of IDs and max distances/redshifts
@@ -65,50 +102,43 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zg=None, Pz=None, zlims=None):
 
 	# draw from fit to redshift distribution of real galaxies
 	if zg is not None and Pz is not None:
-		for i in tqdm(range(Nrand), desc='\t\tclone batches', ascii=True, ncols=100):
-			zdraw = pchoice(zg, p=Pz, size=Ngal)
-			mask = maxcol > 0
-			nbad = (zdraw[mask] > maxcol[mask]).sum() # number of long-draws
-			dnbad = nbad*1
-			while nbad > 0:
-				#print nbad
-				badz = np.where((zdraw > maxcol) & mask)[0]
-				if dnbad <= 10: # if re-draws are slowing down, loop over remaining draws with truncated P(z)
-					for bz in badz:
-						zg1, Pz1 = zg[zg < maxcol[bz]], Pz[zg < maxcol[bz]]
-						Pz1 /= Pz1.sum()
-						zdraw[bz] = pchoice(zg1, p=Pz1, size=1)[0]
-				else: # otherwise keep re-drawing
-					zdraw[badz] = pchoice(zg, p=Pz, size=len(badz))
-				dnbad = nbad - (zdraw[mask] > maxcol[mask]).sum()
-				nbad = (zdraw[mask] > maxcol[mask]).sum()
-			zdraw[~mask] = -99.
-			id_zdraw = np.column_stack((idcol.copy(), zdraw))
-			randoms_id_z[i*Ngal:(i+1)*Ngal] = id_zdraw
-		mask = maxcol > 0
-		mask = np.array(list(mask) * Nrand)
-		randoms_id_z[:, 1] = np.where(mask, randoms_id_z[:, 1], -99.)
-		return randoms_id_z
+		pass
+		#for i in tqdm(range(Nrand), desc='\t\tclone batches', ascii=True, ncols=100):
+		#	zdraw = pchoice(zg, p=Pz, size=Ngal)
+		#	mask = maxcol > 0
+		#	nbad = (zdraw[mask] > maxcol[mask]).sum() # number of long-draws
+		#	dnbad = nbad*1
+		#	while nbad > 0:
+		#		#print nbad
+		#		badz = np.where((zdraw > maxcol) & mask)[0]
+		#		if dnbad <= 10: # if re-draws are slowing down, loop over remaining draws with truncated P(z)
+		#			for bz in badz:
+		#				zg1, Pz1 = zg[zg < maxcol[bz]], Pz[zg < maxcol[bz]]
+		#				Pz1 /= Pz1.sum()
+		#				zdraw[bz] = pchoice(zg1, p=Pz1, size=1)[0]
+		#		else: # otherwise keep re-drawing
+		#			zdraw[badz] = pchoice(zg, p=Pz, size=len(badz))
+		#		dnbad = nbad - (zdraw[mask] > maxcol[mask]).sum()
+		#		nbad = (zdraw[mask] > maxcol[mask]).sum()
+		#	zdraw[~mask] = -99.
+		#	id_zdraw = np.column_stack((idcol.copy(), zdraw))
+		#	randoms_id_z[i*Ngal:(i+1)*Ngal] = id_zdraw
+		#mask = maxcol > 0
+		#mask = np.array(list(mask) * Nrand)
+		#randoms_id_z[:, 1] = np.where(mask, randoms_id_z[:, 1], -99.)
+		#return randoms_id_z
 
 	# draw from d^2 (== growth of volume element) between [0, d_max]
 	else:
 		Nrand_maxcol = np.array(list(maxcol) * Nrand)
 		Nrand_idcol = np.array(list(idcol) * Nrand)
 		ddraw = np.random.power(3, Ngal * Nrand) * Nrand_maxcol * u.Mpc
-		#ddraw = np.where(ddraw > dceil, -99., ddraw)
 		ddraw = ddraw.value
 		mask = ddraw > 0
-		#zmin = z_at_value(cosmo.comoving_distance, ddraw[mask].min())
-		#zmax = z_at_value(cosmo.comoving_distance, ddraw[mask].max())
-		#zgrid = np.logspace(log10(zmin), log10(zmax), 100)
 		zgrid = np.linspace(zmin, zmax, 1000)
 		dgrid = cosmo.comoving_distance(zgrid).value
 		zdraw = np.ones_like(ddraw) * -99.
 		zdraw[mask] = interp1d_(ddraw[mask], dgrid, zgrid)
-#		print 'zmin =', zmin
-#		print 'zmax =', zmax
-#		print 'dceil =', dceil
-#		print 'ddraw =', ddraw.min(), ddraw[mask].min(), ddraw[mask].mean(), ddraw[mask].max()
 
 		randoms_id_z = np.column_stack((Nrand_idcol, zdraw))
 		return randoms_id_z
@@ -124,13 +154,17 @@ def main(args):
 	for cat_path in args.catalogues:
 		print 'reading %s..' % cat_path
 		cat = fits.open(cat_path)[1].data
+		t = Table(cat)
 		# establish zmax per detection band
-		for mcol, mlim in zip(args.magcols, args.maglims):
-			#ceil = cosmo.comoving_distance(args.zlims[1]).value
-			hdu = get_zmax_hdu(cat, mcol, mlim, args.zcol)
-			cat = hdu.data
-		# save new columns
-		hdu.writeto(cat_path, overwrite=1)
+		for mcol, mlim, kcorr in zip(args.magcols, args.maglims, args.kcorrs):
+			print '\t"%s" at limit: %s' % (mcol, mlim)
+			print '\treading "%s" k-corrections..' % kcorr
+			kcorr_list = pd.read_csv(kcorr, delimiter=' ')
+			max_redshift = find_M_crossing(cat[mcol], mlim, kcorr_list)
+			zmax_col = mcol+'_fl%.1f_zmax'%mlim
+			t[zmax_col] = max_redshift
+		t.write(cat_path, format='fits', overwrite=1)
+		cat = t.copy()
 
 		if args.randoms:
 			print '\tbuilding clone randoms..'
@@ -160,7 +194,8 @@ def main(args):
 			# construct redshift distribution per band
 			print '\t\tcloning..'
 			for mcol, mlim in zip(args.magcols, args.maglims):
-				maxcol = cat[mcol+'_fl%.1f_dmax'%mlim]
+				zmax_col = mcol+'_fl%.1f_zmax'%mlim
+				maxcol = cosmo.comoving_distance(cat[zmax_col]).value
 				randoms_id_z = clone_galaxies(idcol, maxcol, args.Nrand, zg=zg, Pz=Pz, zlims=args.zlims)
 				zmin, zmax = 0., randoms_id_z[:, 1].max()
 				zgrid = np.linspace(zmin, zmax, 100)
@@ -186,7 +221,7 @@ if __name__ == '__main__':
 	parser.add_argument(
 		'catalogues',
 		nargs='*',
-		default='give paths to fits catalogue(s) with redshifts')
+		default='give paths to fits catalogue(s) with redshifts and absolute rest-frame magnitudes')
 	parser.add_argument(
 		'-magcols',
 		nargs='*',
@@ -197,6 +232,11 @@ if __name__ == '__main__':
 		nargs='*',
 		type=float,
 		help='specify apparent magnitude detection limit per -magcols column')
+	parser.add_argument(
+		'-kcorrs',
+		nargs='*',
+		type=str,
+		help='specify k-corrections filename(s), for computation of Vmax(s). File must have columns ID, z, maggie_ratio')
 	parser.add_argument(
 		'-randoms',
 		type=int,
@@ -232,6 +272,8 @@ if __name__ == '__main__':
 		help='specify output filename for randoms -- default is <catalogue>_CloneRandoms.fits')
 	args = parser.parse_args()
 
+	#if args.kcorrs is None:
+	#	args.kcorrs = [None]*len(args.magcols)
 	main(args)
 
 
