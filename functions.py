@@ -21,7 +21,7 @@ from scipy.optimize import curve_fit
 norm = stats.norm
 from astropy.io import fits, ascii
 fitscol = fits.Column
-from astropy.table import Table
+from astropy.table import Table, vstack
 from astropy import cosmology
 from astropy import units as u
 from astropy.cosmology import FlatLambdaCDM as FLCDM
@@ -90,6 +90,7 @@ try:
 	ds_jkfunc = ds.make_jks
 except:
 	pass
+down = lambda x, f: x[np.random.rand(len(x)) <= f]
 frac = lambda x: np.sum(x)/np.float32(len(x))
 minmax = lambda x: (x.min(), x.max())
 midpoints = lambda x: (x[1:] + x[:-1]) / 2.

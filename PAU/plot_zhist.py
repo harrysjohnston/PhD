@@ -14,16 +14,25 @@ zcol = sys.argv[3]
 magcol = sys.argv[4]
 idcol = sys.argv[5]
 
+#bg = np.loadtxt('badgalaxies.txt')
+
 hargs = {'alpha':0.2, 'normed':1}#, 'bins':'auto'}
-cmask = (cat[magcol] > -30) & (cat[zcol] > 0.02)
+cmask = ((cat['absmag_r'] > -26) &
+		(cat['absmag_r'] < -16)	&
+		(cat[zcol] > 0.02) &
+		(cat[magcol+'_fl19.8_zmax'] > 0.))
+		#~np.isin(cat[idcol], bg.T[0]))
 rmask = rand[magcol+'_cloneZ'] > 0.02
 
-sels = [(-19 < cat[magcol]) & (cat[magcol] < -18.9) & cmask,
-		(-22 < cat[magcol]) & (cat[magcol] < -21.9) & cmask,
-		(cat[magcol] > -17) & cmask]
-labs = ['$-19 < M < -18.9$',
-		'$-21 < M < -20.9$',
-		'$-17 < M$']
+
+cutcol = 'logmstar'
+percs = np.percentile(cat[cutcol], [10., 30., 60., 80.])
+sels = [(cat[cutcol] < percs[0]) & cmask,
+		(cat[cutcol] > percs[1]) & (cat[cutcol] < percs[2]) & cmask,
+		(cat[cutcol] > percs[3]) & cmask]
+labs = ['%s < %.1f' % (cutcol, percs[0]),
+		'%.1f < %s < %.1f' % (percs[1], cutcol, percs[2]),
+		'%s > %.1f' % (cutcol, percs[3])]
 #labs = ['M bin %s'%(i+1) for i in range(len(sels))]
 #sels = [cmask]
 #labs = ['all']
@@ -34,18 +43,20 @@ else:
 nbin = np.linspace(0, zmax, 100)
 f, ax = plt.subplots(figsize=(10,8))
 plt.hist(cat[zcol][cmask], bins=nbin, **hargs)
-plt.hist(rand[magcol+'_cloneZ'][rmask], bins=nbin, **hargs)
+plt.hist(rand[magcol+'_cloneZ'][rmask], bins='auto', **hargs)
 
 for i in range(len(sels)):
 	scat = cat[sels[i]]
 	idcut = np.isin(rand[magcol+'_cloneID'], scat[idcol])
 	rcat = rand[idcut & rmask]
+	if len(rcat)>1e5:
+		rcat = down(rcat, 1e5/len(rcat))
 
 	lab = '%s: %s'%(i+1, labs[i])
 	rlab = 'randoms %s'%(i+1)
 	h = myhist(scat[zcol], bins=nbin,
 				ls=':', lw=1.6, label=lab)
-	myhist(rcat[magcol+'_cloneZ'], bins=nbin,
+	myhist(rcat[magcol+'_cloneZ'], bins='auto',
 			lw=0.8, label=rlab, color=h[-1][0].get_edgecolor())
 
 plt.xlim(-0.03, zmax)
