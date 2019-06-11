@@ -6,6 +6,7 @@ from astropy.table import Table
 from astropy.cosmology import FlatLambdaCDM
 from scipy.interpolate import interp1d, interp2d, InterpolatedUnivariateSpline
 import argparse
+import warnings
 import numpy as np
 import pandas as pd
 import astropy.units as u
@@ -175,36 +176,45 @@ def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
 		fx0 = fx.copy()
 		x, s, p = perturb(x, sign=s, boost=boost, bounds=bounds)
 		if all(np.array(fins)[-5:] == 0):
-			x[x < x0[idx1]] = x0[idx1][x < x0[idx1]] * 1.1
+			x[x < x0[idx1]] = x0[idx1][x < x0[idx1]]
 			s[x < x0[idx1]] = 1.
 		fx = fun(x, idx1, kcorrect=kcorrect)
 
 		try:
-			for i in np.random.choice(range(len(fx)), size=8):
+			for i in range(8):
 				print 'galaxy %s: delta=%.3f[mag], last z_max=%.3f, z of object=%.3f' % (i+1, fx[i], x[i], x0[idx1][i])
 			print 'N outside tolerance =', (~fin).sum()
 		except:
 			pass
-		if all(np.array(fins)[-200:] == 0):
-			np.savetxt('badgalaxies.txt', np.column_stack((idx1, x)))
-			print 'saving failures to ./badgalaxies.txt !'
-			x_out[idx1] = x
-			break
+		#if all(np.array(fins)[-200:] == 0):
+		#	np.savetxt('badgalaxies.txt', np.column_stack((idx1, x)))
+		#	print 'saving failures to ./badgalaxies.txt !'
+		#	x_out[idx1] = x
+		#	break
 
 	return x_out
 
 def get_windows(z, area=180., volume=3.5e6):
 	area = area / (180. / np.pi)**2. # convert sqdeg to steradians
 	def invvol(r1, vol):
-		r2 = ( (3. * vol / area) + r1**3. ) ** (1./3.)
-		width = r2 - r1 # width forward from lower-limit
-		new_r1 = r1 - width/2. # decrease lower-limit & recalculate width at location of r1
-		new_r2 = ( (3. * vol / area) + new_r1**3. ) ** (1./3.)
-		return [new_r1, new_r2]
+		r2 = ((3. * vol / area) + r1**3.) ** (1./3.)
+		# calculate asymmetric limits of volume -- see notes
+		with warnings.catch_warnings():
+			warnings.simplefilter("ignore")
+			new_r1 = ((3.*r1**3. - r2**3.) / 2.) ** (1./3.)
+		new_r2 = ((r1**3. + r2**3.) / 2.) ** (1./3.) # 1s limits
+		# fix NaNs in new_r1 -- make positive for the cube-root, and then negative again
+		badr1 = np.isnan(new_r1)
+		new_r1[badr1] = np.abs(((3.*r1[badr1]**3. - r2[badr1]**3.) / 2.)) ** (1./3.)
+		new_r1[badr1] *= -1.
+#		new_r1 = r1 - 2*(r1 - new_r1)
+#		new_r2 = r1 + 2*(new_r2 - r1) # 2s limits
+		return [new_r1, r1, new_r2]
 
 	d = get_d(z)
-	widths = invvol(d, volume) # volume is the 68% intvl, so widths are \pm{}1s limits
-	return np.asarray(widths).squeeze()
+	widths = np.asarray(invvol(d, volume)).squeeze()
+	np.savetxt('./asymmlimits_2s_vol.txt', widths)
+	return widths
 
 def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, windows=None, dobs=None):
 	# take arrays of IDs and max distances/redshifts
@@ -224,7 +234,6 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, windows=None, dobs=None)
 	if windows is not None: # if windowing, 'maxcol' must be in comoving Mpc,
 						   # and must also pass observed distances 'dobs'
 						   # 'windows' should be the 2sigma comoving Gaussian width PER OBJECT
-
 		# galaxy-density weighting - may not be needed
 		#ddraw = np.ones(Ngal * Nrand) * Nrand_dobs
 		#dbins = np.linspace(dmin, dmax, 51)
@@ -237,11 +246,15 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, windows=None, dobs=None)
 		#limits = np.where(# this needs to apply a top-hat to the integral, with a zmax per object
 		#ovd_max = np.trapz(ovd_z * dVdz * (dbins[1]-dbins[0]))
 
-		# add a draw from a truncated Gaussian to each distance
-		# windows give 68% intvl; halve for (1s) the scale argument
-		scales = (Nrand_windows[:, 1] - Nrand_windows[:, 0]) / 2.
-		truncgauss = stats.truncnorm(-2, 2, loc=0, scale=scales)
-		ddraw = Nrand_dobs + truncgauss.rvs()
+		#draw1 = (np.random.rand(len(scales)) - 0.5) * 4. * scales
+		# windows gives -1s, d_obs, +1s limits
+		lohi_sigmas = np.column_stack((Nrand_windows[:, 1] - Nrand_windows[:, 0],
+									   Nrand_windows[:, 2] - Nrand_windows[:, 1]))
+		tnorm = stats.truncnorm(-2, 2, loc=0, scale=1)
+		rtnorm = tnorm.rvs(size=len(lohi_sigmas))
+		draw1 = np.where(rtnorm < 0, -rtnorm*lohi_sigmas[:, 0], rtnorm*lohi_sigmas[:, 1])
+
+		ddraw = Nrand_dobs + draw1
 		lowbound = ~badmax & (ddraw < 0)
 		highbound = ~badmax & (ddraw > dmax)
 		ddraw[lowbound] = -ddraw[lowbound] # reflection in z=0
@@ -252,8 +265,11 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, windows=None, dobs=None)
 		# re-draw if outside of bounds
 		while oob.sum() != 0:
 			print 1.*oob.sum()/len(oob)
-			truncgauss = stats.truncnorm(-2, 2, loc=0, scale=scales[oob])
-			ddraw[oob] = Nrand_dobs[oob] + truncgauss.rvs()
+			#draw1 = (np.random.rand(len(scales[oob])) - 0.5) * 4. * scales[oob]
+
+			rtnorm = tnorm.rvs(size=len(lohi_sigmas[oob]))
+			draw1 = np.where(rtnorm < 0, -rtnorm*lohi_sigmas[oob][:, 0], rtnorm*lohi_sigmas[oob][:, 1])
+			ddraw[oob] = Nrand_dobs[oob] + draw1
 			lowbound = ~badmax & (ddraw < 0)
 			highbound = ~badmax & (ddraw > dmax)
 			ddraw[lowbound] = -ddraw[lowbound] # reflection in z=0
