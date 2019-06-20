@@ -1,11 +1,13 @@
 from cosmosis.gaussian_likelihood import GaussianLikelihood
+from cosmosis.datablock import names, option_section
 import numpy as np
 
 class DEI_GAMA_wgplusLikelihood(GaussianLikelihood): # called 'wgplus' but works on wgg as well
 
 	def __init__(self, options):
-		self.options=options
+		self.options = options
 		self.data_x, self.data_y = self.build_data()
+		self.likelihood_only = options.get_bool('likelihood_only', False)
 		if options.has_value("Njkregions"):
 			self.Njkregions = options["Njkregions"]
 			self.testsample = 0
@@ -16,11 +18,20 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood): # called 'wgplus' but works
 			print('No number of realisations in options for Hartlap factor!!',
 				'\nbetter be doing TEST SAMPLER!!')
 			self.testsample = 1
+################################################################
+# PULLED FROM GAUSSIAN_LIKELIHOOD.__INIT__
 		if self.constant_covariance:
 			self.cov = self.build_covariance()
 			self.inv_cov = self.build_inverse_covariance()
+			if not self.likelihood_only:
+				self.chol = np.linalg.cholesky(self.cov)
+			include_norm = self.options.get_bool("include_norm", False)
+			if include_norm:
+				self.log_det_constant = GaussianLikelihood.extract_covariance_log_determinant(self,None)
+				print("Including -0.5*|C| normalization in {} likelihood where |C| = {}".format(self.like_name, self.log_det_constant))
+			else:
+				self.log_det_constant = 0.0
 		self.kind = self.options.get_string("kind", "cubic")
-
 		# Allow over-riding where the inputs come from in 
 		#the options section
 		if options.has_value("x_section"):
@@ -33,6 +44,7 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood): # called 'wgplus' but works
 			self.y_name = options['y_name']
 		if options.has_value("like_name"):
 			self.like_name = options['like_name']
+################################################################
 
 	def build_data(self):
 		# use self.options to find the data_file and load r_p and wg+
@@ -47,7 +59,9 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood): # called 'wgplus' but works
 
 		# limit x-range of data for fitting
 		if self.NLA:
-			rplim = 6 # Mpc/h
+			self.rplim = self.options.get_double('rplim', default=6.)
+			rplim = self.rplim
+
 			print('fitting NLA model; discard r_p < %s Mpc/h...!'%rplim)
 			self.nla_cov_cut = sum(rp>rplim)
 			rp, wgp = rp[rp>rplim], wgp[rp>rplim]
@@ -63,6 +77,7 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood): # called 'wgplus' but works
 
 	def build_covariance(self):
 		cov_file = self.options.get_string("cov_file")
+		self.diag_only = self.options.get_bool("diag_only", default=False)
 		try:
 			covmat = np.loadtxt(cov_file)
 		except ValueError:
@@ -74,6 +89,11 @@ class DEI_GAMA_wgplusLikelihood(GaussianLikelihood): # called 'wgplus' but works
 			covmat = covmat[-self.nla_cov_cut:,-self.nla_cov_cut:]
 		if self.drop_large_bins!=0:
 			covmat = covmat[:-self.drop_large_bins,:-self.drop_large_bins]
+
+		if self.diag_only:
+			print('==================== ===================== ===================== DIAGONAL COVARIANCE ONLY!!')
+			covmat = np.diag(covmat) * np.identity(len(covmat))
+
 		return covmat
 
 	def build_inverse_covariance(self):
