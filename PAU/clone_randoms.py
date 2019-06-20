@@ -194,7 +194,9 @@ def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
 
 	return x_out
 
-def get_windows(z, area=180., volume=3.5e6):
+def get_volume_limits(d, area=180., volume=3.5e6):
+	# get asymmetric LoS limits for a given
+	# volume centred on each galaxy with distance d
 	area = area / (180. / np.pi)**2. # convert sqdeg to steradians
 	def invvol(r1, vol):
 		r2 = ((3. * vol / area) + r1**3.) ** (1./3.)
@@ -202,38 +204,52 @@ def get_windows(z, area=180., volume=3.5e6):
 		with warnings.catch_warnings():
 			warnings.simplefilter("ignore")
 			new_r1 = ((3.*r1**3. - r2**3.) / 2.) ** (1./3.)
-		new_r2 = ((r1**3. + r2**3.) / 2.) ** (1./3.) # 1s limits
+		new_r2 = ((r1**3. + r2**3.) / 2.) ** (1./3.)
 		# fix NaNs in new_r1 -- make positive for the cube-root, and then negative again
 		badr1 = np.isnan(new_r1)
-		new_r1[badr1] = np.abs(((3.*r1[badr1]**3. - r2[badr1]**3.) / 2.)) ** (1./3.)
+		new_r1[badr1] = (-(3.*r1[badr1]**3. - r2[badr1]**3.) / 2.) ** (1./3.)
 		new_r1[badr1] *= -1.
-#		new_r1 = r1 - 2*(r1 - new_r1)
-#		new_r2 = r1 + 2*(new_r2 - r1) # 2s limits
 		return [new_r1, r1, new_r2]
-
-	d = get_d(z)
 	widths = np.asarray(invvol(d, volume)).squeeze()
-	np.savetxt('./asymmlimits_2s_vol.txt', widths)
 	return widths
+def get_volume(limits, area=180.):
+	# get volume defined by limits, for a given area
+	area = area / (180. / np.pi)**2. # convert sqdeg to steradians
+	volume = (area / 3.) * (limits[1]**3. - limits[0]**3.)
+	return volume
 
-def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, windows=None, dobs=None):
+def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, dobs=None):
 	# take arrays of IDs and max distances/redshifts
 	# draw Nrand redshifts from quadratic/fitted distribution [0, {d/z}max] per galaxy
 	Ngal = len(idcol)
 	zmin, zmax = zlims or (0., 6.)
 	dmin, dmax = cmd([zmin, zmax])
 
-	Nrand_windows = np.array(list(windows.T) * Nrand)
-	Nrand_maxcol = np.array(list(maxcol) * Nrand)
-	Nrand_idcol = np.array(list(idcol) * Nrand)
-	Nrand_dobs = np.array(list(dobs) * Nrand)
+	# duplicate galaxies x times according to their Vmax / window_vol(2s)
+	_2sigma_limits = get_volume_limits(dobs, volume=2*window_vol)
+	upps = np.stack((_2sigma_limits[1], maxcol, np.ones_like(maxcol)*dmax))
+	hilim = np.min(upps, axis=0) # failures will have -99. -> set Vmax to zero for these
+	hilim[hilim == -99.] = 0.
+	#lolim = np.where(_2sigma_limits[0] < 0, 0., _2sigma_limits[0])
+	lolim = np.max(np.stack((_2sigma_limits[0], np.zeros_like(_2sigma_limits[0]))), axis=0)
+	limits = np.stack((lolim, hilim))
+	Vmax = get_volume(limits)
+	Vmax[Vmax < 0] = 0.
+	np.savetxt('Vmax.txt', Vmax)
+	ratio = Vmax / (2.*window_vol)
+	n_clones = np.asarray(np.round(Nrand * ratio), dtype=int)
+	Nrand_maxcol = np.repeat(maxcol, n_clones)
+	Nrand_idcol = np.repeat(idcol, n_clones)
+	Nrand_dobs = np.repeat(dobs, n_clones)
+
+#	Nrand_maxcol = np.array(list(maxcol) * Nrand)
+#	Nrand_idcol = np.array(list(idcol) * Nrand)
+#	Nrand_dobs = np.array(list(dobs) * Nrand)
 	print '\t\t(', (dobs > maxcol).sum(), 'objects observed beyond calculated maximum -- setting observed=max )'
 	Nrand_maxcol[Nrand_dobs > Nrand_maxcol] = Nrand_dobs[Nrand_dobs > Nrand_maxcol]
-	badmax = (Nrand_maxcol == -99.) | (Nrand_maxcol < 60.)
+	badmax = (Nrand_maxcol == -99.) | (Nrand_maxcol < 60.) | (Nrand_dobs > dmax)
 
-	if windows is not None: # if windowing, 'maxcol' must be in comoving Mpc,
-						   # and must also pass observed distances 'dobs'
-						   # 'windows' should be the 2sigma comoving Gaussian width PER OBJECT
+	if window_vol is not None:
 		# galaxy-density weighting - may not be needed
 		#ddraw = np.ones(Ngal * Nrand) * Nrand_dobs
 		#dbins = np.linspace(dmin, dmax, 51)
@@ -246,35 +262,43 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, windows=None, dobs=None)
 		#limits = np.where(# this needs to apply a top-hat to the integral, with a zmax per object
 		#ovd_max = np.trapz(ovd_z * dVdz * (dbins[1]-dbins[0]))
 
-		#draw1 = (np.random.rand(len(scales)) - 0.5) * 4. * scales
-		# windows gives -1s, d_obs, +1s limits
-		lohi_sigmas = np.column_stack((Nrand_windows[:, 1] - Nrand_windows[:, 0],
-									   Nrand_windows[:, 2] - Nrand_windows[:, 1]))
 		tnorm = stats.truncnorm(-2, 2, loc=0, scale=1)
-		rtnorm = tnorm.rvs(size=len(lohi_sigmas))
-		draw1 = np.where(rtnorm < 0, -rtnorm*lohi_sigmas[:, 0], rtnorm*lohi_sigmas[:, 1])
 
-		ddraw = Nrand_dobs + draw1
+		rtnorm = tnorm.rvs(size=len(Nrand_dobs))
+		#rtnorm = (np.random.rand(len(Nrand_dobs)) - 0.5) * 4.
+		rvols = np.abs(rtnorm) * window_vol
+		print '\t\t( 1sigma window volume given as %.1e [Mpc/h]^3 )'%window_vol
+		lims = get_volume_limits(Nrand_dobs, volume=rvols)
+		draw1 = np.where(rtnorm < 0, lims[0], lims[2])
+
+		ddraw = draw1.copy()
 		lowbound = ~badmax & (ddraw < 0)
 		highbound = ~badmax & (ddraw > dmax)
+		maxbound = ~badmax & ((ddraw < dmax) & (ddraw > Nrand_maxcol))
 		ddraw[lowbound] = -ddraw[lowbound] # reflection in z=0
 		ddraw[highbound] = 2.*dmax - ddraw[highbound] # reflection in z-limit
+		ddraw[maxbound] = 2.*Nrand_maxcol[maxbound] - ddraw[maxbound] # reflection in z-max
 		ddraw[badmax] = -99.
 
-		oob = (ddraw > Nrand_maxcol) & ~badmax
+		oob = ~badmax & ((ddraw > Nrand_maxcol) | (ddraw < 0) | (ddraw > dmax))
 		# re-draw if outside of bounds
-		while oob.sum() != 0:
-			print 1.*oob.sum()/len(oob)
-			#draw1 = (np.random.rand(len(scales[oob])) - 0.5) * 4. * scales[oob]
+		while any(oob):
+			print oob.sum()
 
-			rtnorm = tnorm.rvs(size=len(lohi_sigmas[oob]))
-			draw1 = np.where(rtnorm < 0, -rtnorm*lohi_sigmas[oob][:, 0], rtnorm*lohi_sigmas[oob][:, 1])
-			ddraw[oob] = Nrand_dobs[oob] + draw1
+			rtnorm = tnorm.rvs(size=len(Nrand_dobs[oob]))
+			#rtnorm = (np.random.rand(len(Nrand_dobs[oob])) - 0.5) * 4.
+			rvols = np.abs(rtnorm) * window_vol
+			lims = get_volume_limits(Nrand_dobs[oob], volume=rvols)
+			draw1 = np.where(rtnorm < 0, lims[0], lims[2])
+
+			ddraw[oob] = draw1.copy()
 			lowbound = ~badmax & (ddraw < 0)
 			highbound = ~badmax & (ddraw > dmax)
+			maxbound = ~badmax & ((ddraw < dmax) & (ddraw > Nrand_maxcol))
 			ddraw[lowbound] = -ddraw[lowbound] # reflection in z=0
 			ddraw[highbound] = 2.*dmax - ddraw[highbound] # reflection in z-limit
-			oob = (ddraw > Nrand_maxcol) & ~badmax
+			ddraw[maxbound] = 2.*Nrand_maxcol[maxbound] - ddraw[maxbound] # reflection in z-max
+			oob = ~badmax & ((ddraw > Nrand_maxcol) | (ddraw < 0) | (ddraw > dmax))
 	else:
 		# draw from d^2 (== growth of volume element) between [0, d_max]
 		ddraw = np.random.power(3, Ngal * Nrand) * Nrand_maxcol * u.Mpc
@@ -345,14 +369,9 @@ def main(args):
 				zmax_col = mcol+'_fl%.1f_zmax'%mlim
 				#zmax_col = 'zmax_19p8'
 
-				if args.window:
-					windows = get_windows(zcol)
-				else:
-					windows = None					
-
 				maxcol = get_d(cat[zmax_col])
 				dobs = get_d(zcol)
-				randoms_id_z = clone_galaxies(idcol, maxcol, args.Nrand, zlims=args.zlims, windows=windows, dobs=dobs)
+				randoms_id_z = clone_galaxies(idcol, maxcol, args.Nrand, zlims=args.zlims, window_vol=args.window, dobs=dobs)
 				randoms_comoving = get_d(randoms_id_z[:, 1])
 
 				random_cols.append(fitscol(array=randoms_id_z[:, 0], name=mcol+'_cloneID', format='K'))
@@ -397,7 +416,8 @@ if __name__ == '__main__':
 		help='1 = create a randoms catalogue with 1 redshift distribution per -magcol')
 	parser.add_argument(
 		'-window',
-		help='1 = scatter clones within a truncated Gaussian window, per-object')
+		type=float,
+		help='optionally, give 1s window volume for windowed scattering of randoms (e.g. GAMA is 3.5e6)')
 	parser.add_argument(
 		'-idcol',
 		default='ID',
