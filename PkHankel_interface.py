@@ -72,7 +72,7 @@ def execute(block, config):
 	if make_nz_args[0]:
 		#print('PkHankel: making n(z) arrays for weight functions..')
 		shapes_z, density_z = read_z(make_nz_args[1], make_nz_args[2])
-		z = block['distances', 'z']
+		z = block['matter_power_lin', 'z']
 		z_mids, nofz_shap = create_nz(shapes_z, nz, nbin, z)
 		z_mids, nofz_dens = create_nz(density_z, nz, nbin, z)
 		block.put_double_array_1d(nz_section, 'z', z_mids)
