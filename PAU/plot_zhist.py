@@ -1,5 +1,8 @@
 # coding: utf-8
 from functions import *
+run_startup()
+mpl.rcParams['xtick.labelsize'] = 14
+mpl.rcParams['ytick.labelsize'] = 14
 if len(sys.argv) < 6:
 	print '\n1: catalogue\
 		   \n2: randoms\
@@ -36,7 +39,7 @@ else:
 	zmax = cat[zcol].max()
 nbin = 50
 area = 180.
-f, ax = plt.subplots(figsize=(10,8))
+f, ax = plt.subplots(figsize=(8,6))
 barplot = lambda x, **args:   plt.bar(midpoints(x[1])[:-1], np.diff(np.cumsum(1.*x[0]/x[0].sum())), width=np.diff(x[1])[0], **args)
 stepplot = lambda x, **args: plt.plot(midpoints(x[1])[:-1], np.diff(np.cumsum(1.*x[0]/x[0].sum())), **args)
 

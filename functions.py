@@ -39,6 +39,9 @@ def euc():
 def mill():
 	os.chdir('/share/data1/hj/millennium/')
 	print('/share/data1/hj/millennium/')
+def dr4():
+	os.chdir('/share/data1/kids/catalogues/DR4')
+	print('/share/data1/kids/catalogues/DR4')
 def kids():
 	os.chdir('/share/splinter/hj/PhD/KiDS_PhotometricClustering')
 	print('/share/splinter/hj/PhD/KiDS_PhotometricClustering')
@@ -123,10 +126,13 @@ def print_tile_cuts(N=50, max_tile=700):
     print(string)
     print('\n\n\t ~%s deg^2 per grouping'%(t2-1-t1))
 
-def path_to_map(filename, nside=1024, cut_col=None, shift_ra=0, colnames=None):
+def path_to_map(filename, nside=1024, cut_col=None, shift_ra=0, colnames=None, **kwargs):
 	if colnames is None:
 		colnames = ('RA', 'DEC')
-	cat = fits.open(filename)[1].data
+	try:
+		cat = fits.open(filename)[1].data
+	except:
+		cat = pd.read_csv(filename, **kwargs)
 	if cut_col is not None:
 		if hasattr(cut_col, '__iter__'):
 			cut = np.ones(len(cat), dtype=bool)
