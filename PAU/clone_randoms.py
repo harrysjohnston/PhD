@@ -288,7 +288,7 @@ def get_tgauss_window(d, hilim, lolim, area=180., volume=3.5e6, d_base=None, zma
 	return window_fn
 
 def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=180.,
-				   dobs=None, zres=0.01, Niter=15, load_windows=True, runid=''):
+				   dobs=None, zres=0.006, Niter=15, load_windows=True, runid=''):
 	# take arrays of IDs and max distances/redshifts
 	# draw Nrand redshifts from quadratic/fitted distribution [0, {d/z}max] per galaxy
 	Ngal = len(idcol)
@@ -430,7 +430,7 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			pass
 		this_iter += 1
 
-	with h5py.File('diagnostics_clonerandoms.h5', 'w') as h5_diag:
+	with h5py.File('diagnostics_clonerandoms%s.h5'%runid, 'w') as h5_diag:
 		h5_diag.create_dataset('Vmax', data=Vmax)
 		h5_diag.create_dataset('d_mid', data=d_mid)
 		h5_diag.create_dataset('Vmax_dc', data=Vmax_dc_list)
