@@ -231,17 +231,19 @@ def get_volume_limits(d, area=180., volume=3.5e6):
 	def invvol(r1, vol):
 		r2 = ((3. * vol / area) + r1**3.) ** (1./3.)
 		# calculate asymmetric limits of volume -- see notes
-		with warnings.catch_warnings():
-			warnings.simplefilter("ignore")
-			new_r1 = ((3.*r1**3. - r2**3.) / 2.) ** (1./3.)
-		new_r2 = ((r1**3. + r2**3.) / 2.) ** (1./3.)
-		# fix NaNs in new_r1 -- make positive for the cube-root, and then negative again
-		badr1 = np.isnan(new_r1)
-		try:
-			new_r1[badr1] = (-(3.*r1[badr1]**3. - r2[badr1]**3.) / 2.) ** (1./3.)
-		except IndexError:
-			new_r1[badr1] = (-(3.*r1**3. - r2[badr1]**3.) / 2.) ** (1./3.)
-		new_r1[badr1] *= -1.
+		#with warnings.catch_warnings():
+		#	warnings.simplefilter("ignore")
+		#	new_r1 = ((3.*r1**3. - r2**3.) / 2.) ** (1./3.)
+		#new_r2 = ((r1**3. + r2**3.) / 2.) ** (1./3.)
+		## fix NaNs in new_r1 -- make positive for the cube-root, and then negative again
+		#badr1 = np.isnan(new_r1)
+		#try:
+		#	new_r1[badr1] = (-(3.*r1[badr1]**3. - r2[badr1]**3.) / 2.) ** (1./3.)
+		#except IndexError:
+		#	new_r1[badr1] = (-(3.*r1**3. - r2[badr1]**3.) / 2.) ** (1./3.)
+		#new_r1[badr1] *= -1.
+		new_r1 = 2.*r1 - r2
+		new_r2 = r2
 		return [new_r1, r1, new_r2]
 
 	widths = np.asarray(invvol(d, volume)).squeeze()
@@ -368,6 +370,7 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		print '\t\tcombining with probdens..'
 		windows_fine = (windows_fine.T / np.sum(windows_fine * np.diff(d_mid_fine)[0], axis=1)).T
 		quadratic_weight = d_mid_fine**2. / np.sum(d_mid_fine**2. * np.diff(d_mid_fine)[0])
+		#quadratic_weight = np.ones_like(quadratic_weight)
 		pdfs = windows_fine * quadratic_weight
 		#pdfs = (pdfs.T / np.sum(pdfs * np.diff(d_mid_fine)[0], axis=1)).T
 		#pdfs = pdfs * windows_fine
