@@ -21,7 +21,7 @@ idcol = sys.argv[5]
 
 #hargs = {'alpha':0.2, 'normed':1}#, 'bins':'auto'}
 cmask = ((cat['absmag_r'] > -26) &
-		(cat['absmag_r'] < -16)	&
+		(cat['absmag_r'] < -17)	&
 		(cat[zcol] > 0.0) &
 		(cat[magcol+'_fl19.8_zmax'] > 0.))
 		#~np.isin(cat[idcol], bg.T[0]))

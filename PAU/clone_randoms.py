@@ -24,7 +24,7 @@ interp1d_ = lambda x, xx, xy: interp1d(xx, xy, bounds_error=0, fill_value=-99.)(
 midpoints = lambda x: (x[1:] + x[:-1]) / 2.
 sqdeg2ster = lambda a: a / (180./np.pi)**2.
 tnorm = stats.truncnorm(-2, 2, loc=0, scale=1)
-rtnorm_prep = tnorm.rvs(size=2000)
+rtnorm_prep = tnorm.rvs(size=10000)
 
 def smooth(y, box_pts):
 	box = np.ones(box_pts)/box_pts
@@ -40,6 +40,9 @@ def find_nearest(array, values, give_indices=False):
 		return indices
 	else:
 		return array[indices]
+
+#class CloneRandoms:
+#	def __init__(self, args):
 
 def get_k_z(kcorrs):
 	"""
@@ -253,32 +256,33 @@ def get_volume(limits, area=180.):
 
 def get_tgauss_window(d, hilim, lolim, area=180., volume=3.5e6, d_base=None, zmax=0.6):
 	area = sqdeg2ster(area)
-	# skip extremely near/distant galaxies
 	dmax = get_d(zmax)
-	if d < 1 or d > dmax:
+
+	if d < 10 or d > dmax:
+		# skip extremely near/distant galaxies
 		mid_bins = midpoints(d_base)
 		window_fn = np.zeros_like(mid_bins)
-		return np.stack((mid_bins, window_fn))
+		window_fn[(mid_bins >= lolim) & (mid_bins <= hilim)] = 1.
+	else:
+		# draw from a truncated [-2, 2] Gaussian (pre-drawn); convert to volumes
+		rvols = np.abs(rtnorm_prep) * volume
 
-	# draw from a truncated [-2, 2] Gaussian (pre-drawn); convert to volumes
-	rvols = np.abs(rtnorm_prep) * volume
+		# convert draws to comoving distances
+		limits = get_volume_limits(d, volume=rvols)[[0, 2]]
+		limits = np.concatenate(limits)
+		# reflect in boundaries
+		while any(limits > hilim) or any(limits < lolim):
+			limits[limits < lolim] += 2.*(lolim - limits[limits < lolim])
+			limits[limits > hilim] += 2.*(hilim - limits[limits > hilim])
 
-	# convert draws to comoving distances
-	limits = get_volume_limits(d, volume=rvols)[[0, 2]]
-	limits = np.concatenate(limits)
-	# reflect in boundaries
-	while any(limits > hilim) or any(limits < lolim):
-		limits[limits < lolim] += 2.*(lolim - limits[limits < lolim])
-		limits[limits > hilim] += 2.*(hilim - limits[limits > hilim])
-
-	# bin, smooth and normalise for the pdf
-	if d_base is not None: bins = d_base
-	else: bins = 'auto'
-	window_fn, bin_edges = np.histogram(limits, bins=bins)
-	mid_bins = midpoints(bin_edges)
-	window_fn = smooth(window_fn, 5)
-	window_fn[mid_bins < lolim] = 0.
-	window_fn[mid_bins > hilim] = 0.
+		# bin, smooth and normalise for the pdf
+		if d_base is not None: bins = d_base
+		else: bins = 'auto'
+		window_fn, bin_edges = np.histogram(limits, bins=bins)
+		mid_bins = midpoints(bin_edges)
+		window_fn = smooth(window_fn, 5)
+		window_fn[mid_bins < lolim] = 0.
+		window_fn[mid_bins > hilim] = 0.
 
 	# normalisation must be such that int[W(V) dV] = 1
 	N = area * np.trapz(window_fn * mid_bins**2., x=mid_bins)
@@ -288,7 +292,7 @@ def get_tgauss_window(d, hilim, lolim, area=180., volume=3.5e6, d_base=None, zma
 	return window_fn
 
 def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=180.,
-				   dobs=None, zres=0.006, Niter=15, load_windows=True, runid=''):
+				   dobs=None, zres=0.003, Niter=15, load_windows=True, runid=''):
 	# take arrays of IDs and max distances/redshifts
 	# draw Nrand redshifts from quadratic/fitted distribution [0, {d/z}max] per galaxy
 	Ngal = len(idcol)
@@ -324,8 +328,19 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 	d_base = np.arange(dmin, dmax+dstep, step=dstep)
 	n_g = np.asarray(np.histogram(dobs, bins=d_base)[0], dtype=np.float32)
 	d_mid = midpoints(d_base)
+	#d_mid_r = np.concatenate((-d_mid[::-1], d_mid))
+	d_mid_fine = np.linspace(d_mid.min(), d_mid.max(), len(d_mid)*30)
 
 	if window_vol is not None:
+		# build probdens for volume-weighted Gaussian
+#		pchi = lambda chi: (sqdeg2ster(area) * d_mid_fine**2.) / (window_vol * (2.*np.pi)**0.5) \
+#								* np.exp(-0.5 * ((sqdeg2ster(area) / 3.) * (d_mid_fine**3. - chi**3.) / window_vol)**2.)
+#		pdfs = np.empty([len(dobs), len(d_mid_fine)])
+#		for i, chi in enumerate(tqdm(dobs, desc='\t\tbuilding comoving distance probdens', ncols=100)):
+#			prob = pchi(chi)
+#			#prob = np.interp(d_mid_fine, d_mid, prob)
+#			pdfs[i] = prob
+
 		# get truncated Gaussian window per object
 		if load_windows:
 			print '\t\tloading Gaussian windows..'
@@ -342,15 +357,30 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			windows = [get_tgauss_window(dobs[i], hilim[i], lolim[i], volume=window_vol, d_base=d_base, zmax=zmax)
 						for i in tqdm(range(len(dobs)), desc='\t\twindowing', ncols=100)]
 			windows = np.array(windows)[:, 1, :]
+
+		# interpolate onto finer comoving grid
+		windows_fine = np.empty([len(windows), len(d_mid_fine)])
+		for i, w in enumerate(tqdm(windows, desc='\t\tinterpolating windows', ncols=100)):
+			window_int = np.interp(d_mid_fine, d_mid, w)
+			windows_fine[i] = window_int
+
+		# combine window with pdf
+		print '\t\tcombining with probdens..'
+		windows_fine = (windows_fine.T / np.sum(windows_fine * np.diff(d_mid_fine)[0], axis=1)).T
+		quadratic_weight = d_mid_fine**2. / np.sum(d_mid_fine**2. * np.diff(d_mid_fine)[0])
+		pdfs = windows_fine * quadratic_weight
+		#pdfs = (pdfs.T / np.sum(pdfs * np.diff(d_mid_fine)[0], axis=1)).T
+		#pdfs = pdfs * windows_fine
+		pdfs = (pdfs.T / np.sum(pdfs, axis=1)).T
+
 	else:
 		windows = np.ones([len(maxcol), len(d_mid)], dtype=np.float32)
 		norm = sqdeg2ster(area) * np.trapz(d_mid**2., x=d_mid)
 		windows = windows / norm
 
-	with h5py.File('windows.h5', 'w') as f:
+	with h5py.File('windows%s.h5'%runid, 'w') as f:
 		f.create_dataset('windows', data=windows)
 		f.close()
-	#np.savetxt('windows%s.txt'%runid, windows, header='truncated gauss window matrix, shape=(# galaxies, comovingDistance baseline)')
 
 	# setup diagnostic save-outs
 	Vmax_dc_list = []
@@ -361,28 +391,24 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 	this_iter = 1
 	print '\t\titerating n_clones calculation..'
 	while this_iter < Niter+1:
-		print '\n======= ITERATION #%s =======\n' % this_iter
+		print '\t\t======= ITERATION #%s =======' % this_iter
 		# get Vmax,dc ; density-weighted Vmax for n_clone calculation
 		if this_iter == 1:
 			Delta_d = np.ones_like(d_mid, dtype=np.float64)
-			#Vmax_dc = Vmax.copy()
 		else:
 			n_r = np.asarray(np.histogram(ddraw, bins=d_base)[0], dtype=np.float32)
 			Delta_d = np.nan_to_num(Nrand * n_g / n_r)
 		delta_mask = ~np.isnan(Delta_d) & ~np.isinf(Delta_d)
-		print Delta_d
 		Vmax_dc = Vmax / (sqdeg2ster(area) * np.trapz(d_mid[delta_mask]**2. * Delta_d[delta_mask] * windows.T[delta_mask].T, x=d_mid[delta_mask], axis=1))
 
-		#np.savetxt('Vmax_dc_%s%s.txt'%(str(this_iter).zfill(2), runid), Vmax_dc)
 		Vmax_dc_list.append(Vmax_dc)
 
 		bad_Vmaxdc = np.isnan(Vmax_dc) | np.isinf(Vmax_dc) | (Vmax_dc <= 0)
 		n_clones = np.asarray(Nrand * Vmax / Vmax_dc, dtype=int)
 		n_clones[bad_Vmaxdc] = 0
 		n_clones[n_clones < 0] = 0
-		#np.savetxt('n_clones_%s%s.txt'%(str(this_iter).zfill(2), runid), n_clones)
 		n_clones_list.append(n_clones)
-		print 'total N clones = %s'%n_clones.sum()
+		print '\t\ttotal N clones = %s'%n_clones.sum()
 
 		Nrand_idcol = np.repeat(idcol, n_clones)
 		Nrand_dobs = np.repeat(dobs, n_clones)
@@ -395,24 +421,32 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 
 		if window_vol is not None:
 			# draw from truncated [-2, 2] Gaussian
-			tnorm = stats.truncnorm(-2, 2, loc=0, scale=1)
-			rtnorm = tnorm.rvs(size=len(Nrand_dobs))
+			#tnorm = stats.truncnorm(-2, 2, loc=0, scale=1) # this draw needs to be weighted as chi^2
+			#rtnorm = tnorm.rvs(size=len(Nrand_dobs))
 
 			# convert draws to window-volumes
-			rvols = np.abs(rtnorm) * window_vol
+			#rvols = np.abs(rtnorm) * window_vol
 			# calculate limits for the volumes and take as the distance-draws
-			lims = get_volume_limits(Nrand_dobs, volume=rvols)
-			ddraw = np.where(rtnorm < 0, lims[0], lims[2])
+			#lims = get_volume_limits(Nrand_dobs, volume=rvols)
+			#ddraw = np.where(rtnorm < 0, lims[0], lims[2])
+
+			# draw n_clones from each comoving distance probdens function
+			ddraw = []
+			for pdf, nc in tqdm(zip(pdfs, n_clones), desc='\t\tdrawing clones', ncols=100):
+				ddraw.append(np.random.choice(d_mid_fine, p=pdf, size=nc))
+			ddraw = np.concatenate(ddraw)
+
 			ddraw[badmax] = -99. # set unwanted to -99
 
 			# reflect out-of-bounds draws in the boundaries
+			print '\t\treflecting at boundaries..'
 			oob = ~badmax & ((ddraw < Nrand_lolim) | (ddraw > Nrand_hilim))
 			oob1 = len(oob)
 			while any(oob):
 				ddraw[ddraw < Nrand_lolim] += 2.*(Nrand_lolim[ddraw < Nrand_lolim] - ddraw[ddraw < Nrand_lolim])
 				ddraw[ddraw > Nrand_hilim] += 2.*(Nrand_hilim[ddraw > Nrand_hilim] - ddraw[ddraw > Nrand_hilim])
 				oob = ~badmax & ((ddraw < Nrand_lolim) | (ddraw > Nrand_hilim))
-				if oob.sum() < oob1:
+				if oob.sum() < oob1 and oob.sum() != 0:
 					print oob.sum()
 					oob1 = oob.sum()
 		else:
@@ -421,10 +455,8 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			ddraw = ddraw.value
 			ddraw[badmax] = -99.
 
-		#np.savetxt('Delta_d_%s%s.txt'%(str(this_iter).zfill(2), runid), np.column_stack((d_mid, Delta_d)), header='comoving_mid\tDelta')
 		Delta_d_list.append(Delta_d)
 		try:
-			#np.savetxt('n_r_%s%s.txt'%(str(this_iter).zfill(2), runid), np.column_stack((d_mid, n_r)), header='comoving_mid\tn_r')
 			n_r_list.append(n_r)
 		except:
 			pass

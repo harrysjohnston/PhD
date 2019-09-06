@@ -1,6 +1,6 @@
 # coding: utf-8
 from functions import *
-run_startup()
+#run_startup()
 mpl.rcParams['xtick.labelsize'] = 14
 mpl.rcParams['ytick.labelsize'] = 14
 if len(sys.argv) < 6:
@@ -13,6 +13,8 @@ if len(sys.argv) < 6:
 
 cat = fopen(sys.argv[1])
 rand = fopen(sys.argv[2])
+if len(rand) > 1e7:
+	rand = down(rand, 1e7/len(rand))
 zcol = sys.argv[3]
 magcol = sys.argv[4]
 idcol = sys.argv[5]
@@ -21,8 +23,9 @@ idcol = sys.argv[5]
 
 #hargs = {'alpha':0.2, 'normed':1}#, 'bins':'auto'}
 cmask = ((cat['absmag_r'] > -26) &
-		(cat['absmag_r'] < -16)	&
-		(cat[zcol] > 0.0) &
+		(cat['absmag_r'] < -17)	&
+		(cat['PETROMAG_R'] < 19.8)	&
+		(cat[zcol] > 0.02) &
 		(cat[magcol+'_fl19.8_zmax'] > 0.))
 		#~np.isin(cat[idcol], bg.T[0]))
 rmask = rand[magcol+'_cloneZ'] > 0.0
