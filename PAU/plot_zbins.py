@@ -28,7 +28,7 @@ cmask = ((cat['absmag_r'] > -26) &
 		(cat[zcol] > 0.02) &
 		(cat[magcol+'_fl19.8_zmax'] > 0.))
 		#~np.isin(cat[idcol], bg.T[0]))
-rmask = rand[magcol+'_cloneZ'] > 0.0
+rmask = (rand[magcol+'_cloneZ'] > 0.0) & (np.isin(rand[magcol+'_cloneID'], cat[cmask][idcol]))
 
 zbin = np.linspace(0, 0.5, 6)
 fmt = ['r-','g--','b-','m--','k-']
@@ -36,7 +36,7 @@ f, ax = plt.subplots()
 for i in range(len(zbin)-1):
 	scat = cat[cmask & (cat[zcol] > zbin[i]) & (cat[zcol] <= zbin[i+1])]
 	sran = rand[np.isin(rand[magcol+'_cloneID'], scat[idcol])]
-	h, b = np.histogram(sran[magcol+'_cloneZ'], bins=100)
+	h, b = np.histogram(sran[magcol+'_cloneZ'], range=(0, cat[zcol].max()), bins='auto')
 	h = np.asarray(h, dtype=np.float32)
 	h /= (h.sum() * np.diff(b)[0])
 	plt.plot(midpoints(b), h, fmt[i], label='$%.1f<z<%.1f$'%(zbin[i], zbin[i+1]))
