@@ -87,7 +87,7 @@ def interp_dm(z_grid, d_grid, z_out):
 				bounds_error=False, fill_value=z_grid.max())(z_out)
 	return x
 
-def fit_zmax(fluxlim, m_obs, z_obs, z_grid, k_z):
+def fit_zmax(fluxlim, m_obs, z_obs, z_grid, k_z, min=0):
 	"""
 	Fit a maximum redshift to each galaxy
 	given the observed redshift and magnitude,
@@ -120,13 +120,13 @@ def fit_zmax(fluxlim, m_obs, z_obs, z_grid, k_z):
 
 	# define the function to minimise
 	LHS = fluxlim - m_obs + dm_obs + k_obs
-	def distmod_relation(z_max, idx, kcorrect=1):
+	def distmod_relation(z_max, idx, get_kmax=1):
 		# LHS = mu(z_max) + k(z_max)
 		# the array z_max has length = # of galaxies
 		# pass idx to specify indices of galaxies within main array
 
 		dm_max = interp_dm(z_grid_fine, d_grid_fine, z_max)
-		if kcorrect:
+		if get_kmax:
 			k_max = np.array([ki(z) for ki, z in np.column_stack((k_interpolators[idx], z_max))])
 		else:
 			k_max = np.zeros_like(z_max)
@@ -135,7 +135,10 @@ def fit_zmax(fluxlim, m_obs, z_obs, z_grid, k_z):
 		loss_fn[np.isnan(loss_fn) | np.isinf(loss_fn)] = 0.
 		return abs(loss_fn)
 
-	print '\tfitting z_max per galaxy..'
+	if not min:
+		print '\tfitting z_max per galaxy..'
+	else:
+		print '\tfitting z_max per galaxy..'
 	x = minimize(distmod_relation, z_obs, bounds=[0., z_grid.max()])
 	return x
 
@@ -172,9 +175,9 @@ def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
 	x_out = np.zeros_like(x0)
 	idx = np.arange(len(x0), dtype=int)
 	idx1 = idx.copy()
-	kcorrect = False
-	fx = fun(x, idx, kcorrect=kcorrect)
-	fx0 = fun(x0, idx, kcorrect=kcorrect)
+	get_kmax = False # True=slower, will assume kmax=0 otherwise
+	fx = fun(x, idx, get_kmax=get_kmax)
+	fx0 = fun(x0, idx, get_kmax=get_kmax)
 
 	fins = []
 	while any(x_out == 0):
@@ -183,7 +186,7 @@ def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
 
 		# catch brightest galaxies with z_max >> survey limit
 		if all(np.array(fins[-50:]) == 0):
-			print 'rounding-off bright galaxies..'
+			print '\trounding-off bright galaxies..'
 			fracs = np.linspace(0.01, 1., 200)
 			roundoff_array = np.array([fun(x*frac, idx1) for frac in fracs])
 			minima = np.argmin(roundoff_array, axis=0)
@@ -213,7 +216,7 @@ def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
 		if all(np.array(fins)[-5:] == 0):
 			x[x < x0[idx1]] = x0[idx1][x < x0[idx1]]
 			s[x < x0[idx1]] = 1.
-		fx = fun(x, idx1, kcorrect=kcorrect)
+		fx = fun(x, idx1, get_kmax=get_kmax)
 
 		try:
 			for i in np.random.choice(range(len(x)), size=10):
@@ -448,7 +451,7 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			# draw n_clones from each comoving distance probdens function
 			ddraw = []
 			for pdf, nc in tqdm(zip(pdfs, n_clones), desc='\t\tfilling windows', ncols=100):
-				ddraw.append(np.random.choice(d_mid_fine, p=pdf, size=nc)+(np.random.rand(size=nc)-0.5)*(dres/2.))
+				ddraw.append(np.random.choice(d_mid_fine, p=pdf, size=nc)+(np.random.rand(nc)-0.5)*(dres/2.))
 			ddraw = np.concatenate(ddraw)
 
 			ddraw[badmax] = -99. # set unwanted to -99
