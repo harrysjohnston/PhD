@@ -268,7 +268,7 @@ def get_tgauss_window(d, hilim, lolim, area=180., volume=3.5e6, d_base=None, zma
 	mid_bins = midpoints(d_base)
 	window_fn = np.zeros_like(mid_bins)
 
-	if d > dmax or hilim == 0 or (lolim == d and d == hilim):
+	if d > dmax or hilim == -99. or lolim == -99. or lolim == hilim:
 		# throw away those with poor k-corrections->limits
 		window_fn *= np.nan
 	elif d < 10:
@@ -315,8 +315,9 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 	maxcol[dobs > maxcol] = -99.
 	maxcol[maxcol < dmin] = -99.
 	if mincol is not None:
-		print '\t\t(', (dobs < mincol).sum(), 'objects observed closer than bright limit -- setting observed=min )'
-		mincol[dobs < mincol] = dobs[dobs < mincol]
+		print '\t\t(', (dobs < mincol).sum(), 'objects observed closer than bright limit -- REMOVING )'
+		#mincol[dobs < mincol] = dobs[dobs < mincol]
+		mincol[dobs < mincol] = -99.
 	else:
 		mincol = dmin * np.ones_like(maxcol)
 
@@ -325,10 +326,6 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 	lows = np.stack((np.zeros_like(maxcol), mincol))
 	hilim = np.min(upps, axis=0)
 	lolim = np.max(lows, axis=0)
-	hilim[hilim == -99.] = 0.
-	#if type(lolim) != type(hilim):
-	#	lolim = np.ones_like(hilim) * lolim
-	#limits = np.stack((lolim, hilim))
 
 	# ready comoving distance baseline
 	dres_fine = dres / 5.
@@ -381,8 +378,10 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 
 	else:
 		windows = np.ones([len(maxcol), len(d_mid)], dtype=np.float32)
-		norm = Om * np.trapz(d_mid**2., x=d_mid)
-		windows = windows / norm
+		for i in tqdm(range(len(windows)), desc='\t\tlimiting integrals', ncols=100):
+			windows[i][(d_mid < lolim[i]) | (d_mid > hilim[i])] = 0.
+		norm = Om * np.trapz(d_mid**2. * windows, x=d_mid, axis=1)
+		windows = (windows.T / norm).T
 
 	# get Vmax
 	Vmax = Om * np.trapz(d_mid**2. * windows, x=d_mid)
@@ -404,9 +403,8 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		else:
 			n_r = np.asarray(np.histogram(ddraw, bins=d_base)[0], dtype=np.float32)
 			Delta_d = Nrand * n_g / n_r
-			Delta_d = np.nan_to_num(Nrand * n_g / n_r)
 		delta_mask = ~np.isnan(Delta_d) & ~np.isinf(Delta_d)
-		assert all(delta_mask), "Delta going undefined!"
+		#assert all(delta_mask), "Delta going undefined!"
 		Vmax_dc = Vmax / (Om * np.trapz(d_mid[delta_mask]**2. * Delta_d[delta_mask] * windows.T[delta_mask].T, x=d_mid[delta_mask], axis=1))
 
 		Vmax_dc_list.append(Vmax_dc)
@@ -431,9 +429,11 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 
 		Nrand_maxcol[Nrand_dobs > Nrand_maxcol] = Nrand_dobs[Nrand_dobs > Nrand_maxcol]
 		badmax = ((Nrand_maxcol == -99.) |
+				  (Nrand_hilim == -99.) |
+				  (Nrand_lolim == -99.) |
 				  (Nrand_dobs < 30.) | (Nrand_maxcol < 30.) |
 				  (Nrand_dobs > dmax) |
-				 ((Nrand_dobs == Nrand_lolim) & (Nrand_dobs == Nrand_hilim)) )
+				  (Nrand_lolim == Nrand_hilim))
 
 		if window_vol is not None:
 			# draw from truncated [-2, 2] Gaussian
@@ -447,8 +447,8 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 
 			# draw n_clones from each comoving distance probdens function
 			ddraw = []
-			for pdf, nc in tqdm(zip(pdfs, n_clones), desc='\t\tdrawing clones', ncols=100):
-				ddraw.append(np.random.choice(d_mid_fine, p=pdf, size=nc))
+			for pdf, nc in tqdm(zip(pdfs, n_clones), desc='\t\tfilling windows', ncols=100):
+				ddraw.append(np.random.choice(d_mid_fine, p=pdf, size=nc)+(np.random.rand(size=nc)-0.5)*(dres/2.))
 			ddraw = np.concatenate(ddraw)
 
 			ddraw[badmax] = -99. # set unwanted to -99
@@ -467,8 +467,12 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		else:
 			# draw from d^2 (== growth of volume element) between [0, upperlimit]
 			ddraw = np.random.power(3, n_clones.sum()) * Nrand_hilim
-			while any(ddraw < Nrand_lolim):
+			#i = 1
+			while any(ddraw[~badmax] < Nrand_lolim[~badmax]):
+				#i += 1
 				ddraw[ddraw < Nrand_lolim] = np.random.power(3, (ddraw < Nrand_lolim).sum()) * Nrand_hilim[ddraw < Nrand_lolim]
+				#if i > 100:
+					#import pdb ; pdb.set_trace()
 			#vdraw = np.random.rand(n_clones.sum()) * Nrand_Vmax
 			#ddraw = get_volume_depth(vdraw, area=area)
 			ddraw[badmax] = -99.

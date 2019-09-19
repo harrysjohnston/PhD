@@ -1,6 +1,6 @@
 # coding: utf-8
 from functions import *
-run_startup()
+#run_startup()
 mpl.rcParams['xtick.labelsize'] = 14
 mpl.rcParams['ytick.labelsize'] = 14
 if len(sys.argv) < 6:
@@ -17,15 +17,12 @@ zcol = sys.argv[3]
 magcol = sys.argv[4]
 idcol = sys.argv[5]
 
-#bg = np.loadtxt('badgalaxies.txt')
-
-#hargs = {'alpha':0.2, 'normed':1}#, 'bins':'auto'}
 cmask = ((cat['absmag_r'] > -26) &
 		(cat['absmag_r'] < -17)	&
-		(cat[zcol] > 0.0) &
+		(cat[zcol] > 0.02) &
 		(cat[magcol+'_fl19.8_zmax'] > 0.))
-		#~np.isin(cat[idcol], bg.T[0]))
-rmask = rand[magcol+'_cloneZ'] > 0.0
+rmask = ((rand[magcol+'_cloneZ'] > 0.0) &
+		 (np.isin(rand[magcol+'_cloneID'], cat[cmask][idcol]))) # so rmask has cmask built-in
 
 
 cutcol = 'logmstar'
@@ -51,7 +48,7 @@ barplot(allrand_hist, alpha=0.2)
 #stepplot(allrand_hist, c='grey', ls='--', lw=1.8, alpha=0.4)
 
 for i in range(len(sels)):
-	scat = cat[sels[i]]
+	scat = cat[sels[i] & cmask]
 	idcut = np.isin(rand[magcol+'_cloneID'], scat[idcol])
 	rcat = rand[idcut & rmask]
 	if len(rcat)>1e5:
