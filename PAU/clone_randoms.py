@@ -358,6 +358,7 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			windows = [get_tgauss_window(dobs[i], hilim[i], lolim[i], volume=window_vol, d_base=d_base, zmax=zmax, area=area)
 						for i in tqdm(range(len(dobs)), desc='\t\twindowing', ncols=100)]
 			windows = np.array(windows)[:, 1, :]
+			assert (not all(np.isnan(windows.flatten()))), "Windowing failed! All windows are NaN; d > dmax or bad limits"
 
 		with h5py.File('windows%s.h5'%runid, 'w') as f:
 			f.create_dataset('windows', data=windows)
@@ -370,7 +371,7 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			windows_fine[i] = window_int
 
 		# combine window with pdf
-		print '\t\tcombining with probdens..'
+		print '\t\tcombining with probdens..',
 		windows_fine = (windows_fine.T / np.sum(windows_fine * np.diff(d_mid_fine)[0], axis=1)).T
 		quadratic_weight = d_mid_fine**2. / np.sum(d_mid_fine**2. * np.diff(d_mid_fine)[0])
 		#quadratic_weight = np.ones_like(quadratic_weight)
@@ -378,6 +379,7 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		#pdfs = (pdfs.T / np.sum(pdfs * np.diff(d_mid_fine)[0], axis=1)).T
 		#pdfs = pdfs * windows_fine
 		pdfs = (pdfs.T / np.sum(pdfs, axis=1)).T
+		print 'done.'
 
 	else:
 		windows = np.ones([len(maxcol), len(d_mid)], dtype=np.float32)
@@ -451,7 +453,12 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			# draw n_clones from each comoving distance probdens function
 			ddraw = []
 			for pdf, nc in tqdm(zip(pdfs, n_clones), desc='\t\tfilling windows', ncols=100):
-				ddraw.append(np.random.choice(d_mid_fine, p=pdf, size=nc)+(np.random.rand(nc)-0.5)*(dres/2.))
+				if nc != 0:
+					draw = np.random.choice(d_mid_fine, p=pdf, size=nc) \
+							+ (np.random.rand(nc) - 0.5) * (dres / 2.)
+					ddraw.append(draw)
+				else:
+					continue
 			ddraw = np.concatenate(ddraw)
 
 			ddraw[badmax] = -99. # set unwanted to -99
@@ -470,12 +477,8 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		else:
 			# draw from d^2 (== growth of volume element) between [0, upperlimit]
 			ddraw = np.random.power(3, n_clones.sum()) * Nrand_hilim
-			#i = 1
 			while any(ddraw[~badmax] < Nrand_lolim[~badmax]):
-				#i += 1
 				ddraw[ddraw < Nrand_lolim] = np.random.power(3, (ddraw < Nrand_lolim).sum()) * Nrand_hilim[ddraw < Nrand_lolim]
-				#if i > 100:
-					#import pdb ; pdb.set_trace()
 			#vdraw = np.random.rand(n_clones.sum()) * Nrand_Vmax
 			#ddraw = get_volume_depth(vdraw, area=area)
 			ddraw[badmax] = -99.
@@ -520,7 +523,7 @@ def main(args):
 		cat = fits.open(cat_path)[1].data
 		t = Table(cat)
 
-		if args.window is None and args.refresh_zmax:
+		if args.refresh_zmax:
 			# establish zmax per detection band
 			for mcol, mlim, kcorr, blim in zip(args.magcols, args.maglims, args.kcorrs, args.brightlim):
 				print '\t"%s" at limit: %s' % (mcol, mlim)
@@ -562,8 +565,8 @@ def main(args):
 			#print '\t\tcloning..'
 			random_cols = []
 			for mcol, mlim, blim in zip(args.magcols, args.maglims, args.brightlim):
-				#zmax_col = mcol+'_fl%.1f_zmax'%mlim
-				zmax_col = 'zmax_19p8'
+				zmax_col = mcol+'_fl%.1f_zmax'%mlim
+				#zmax_col = 'zmax_19p8'
 
 				maxcol = get_d(cat[zmax_col])
 				dobs = get_d(zcol)
@@ -572,7 +575,7 @@ def main(args):
 					mincol = get_d(cat[zmin_col])
 				else:
 					mincol = None
-				randoms_id_z = clone_galaxies(idcol, maxcol, args.Nrand, zlims=args.zlims, window_vol=args.window, area=args.area,
+				randoms_id_z = clone_galaxies(idcol, maxcol, args.Nrand, zlims=args.zlims, window_vol=args.window, area=args.area, dres=args.dres,
 											  dobs=dobs, Niter=args.niter, load_windows=args.load_windows, runid=args.id, mincol=mincol)
 				randoms_comoving = get_d(randoms_id_z[:, 1])
 
@@ -640,6 +643,11 @@ if __name__ == '__main__':
 		'-randoms',
 		type=int,
 		help='1 = create a randoms catalogue with 1 redshift distribution per -magcol')
+	parser.add_argument(
+		'-dres',
+		type=float,
+		default=1.,
+		help='optionally, specify grid resolution (float) for window calculation, default= 1 Mpc/h')
 	parser.add_argument(
 		'-window',
 		type=float,

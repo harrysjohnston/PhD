@@ -17,9 +17,9 @@ zcol = sys.argv[3]
 magcol = sys.argv[4]
 idcol = sys.argv[5]
 
-cmask = ((cat['absmag_r'] > -26) &
-		(cat['absmag_r'] < -17)	&
-		(cat[zcol] > 0.02) &
+#cmask = ((cat['absmag_r'] > -26) &
+#		(cat['absmag_r'] < -17)	&
+cmask = ((cat[zcol] > 0.02) &
 		(cat[magcol+'_fl19.8_zmax'] > 0.))
 rmask = ((rand[magcol+'_cloneZ'] > 0.0) &
 		 (np.isin(rand[magcol+'_cloneID'], cat[cmask][idcol]))) # so rmask has cmask built-in

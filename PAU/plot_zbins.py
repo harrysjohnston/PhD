@@ -22,15 +22,16 @@ idcol = sys.argv[5]
 #bg = np.loadtxt('badgalaxies.txt')
 
 #hargs = {'alpha':0.2, 'normed':1}#, 'bins':'auto'}
-cmask = ((cat['absmag_r'] > -26) &
-		(cat['absmag_r'] < -17)	&
-		(cat['PETROMAG_R'] < 19.8)	&
-		(cat[zcol] > 0.02) &
-		(cat[magcol+'_fl19.8_zmax'] > 0.))
-		#~np.isin(cat[idcol], bg.T[0]))
+#cmask = ((cat['absmag_r'] > -26) &
+#		(cat['absmag_r'] < -17)	&
+#		(cat['PETROMAG_R'] < 19.8)	&
+#		(cat[zcol] > 0.02) &
+#		(cat[magcol+'_fl19.8_zmax'] > 0.))
+#		#~np.isin(cat[idcol], bg.T[0]))
+cmask = np.ones(len(cat), dtype=bool)
 rmask = (rand[magcol+'_cloneZ'] > 0.0) & (np.isin(rand[magcol+'_cloneID'], cat[cmask][idcol]))
 
-zbin = np.linspace(0, 0.5, 6)
+zbin = np.linspace(0, cat[zcol].max(), 6)
 fmt = ['r-','g--','b-','m--','k-']
 f, ax = plt.subplots()
 for i in range(len(zbin)-1):
@@ -41,7 +42,7 @@ for i in range(len(zbin)-1):
 	h /= (h.sum() * np.diff(b)[0])
 	plt.plot(midpoints(b), h, fmt[i], label='$%.1f<z<%.1f$'%(zbin[i], zbin[i+1]))
 
-plt.xlim(0., 0.5)
+plt.xlim(0., cat[zcol].max())
 plt.ylim(0., None)
 plt.legend(fontsize=14, frameon=0)
 plt.xlabel('$z$')
