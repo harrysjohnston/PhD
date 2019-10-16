@@ -42,9 +42,6 @@ def find_nearest(array, values, give_indices=False):
 	else:
 		return array[indices]
 
-#class CloneRandoms:
-#	def __init__(self, args):
-
 def get_k_z(kcorrs):
 	"""
 	Read maggy ratios from file, where each can be converted
@@ -54,11 +51,13 @@ def get_k_z(kcorrs):
 		2. z_grid: at which the k(z->0) is to computed
 		3. mask: indicates bad photometry
 	"""
-	df_kcorrs = pd.read_csv(kcorrs, delimiter=' ')
-	ID = df_kcorrs['ID']
+	#df_kcorrs = pd.read_csv(kcorrs, delimiter=' ')
+	df_kcorrs = h5py.File(kcorrs, 'r')
+	ID = df_kcorrs['ID'][:]
+	z = df_kcorrs['z'][:]
+	maggyratio = df_kcorrs['maggy_ratio'][:]
 	idsort = np.argsort(ID[:len(set(ID))])
-	z = df_kcorrs['z']
-	maggyratio = df_kcorrs['maggy_ratio']
+
 	zero_ratio = maggyratio[np.where(z == 0)[0]] # mgy(z=0) / mgy(z=0)
 	mask = zero_ratio != 1 # ratio != 1 indicates error in computation of kcorrections -- should trace back to bad photometry
 
@@ -133,12 +132,12 @@ def fit_zmax(fluxlim, m_obs, z_obs, z_grid, k_z, min=0):
 
 		loss_fn = LHS[idx] - (dm_max + k_max)
 		loss_fn[np.isnan(loss_fn) | np.isinf(loss_fn)] = 0.
-		return abs(loss_fn)
+		return np.abs(loss_fn)
 
 	if not min:
 		print '\tfitting z_max per galaxy..'
 	else:
-		print '\tfitting z_max per galaxy..'
+		print '\tfitting z_min per galaxy..'
 	x = minimize(distmod_relation, z_obs, bounds=[0., z_grid.max()])
 	return x
 
@@ -150,8 +149,8 @@ def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
 	# but now with a smaller chance to flip the sign
 	# if fun(x1) > fun(x0), perturb x1 by 10% again,
 	# but now with a larger chance to flip the sign
-	nflip = np.array([-1., -1., -1., -1. , -1.])
-	pflip = np.array([1., 1., 1., 1., 1.]) # 0% chance to go the 'wrong' way
+	nflip = np.array([-1.,-1.,-1.,-1.,1.])
+	pflip = np.array([1.,1.,1.,1.,-1.])
 	def perturb(y, sign=None, boost=None, bounds=None):
 		# return y1 = y +/- 10%, the sign of the shift and the perturbation
 		perturbation = (np.random.rand(len(y)) - 0.5) / 5.
@@ -175,7 +174,7 @@ def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
 	x_out = np.zeros_like(x0)
 	idx = np.arange(len(x0), dtype=int)
 	idx1 = idx.copy()
-	get_kmax = False # True=slower, will assume kmax=0 otherwise
+	get_kmax = False # True=slower but strictly more accurate, will assume kmax=0 otherwise
 	fx = fun(x, idx, get_kmax=get_kmax)
 	fx0 = fun(x0, idx, get_kmax=get_kmax)
 
@@ -185,7 +184,7 @@ def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
 		fins.append(fin.sum())
 
 		# catch brightest galaxies with z_max >> survey limit
-		if all(np.array(fins[-50:]) == 0):
+		if all(np.array(fins[-100:]) == 0):
 			print '\trounding-off bright galaxies..'
 			fracs = np.linspace(0.01, 1., 200)
 			roundoff_array = np.array([fun(x*frac, idx1) for frac in fracs])
@@ -301,6 +300,7 @@ def get_tgauss_window(d, hilim, lolim, area=180., volume=3.5e6, d_base=None, zma
 	# normalisation must be such that int[W(V) dV] = 1
 	N = Om * np.trapz(window_fn * mid_bins**2., x=mid_bins)
 	window_fn = np.asarray(window_fn, dtype=np.float32) / N
+	#window_fn *= Om * mid_bins**2.
 
 	window_fn = np.stack((mid_bins, window_fn))
 	return window_fn
@@ -371,25 +371,30 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			windows_fine[i] = window_int
 
 		# combine window with pdf
-		print '\t\tcombining with probdens..',
-		windows_fine = (windows_fine.T / np.sum(windows_fine * np.diff(d_mid_fine)[0], axis=1)).T
-		quadratic_weight = d_mid_fine**2. / np.sum(d_mid_fine**2. * np.diff(d_mid_fine)[0])
-		#quadratic_weight = np.ones_like(quadratic_weight)
-		pdfs = windows_fine# * quadratic_weight
-		#pdfs = (pdfs.T / np.sum(pdfs * np.diff(d_mid_fine)[0], axis=1)).T
-		#pdfs = pdfs * windows_fine
-		pdfs = (pdfs.T / np.sum(pdfs, axis=1)).T
+		print '\t\tnormalising windows/building pdfs..',
+		windows_fine = (windows_fine.T / np.sum(windows_fine * dres_fine, axis=1)).T
+		#windows = (windows.T / np.sum(windows * dres, axis=1)).T
+#		quadratic_weight = np.array([d_mid_fine**2. / np.sum(d_mid_fine[w!=0]**2. * dres_fine)
+#										for w in tqdm(windows_fine, desc='\t\tgetting quad-weights', ncols=100)])
+#		pdfs = np.array([windows_fine[i] * quadratic_weight[i]
+#							for i in tqdm(range(len(windows_fine)), desc='\t\tapplying weights', ncols=100)])
+		pdfs = (windows_fine.T / np.sum(windows_fine, axis=1)).T
 		print 'done.'
 
 	else:
 		windows = np.ones([len(maxcol), len(d_mid)], dtype=np.float32)
 		for i in tqdm(range(len(windows)), desc='\t\tlimiting integrals', ncols=100):
 			windows[i][(d_mid < lolim[i]) | (d_mid > hilim[i])] = 0.
-		norm = Om * np.trapz(d_mid**2. * windows, x=d_mid, axis=1)
+		norm = Om * np.trapz(windows * d_mid**2., x=d_mid, axis=1)
 		windows = (windows.T / norm).T
 
 	# get Vmax
-	Vmax = Om * np.trapz(d_mid**2. * windows, x=d_mid)
+	Vmax = np.min(
+		   np.stack(
+				(Om * np.trapz(d_mid**2. * windows, x=d_mid),
+				 Om * np.trapz(d_mid**2., x=d_mid))
+				   ),
+			axis=0)
 
 	# setup diagnostic save-outs
 	Vmax_dc_list = []
@@ -407,17 +412,21 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			Delta_d = np.ones_like(d_mid, dtype=np.float64)
 		else:
 			n_r = np.asarray(np.histogram(ddraw, bins=d_base)[0], dtype=np.float32)
-			Delta_d = Nrand * n_g / n_r
+			Delta_d = np.nan_to_num(Nrand * n_g / n_r)
 		delta_mask = ~np.isnan(Delta_d) & ~np.isinf(Delta_d)
 		#assert all(delta_mask), "Delta going undefined!"
-		Vmax_dc = Vmax / (Om * np.trapz(d_mid[delta_mask]**2. * Delta_d[delta_mask] * windows.T[delta_mask].T, x=d_mid[delta_mask], axis=1))
+		Vmax_dc = Om * np.trapz(d_mid[delta_mask]**2. \
+								* Delta_d[delta_mask] \
+								* windows.T[delta_mask].T, \
+								x=d_mid[delta_mask], axis=1)
+		Vmax_dc = Vmax / Vmax_dc
 
 		Vmax_dc_list.append(Vmax_dc)
 
 		bad_Vmaxdc = np.isnan(Vmax_dc) | np.isinf(Vmax_dc) | (Vmax_dc <= 0)
 		if this_iter > 1:
 			prev_N = n_clones.sum()
-		n_clones = np.asarray(Nrand * Vmax / Vmax_dc, dtype=int)
+		n_clones = np.asarray(np.round(Nrand * Vmax / Vmax_dc), dtype=int)
 		n_clones[bad_Vmaxdc] = 0
 		n_clones[n_clones < 0] = 0
 		n_clones_list.append(n_clones)
@@ -455,7 +464,7 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			for pdf, nc in tqdm(zip(pdfs, n_clones), desc='\t\tfilling windows', ncols=100):
 				if nc != 0:
 					draw = np.random.choice(d_mid_fine, p=pdf, size=nc) \
-							+ (np.random.rand(nc) - 0.5) * (dres / 2.)
+							+ (np.random.rand(nc) - 0.5) * dres
 					ddraw.append(draw)
 				else:
 					continue
