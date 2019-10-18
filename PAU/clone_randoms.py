@@ -140,7 +140,7 @@ def fit_zmax(fluxlim, m_obs, z_obs, z_grid, k_z, min=0):
 	x = minimize(distmod_relation, z_obs, bounds=[0., z_grid.max()])
 	return x
 
-def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf], quiet=1):
+def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf], quiet=True):
 	# find variables x that bring fun(x) down to < tol[mags]
 	# starting with guess x0
 	# perturb x0 by +/- 10% -> x1, and evaluate fun(x1)
