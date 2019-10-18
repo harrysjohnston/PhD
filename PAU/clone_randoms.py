@@ -141,7 +141,7 @@ def fit_zmax(fluxlim, m_obs, z_obs, z_grid, k_z, min=0):
 	x = minimize(distmod_relation, z_obs, bounds=[0., z_grid.max()])
 	return x
 
-def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
+def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf], quiet=True):
 	# find variables x that bring fun(x) down to < tol[mags]
 	# starting with guess x0
 	# perturb x0 by +/- 10% -> x1, and evaluate fun(x1)
@@ -174,7 +174,7 @@ def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
 	x_out = np.zeros_like(x0)
 	idx = np.arange(len(x0), dtype=int)
 	idx1 = idx.copy()
-	get_kmax = False # True=slower but strictly more accurate, will assume kmax=0 otherwise
+	get_kmax = True # True=slower but strictly more accurate, will assume kmax=0 otherwise
 	fx = fun(x, idx, get_kmax=get_kmax)
 	fx0 = fun(x0, idx, get_kmax=get_kmax)
 
@@ -217,12 +217,13 @@ def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
 			s[x < x0[idx1]] = 1.
 		fx = fun(x, idx1, get_kmax=get_kmax)
 
-		try:
-			for i in np.random.choice(range(len(x)), size=10):
-				print 'galaxy %s: delta=%.3f[mag], last z_max=%.3f, z of object=%.3f' % (i+1, fx[i], x[i], x0[idx1][i])
-			print 'N outside tolerance =', (~fin).sum()
-		except:
-			pass
+		if not quiet:
+			try:
+				for i in np.random.choice(range(len(x)), size=10):
+					print 'galaxy %s: delta=%.3f[mag], last z_max=%.3f, z of object=%.3f' % (i+1, fx[i], x[i], x0[idx1][i])
+				print 'N outside tolerance =', (~fin).sum()
+			except:
+				pass
 
 	return x_out
 
@@ -389,12 +390,15 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		windows = (windows.T / norm).T
 
 	# get Vmax
-	Vmax = np.min(
-		   np.stack(
-				(Om * np.trapz(d_mid**2. * windows, x=d_mid),
-				 Om * np.trapz(d_mid**2., x=d_mid))
-				   ),
-			axis=0)
+	Vmax = Om * np.trapz(d_mid**2. * windows, x=d_mid)
+	if window_vol is not None:
+		rawV = get_volume([lolim, hilim], area=area)
+		small_Vmax = rawV < window_vol
+		print '\t\trestricting small-Vmax (< window) objects: %s'%small_Vmax.sum()
+		small_windows = [get_tgauss_window(dobs[small_Vmax][i], hilim[small_Vmax][i], lolim[small_Vmax][i],
+											 volume=rawV[small_Vmax], d_base=d_base, zmax=zmax, area=area)
+								for i in tqdm(range(len(dobs[small_Vmax])), desc='\t\tre-windowing', ncols=100)]
+		windows[small_Vmax] = np.array(small_windows)[:, 1, :]
 
 	# setup diagnostic save-outs
 	Vmax_dc_list = []
