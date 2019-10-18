@@ -42,7 +42,7 @@ def find_nearest(array, values, give_indices=False):
 	else:
 		return array[indices]
 
-def get_k_z(kcorrs):
+def get_k_z(kcorrs, cat_ids):
 	"""
 	Read maggy ratios from file, where each can be converted
 	to a k-correction from z (given by column) to z=0.
@@ -51,11 +51,15 @@ def get_k_z(kcorrs):
 		2. z_grid: at which the k(z->0) is to computed
 		3. mask: indicates bad photometry
 	"""
-	#df_kcorrs = pd.read_csv(kcorrs, delimiter=' ')
 	df_kcorrs = h5py.File(kcorrs, 'r')
 	ID = df_kcorrs['ID'][:]
 	z = df_kcorrs['z'][:]
 	maggyratio = df_kcorrs['maggy_ratio'][:]
+	print '\tcutting IDs..'
+	idcut = np.isin(ID, cat_ids)
+	ID = ID[idcut]
+	z = z[idcut]
+	maggyratio = maggyratio[idcut]
 	idsort = np.argsort(ID[:len(set(ID))])
 
 	zero_ratio = maggyratio[np.where(z == 0)[0]] # mgy(z=0) / mgy(z=0)
@@ -69,10 +73,6 @@ def get_k_z(kcorrs):
 	return k_z[idsort], z_grid, mask[idsort]
 
 def interp_k(z_grid, k_z, z_out):
-	#k_out = []
-	#for i in range(len(k_z)):
-	#	k_out.append( InterpolatedUnivariateSpline(z_grid, k_z[i], bbox=[0., z_grid.max()], ext='const')(z_out[i]) )
-	#return np.array(k_out)
 	print '\tinterpolating k-corrections..'
 	x = np.array([interp1d(z_grid, k_z[i], #axis=1,
 				assume_sorted=True, copy=False,
@@ -80,7 +80,6 @@ def interp_k(z_grid, k_z, z_out):
 	return x
 
 def interp_dm(z_grid, d_grid, z_out):
-	#print '\tinterpolating distance moduli..'
 	x = interp1d(z_grid, d_grid,
 				assume_sorted=True, copy=False,
 				bounds_error=False, fill_value=z_grid.max())(z_out)
@@ -141,7 +140,7 @@ def fit_zmax(fluxlim, m_obs, z_obs, z_grid, k_z, min=0):
 	x = minimize(distmod_relation, z_obs, bounds=[0., z_grid.max()])
 	return x
 
-def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
+def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf], quiet=1):
 	# find variables x that bring fun(x) down to < tol[mags]
 	# starting with guess x0
 	# perturb x0 by +/- 10% -> x1, and evaluate fun(x1)
@@ -174,7 +173,7 @@ def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
 	x_out = np.zeros_like(x0)
 	idx = np.arange(len(x0), dtype=int)
 	idx1 = idx.copy()
-	get_kmax = False # True=slower but strictly more accurate, will assume kmax=0 otherwise
+	get_kmax = True # True=slower but strictly more accurate, will assume kmax=0 otherwise
 	fx = fun(x, idx, get_kmax=get_kmax)
 	fx0 = fun(x0, idx, get_kmax=get_kmax)
 
@@ -217,12 +216,13 @@ def minimize(fun, x0, tol=1e-2, bounds=[-np.inf, np.inf]):
 			s[x < x0[idx1]] = 1.
 		fx = fun(x, idx1, get_kmax=get_kmax)
 
-		try:
-			for i in np.random.choice(range(len(x)), size=10):
-				print 'galaxy %s: delta=%.3f[mag], last z_max=%.3f, z of object=%.3f' % (i+1, fx[i], x[i], x0[idx1][i])
-			print 'N outside tolerance =', (~fin).sum()
-		except:
-			pass
+		if not quiet:
+			try:
+				for i in np.random.choice(range(len(x)), size=10):
+					print 'galaxy %s: delta=%.3f[mag], last z_max=%.3f, z of object=%.3f' % (i+1, fx[i], x[i], x0[idx1][i])
+				print 'N outside tolerance =', (~fin).sum()
+			except:
+				pass
 
 	return x_out
 
@@ -389,12 +389,15 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		windows = (windows.T / norm).T
 
 	# get Vmax
-	Vmax = np.min(
-		   np.stack(
-				(Om * np.trapz(d_mid**2. * windows, x=d_mid),
-				 Om * np.trapz(d_mid**2., x=d_mid))
-				   ),
-			axis=0)
+	Vmax = Om * np.trapz(d_mid**2. * windows, x=d_mid)
+	if window_vol is not None:
+		rawV = get_volume([lolim, hilim], area=area)
+		small_Vmax = rawV < window_vol
+		print '\t\trestricting small-Vmax (< window) objects: %s'%small_Vmax.sum()
+		small_windows = [get_tgauss_window(dobs[small_Vmax][i], hilim[small_Vmax][i], lolim[small_Vmax][i],
+											 volume=rawV[small_Vmax], d_base=d_base, zmax=zmax, area=area)
+								for i in tqdm(range(len(dobs[small_Vmax])), desc='\t\tre-windowing', ncols=100)]
+		windows[small_Vmax] = np.array(small_windows)[:, 1, :]
 
 	# setup diagnostic save-outs
 	Vmax_dc_list = []
@@ -539,7 +542,7 @@ def main(args):
 				print '\tbright limit: %s' % blim
 				print '\treading "%s" k-corrections..' % kcorr
 
-				k_z, z_grid, mask = get_k_z(kcorr)
+				k_z, z_grid, mask = get_k_z(kcorr, cat[args.idcol])
 				max_redshift = fit_zmax(mlim, cat[mcol], cat[args.zcol], z_grid, k_z)
 				max_redshift[mask] = -99.
 

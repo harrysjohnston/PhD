@@ -109,6 +109,9 @@ fopen = lambda x: fits.open(x)[1].data
 ropen = lambda x: open(x, 'r')
 wopen = lambda x: open(x, 'w')
 popen = lambda x: pickle.load(ropen(x))
+pdump = lambda obj, filename: pickle.dump(obj, open(filename, 'w'))
+fd = lambda x: x / x[x!=0].mean() - 1.
+fd0 = lambda x: x / x.mean() - 1.
 
 def plotfile(path, **kwargs):
 	t, w = np.loadtxt(path, **kwargs).T[:2]
