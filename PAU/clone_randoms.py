@@ -394,8 +394,9 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		rawV = get_volume([lolim, hilim], area=area)
 		small_Vmax = rawV < window_vol
 		print '\t\trestricting small-Vmax (< window) objects: %s'%small_Vmax.sum()
+		# re-define window such that the 2sigma volume == Vmax; halve it for the volume argument
 		small_windows = [get_tgauss_window(dobs[small_Vmax][i], hilim[small_Vmax][i], lolim[small_Vmax][i],
-											 volume=rawV[small_Vmax], d_base=d_base, zmax=zmax, area=area)
+											 volume=rawV[small_Vmax][i]/2., d_base=d_base, zmax=zmax, area=area)
 								for i in tqdm(range(len(dobs[small_Vmax])), desc='\t\tre-windowing', ncols=100)]
 		windows[small_Vmax] = np.array(small_windows)[:, 1, :]
 
