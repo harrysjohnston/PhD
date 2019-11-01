@@ -25,6 +25,8 @@ midpoints = lambda x: (x[1:] + x[:-1]) / 2.
 sqdeg2ster = lambda a: a / (180./np.pi)**2.
 tnorm = stats.truncnorm(-2, 2, loc=0, scale=1)
 rtnorm_prep = tnorm.rvs(size=10000)
+norm = stats.norm(loc=0, scale=1)
+rnorm_prep = norm.rvs(size=10000)
 minmax = lambda x: [x.min(), x.max()]
 
 def smooth(y, box_pts):
@@ -267,40 +269,45 @@ def get_volume(limits, area=180.):
 def get_tgauss_window(d, hilim, lolim, area=180., volume=3.5e6, d_base=None, zmax=0.6):
 	Om = sqdeg2ster(area)
 	dmax = get_d(zmax)
-	mid_bins = midpoints(d_base)
+	V_base = get_volume_depth(d_base)
+	mid_bins = midpoints(V_base)
 	window_fn = np.zeros_like(mid_bins)
+	hilim_vol = get_volume((0, hilim), area=area)
+	lolim_vol = get_volume((0, lolim), area=area)
+	vol_at_gal = get_volume((0, d), area=area) # units of volume
+	Vmax = get_volume((0, hilim), area=area)
 
 	if d > dmax or hilim == -99. or lolim == -99. or lolim == hilim:
 		# throw away those with poor k-corrections->limits
 		window_fn *= np.nan
-	elif d < 10:
-		# flat window for nearby galaxies
-		window_fn[(mid_bins >= lolim) & (mid_bins <= hilim)] = 1.
+	elif Vmax < volume:
+		# flat window for Vmax < 1sigma of window
+		window_fn[(mid_bins >= lolim_vol) & (mid_bins <= hilim_vol)] = 1.
 	else:
 		# draw from a truncated [-2, 2] Gaussian (pre-drawn); convert to volumes
-		rvols = np.abs(rtnorm_prep) * volume
+		# draws are already between [-2, 2], so volume arg should be the 1s volume!
+		rvols = rtnorm_prep * volume # units of sigma
+		vol_draw = vol_at_gal + rvols # volume draw
+		# reflect in boundaries, staying in volume units
+		while any(vol_draw > hilim_vol) or any(vol_draw < lolim_vol):
+			vol_draw[vol_draw < lolim_vol] += 2.*(lolim_vol - vol_draw[vol_draw < lolim_vol])
+			vol_draw[vol_draw > hilim_vol] += 2.*(hilim_vol - vol_draw[vol_draw > hilim_vol])
 
-		# convert draws to comoving distances
-		limits = get_volume_limits(d, volume=rvols, area=area)[[0, 2]]
-		limits = np.concatenate(limits)
-		# reflect in boundaries
-		while any(limits > hilim) or any(limits < lolim):
-			limits[limits < lolim] += 2.*(lolim - limits[limits < lolim])
-			limits[limits > hilim] += 2.*(hilim - limits[limits > hilim])
+		# convert volume draws to comoving coordinates
+		#limits = get_volume_depth(vol_draw, area=area)
 
 		# bin, smooth and normalise for the pdf
-		if d_base is not None: bins = d_base
+		if V_base is not None: bins = V_base
 		else: bins = 'auto'
-		window_fn, bin_edges = np.histogram(limits, bins=bins)
+		window_fn, bin_edges = np.histogram(vol_draw, bins=bins)
 		mid_bins = midpoints(bin_edges)
 		window_fn = smooth(window_fn, 5)
-		window_fn[mid_bins < lolim] = 0.
-		window_fn[mid_bins > hilim] = 0.
+		window_fn[mid_bins < lolim_vol] = 0.
+		window_fn[mid_bins > hilim_vol] = 0.
 
 	# normalisation must be such that int[W(V) dV] = 1
-	N = Om * np.trapz(window_fn * mid_bins**2., x=mid_bins)
+	N = np.trapz(window_fn, x=mid_bins)
 	window_fn = np.asarray(window_fn, dtype=np.float32) / N
-	#window_fn *= Om * mid_bins**2.
 
 	window_fn = np.stack((mid_bins, window_fn))
 	return window_fn
@@ -364,6 +371,31 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			f.create_dataset('windows', data=windows)
 			f.close()
 
+
+	flat_windows = np.ones([len(maxcol), len(d_mid)], dtype=np.float32)
+	for i in tqdm(range(len(flat_windows)), desc='\t\tlimiting flat windows', ncols=100):
+		flat_windows[i][(d_mid < lolim[i]) | (d_mid > hilim[i])] = 0.
+	norm = Om * np.trapz(flat_windows * d_mid**2., x=d_mid, axis=1)
+	flat_windows = (flat_windows.T / norm).T
+
+	if window_vol is None:
+		windows = flat_windows
+
+	# get Vmax
+	Vmax = Om * np.trapz(d_mid**2. * windows, x=d_mid)
+	flat_Vmax = Om * np.trapz(d_mid**2. * flat_windows, x=d_mid)
+	if window_vol is not None:
+#		small_Vmax = flat_Vmax < Vmax
+#		if any(small_Vmax):
+#			print '\t\trestricting small-Vmax (< window) objects: %s'%small_Vmax.sum()
+#			# re-define window such that the 2sigma volume == Vmax; quarter it for the (1s) volume argument
+##			small_windows = [get_tgauss_window(dobs[small_Vmax][i], hilim[small_Vmax][i], lolim[small_Vmax][i],
+##												 volume=window_vol*flat_Vmax[small_Vmax][i]/4., d_base=d_base, zmax=zmax, area=area)
+##									for i in tqdm(range(small_Vmax.sum()), desc='\t\tre-windowing', ncols=100)]
+##			windows[small_Vmax] = np.array(small_windows)[:, 1, :]
+#			windows[small_Vmax] = flat_windows[small_Vmax]
+#			Vmax[small_Vmax] = flat_Vmax[small_Vmax]
+
 		# interpolate windows onto finer comoving grid
 		windows_fine = np.empty([len(windows), len(d_mid_fine)])
 		for i, w in enumerate(tqdm(windows, desc='\t\tinterpolating windows', ncols=100)):
@@ -373,32 +405,8 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		# combine window with pdf
 		print '\t\tnormalising windows/building pdfs..',
 		windows_fine = (windows_fine.T / np.sum(windows_fine * dres_fine, axis=1)).T
-		#windows = (windows.T / np.sum(windows * dres, axis=1)).T
-#		quadratic_weight = np.array([d_mid_fine**2. / np.sum(d_mid_fine[w!=0]**2. * dres_fine)
-#										for w in tqdm(windows_fine, desc='\t\tgetting quad-weights', ncols=100)])
-#		pdfs = np.array([windows_fine[i] * quadratic_weight[i]
-#							for i in tqdm(range(len(windows_fine)), desc='\t\tapplying weights', ncols=100)])
 		pdfs = (windows_fine.T / np.sum(windows_fine, axis=1)).T
 		print 'done.'
-
-	else:
-		windows = np.ones([len(maxcol), len(d_mid)], dtype=np.float32)
-		for i in tqdm(range(len(windows)), desc='\t\tlimiting integrals', ncols=100):
-			windows[i][(d_mid < lolim[i]) | (d_mid > hilim[i])] = 0.
-		norm = Om * np.trapz(windows * d_mid**2., x=d_mid, axis=1)
-		windows = (windows.T / norm).T
-
-	# get Vmax
-	Vmax = Om * np.trapz(d_mid**2. * windows, x=d_mid)
-	if window_vol is not None:
-		rawV = get_volume([lolim, hilim], area=area)
-		small_Vmax = rawV < window_vol
-		print '\t\trestricting small-Vmax (< window) objects: %s'%small_Vmax.sum()
-		# re-define window such that the 2sigma volume == Vmax; halve it for the volume argument
-		small_windows = [get_tgauss_window(dobs[small_Vmax][i], hilim[small_Vmax][i], lolim[small_Vmax][i],
-											 volume=rawV[small_Vmax][i]/2., d_base=d_base, zmax=zmax, area=area)
-								for i in tqdm(range(len(dobs[small_Vmax])), desc='\t\tre-windowing', ncols=100)]
-		windows[small_Vmax] = np.array(small_windows)[:, 1, :]
 
 	# setup diagnostic save-outs
 	Vmax_dc_list = []
@@ -418,7 +426,6 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			n_r = np.asarray(np.histogram(ddraw, bins=d_base)[0], dtype=np.float32)
 			Delta_d = np.nan_to_num(Nrand * n_g / n_r)
 		delta_mask = ~np.isnan(Delta_d) & ~np.isinf(Delta_d)
-		#assert all(delta_mask), "Delta going undefined!"
 		Vmax_dc = Om * np.trapz(d_mid[delta_mask]**2. \
 								* Delta_d[delta_mask] \
 								* windows.T[delta_mask].T, \
