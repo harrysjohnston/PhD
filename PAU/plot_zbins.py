@@ -32,11 +32,15 @@ cmask = np.ones(len(cat), dtype=bool)
 rmask = (rand[magcol+'_cloneZ'] > 0.0) & (np.isin(rand[magcol+'_cloneID'], cat[cmask][idcol]))
 
 zbin = np.linspace(0, cat[zcol].max(), 6)
+if 'SMLambdarApMatchedPhotom.fits' in sys.argv[1]:
+	zbin = np.linspace(0, 0.5, 6)
 fmt = ['r-','g--','b-','m--','k-']
 f, ax = plt.subplots()
 for i in range(len(zbin)-1):
 	scat = cat[cmask & (cat[zcol] > zbin[i]) & (cat[zcol] <= zbin[i+1])]
 	sran = rand[np.isin(rand[magcol+'_cloneID'], scat[idcol])]
+	print minmax(scat[zcol])
+	print minmax(sran[magcol+'_cloneZ'])
 	h, b = np.histogram(sran[magcol+'_cloneZ'], range=(0, cat[zcol].max()), bins='auto')
 	h = np.asarray(h, dtype=np.float32)
 	h /= (h.sum() * np.diff(b)[0])
@@ -44,6 +48,7 @@ for i in range(len(zbin)-1):
 
 plt.xlim(0., cat[zcol].max())
 plt.ylim(0., None)
+plt.title(sys.argv[2].replace(sys.argv[1].replace('.fits',''), '').replace('_CloneZIDRandoms_','').replace('.fits',''))
 plt.legend(fontsize=14, frameon=0)
 plt.xlabel('$z$')
 plt.ylabel('$P(z)$')

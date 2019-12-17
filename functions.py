@@ -8,6 +8,7 @@ try:
 except:
 	print(' -- failed to import ipython --')
 import os
+import h5py
 import pickle
 import numpy as np
 import healpy as hp
@@ -112,6 +113,9 @@ popen = lambda x: pickle.load(ropen(x))
 pdump = lambda obj, filename: pickle.dump(obj, open(filename, 'w'))
 fd = lambda x: x / x[x!=0].mean() - 1.
 fd0 = lambda x: x / x.mean() - 1.
+p50 = lambda x: np.percentile(x, 50.)
+mod = lambda ra: np.where(ra > 300., ra - 360., ra)
+nn = lambda x: x[~np.isnan(x) & ~np.isinf(x)]
 
 def plotfile(path, **kwargs):
 	t, w = np.loadtxt(path, **kwargs).T[:2]
