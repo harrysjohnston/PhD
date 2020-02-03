@@ -28,6 +28,8 @@ rtnorm_prep = tnorm.rvs(size=10000)
 norm = stats.norm(loc=0, scale=1)
 rnorm_prep = norm.rvs(size=10000)
 minmax = lambda x: [x.min(), x.max()]
+frac = lambda x: np.sum(x)/np.float32(len(x))
+nn = lambda x: x[~np.isnan(x) & ~np.isinf(x)]
 
 def smooth(y, box_pts):
 	box = np.ones(box_pts)/box_pts
@@ -62,7 +64,7 @@ def get_k_z(kcorrs, cat_ids):
 	ID = ID[idcut]
 	z = z[idcut]
 	maggyratio = maggyratio[idcut]
-	idsort = np.argsort(ID[:len(set(ID))])
+	idsort = np.argsort(ID[:len(np.unique(ID))])
 
 	zero_ratio = maggyratio[np.where(z == 0)[0]] # mgy(z=0) / mgy(z=0)
 	mask = zero_ratio != 1 # ratio != 1 indicates error in computation of kcorrections -- should trace back to bad photometry
@@ -230,47 +232,6 @@ def minimize(fun, x0, tol=1e-1, bounds=[-np.inf, np.inf], quiet=False):
 
 	return x_out
 
-def get_volume_limits(d, area=180., volume=3.5e6):
-	# get asymmetric LoS limits for a given
-	# volume centred on each galaxy with distance d
-	Om = sqdeg2ster(area)
-
-	def invvol(r1, vol):
-		r2 = ((3. * vol / Om) + r1**3.) ** (1./3.)
-		# calculate asymmetric limits of volume -- see notes
-		with warnings.catch_warnings():
-			warnings.simplefilter("ignore")
-			new_r1 = ((3.*r1**3. - r2**3.) / 2.) ** (1./3.)
-		new_r2 = ((r1**3. + r2**3.) / 2.) ** (1./3.)
-		# fix NaNs in new_r1 -- make positive for the cube-root, and then negative again
-		badr1 = np.isnan(new_r1)
-		try:
-			new_r1[badr1] = (-(3.*r1[badr1]**3. - r2[badr1]**3.) / 2.) ** (1./3.)
-		except IndexError:
-			new_r1[badr1] = (-(3.*r1**3. - r2[badr1]**3.) / 2.) ** (1./3.)
-		new_r1[badr1] *= -1.
-		# for symmetric limits (will override the above):
-		#new_r1 = 2.*r1 - r2
-		#new_r2 = r2
-		return [new_r1, r1, new_r2]
-
-	widths = np.asarray(invvol(d, volume)).squeeze()
-
-	return widths
-
-def get_volume_depth(volume, area=180.):
-	Om = sqdeg2ster(area)
-	return (3. * volume / Om)**(1./3.)
-
-def get_volume(limits, area=180.):
-	# get volume defined by limits, for a given area
-	Om = sqdeg2ster(area)
-	if type(limits) == np.array and len(limits) == 2:
-		volume = (Om / 3.) * (limits[1]**3. - limits[0]**3.)
-	else:
-		volume = (Om / 3.) * limits**3.
-	return volume
-
 def get_tgauss_window(d, hilim, lolim, area=180., volume=3.5e6, V_base=None, zmax=0.6):
 	Om = sqdeg2ster(area)
 	dmax = get_d(zmax)
@@ -292,32 +253,35 @@ def get_tgauss_window(d, hilim, lolim, area=180., volume=3.5e6, V_base=None, zma
 		# draw from a truncated [-2, 2] Gaussian (pre-drawn); convert to volumes
 		rvols = rtnorm_prep * volume # units of sigma
 		vol_draw = vol_at_gal + rvols # volume at galaxy + some deviation
+		vol_draw = np.abs(vol_draw)
 		# reflect in boundaries, staying in volume units
-		i = 0
+		x = 0
 		while any(vol_draw > hilim_vol) or any(vol_draw < lolim_vol):
 			vol_draw[vol_draw < lolim_vol] += 2.*(lolim_vol - vol_draw[vol_draw < lolim_vol])
 			vol_draw[vol_draw > hilim_vol] += 2.*(hilim_vol - vol_draw[vol_draw > hilim_vol])
-			i += 1
-			if i > 200:
+			vol_draw = np.abs(vol_draw)
+			x += 1
+			if x > 200:
 				print 'flattening window for zmax = %.4f galaxy' % get_z(hilim)
 				window_fn = np.ones_like(V_mid, dtype=float)
 				window_fn[(V_mid < lolim_vol) | (V_mid > hilim_vol)] = 0.
 				return np.stack((V_mid, window_fn))
+				#break
 
 		# bin, smooth and normalise for the pdf
-		window_fn, bin_edges = np.histogram(vol_draw, bins=V_base)
-		window_fn = smooth(window_fn, 5)
-		#window_fn[V_mid < lolim_vol] = 0.
-		#window_fn[V_mid > hilim_vol] = 0.
+		vol_minmax = minmax(vol_draw)
+		window_fn, bin_edges = np.histogram(vol_draw, bins='auto')
+		window_fn = np.interp(V_mid, midpoints(bin_edges), window_fn)
+		window_fn[(V_mid < vol_minmax[0]) | (V_mid > vol_minmax[1])] = 0.
 
 	# normalisation must be such that int[W(V) dV] = 1
 	#window_fn = np.asarray(window_fn, dtype=np.float32) / np.trapz(window_fn, x=V_mid)
 	window_fn = np.asarray(window_fn, dtype=np.float32)
-	window_fn /= window_fn.max()
+	window_fn /= 1.*window_fn.sum()
 	window_fn = np.stack((V_mid, window_fn))
 	return window_fn
 
-def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=180.,
+def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=180., dspec=None,
 				   dobs=None, dres=1., Niter=15, load_windows=True, runid='', mincol=None):
 	# take arrays of IDs and max distances/redshifts
 	# draw Nrand redshifts from quadratic/fitted distribution [0, {d/z}max] per galaxy
@@ -328,16 +292,17 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 	dmin, dmax = cmd([zmin, zmax])
 	Vminimum = (Om/3.) * dmin**3.
 	Vmaximum = (Om/3.) * dmax**3.
-	print '\t\t(', (dobs > maxcol).sum(), 'objects observed beyond calculated maximum -- setting observed = max )'
-	maxcol[dobs > maxcol] = dobs[dobs > maxcol]
-	#maxcol[dobs > maxcol] = -99.
+	print '\t\t(', (dobs > maxcol).sum(), 'objects observed beyond calculated maximum -- REMOVING )'
+	maxcol[dobs > maxcol] = -99.#dobs[dobs > maxcol]
 	maxcol[maxcol < dmin] = -99.
 	if mincol is not None:
 		print '\t\t(', (dobs < mincol).sum(), 'objects observed closer than bright limit -- REMOVING )'
-		#mincol[dobs < mincol] = dobs[dobs < mincol]
-		mincol[dobs < mincol] = -99.
+		mincol[dobs < mincol] = -99.#dobs[dobs < mincol]
 	else:
 		mincol = dmin * np.ones_like(maxcol)
+	if dspec:
+		zph_bins = np.arange(zmin, zmax+0.1, step=0.1)
+		zspec = get_z(dspec)
 
 	# get limits; zmax/zmin or survey edges
 	upps = np.stack((maxcol, np.ones_like(maxcol)*dmax))
@@ -355,7 +320,7 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 	Vobs = (Om/3.) * dobs**3.
 
 	# take galaxy n(chi)
-	n_g = np.asarray(np.histogram(dobs, bins=d_base)[0], dtype=np.float32)
+	n_g = np.asarray(np.histogram(Vobs, bins=V_base)[0], dtype=np.float32)
 
 	if windowed:
 		print '\t\t( 1sigma window volume given as %.1e [Mpc/h]^3 )'%window_vol
@@ -384,43 +349,18 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 	flat_windows = np.ones([len(maxcol), len(V_mid)], dtype=np.float32)
 	for i in tqdm(range(len(flat_windows)), desc='\t\tlimiting flat windows', ncols=100):
 		flat_windows[i][(V_mid < lolim_vol[i]) | (V_mid > hilim_vol[i])] = 0.
-	#norm = np.trapz(flat_windows, x=V_mid, axis=1)
-	#flat_windows = (flat_windows.T / norm).T
-	if window_vol is None:
+
+	if not windowed:
 		windows = flat_windows
 
 	# get Vmax
 	Vmax = Om * np.trapz(d_mid**2. * windows, x=d_mid, axis=1)
 	flat_Vmax = np.trapz(d_mid**2. * flat_windows, x=d_mid, axis=1)
-	#if windowed:
-#		small_Vmax = flat_Vmax < Vmax
-#		if any(small_Vmax):
-#			print '\t\trestricting small-Vmax (< window) objects: %s'%small_Vmax.sum()
-#			# re-define window such that the 2sigma volume == Vmax; quarter it for the (1s) volume argument
-##			small_windows = [get_tgauss_window(dobs[small_Vmax][i], hilim[small_Vmax][i], lolim[small_Vmax][i],
-##												 volume=window_vol*flat_Vmax[small_Vmax][i]/4., d_base=d_base, zmax=zmax, area=area)
-##									for i in tqdm(range(small_Vmax.sum()), desc='\t\tre-windowing', ncols=100)]
-##			windows[small_Vmax] = np.array(small_windows)[:, 1, :]
-#			windows[small_Vmax] = flat_windows[small_Vmax]
-#			Vmax[small_Vmax] = flat_Vmax[small_Vmax]
-
-		# interpolate windows onto finer comoving grid
-	#	windows_fine = np.empty([len(windows), len(V_mid_fine)])
-	#	for i, w in enumerate(tqdm(windows, desc='\t\tinterpolating windows', ncols=100)):
-	#		window_int = np.interp(V_mid_fine, V_mid, w)
-	#		windows_fine[i] = window_int
-
-		# combine window with pdf
-	#	print '\t\tnormalising windows/building pdfs..',
-	#	windows_fine = (windows_fine.T / np.trapz(windows_fine, x=V_mid_fine, axis=1)).T
-	#	pdfs = (windows_fine.T / np.sum(windows_fine, axis=1)).T
-	#	print 'done.'
 
 	# setup diagnostic save-outs
 	Vmax_dc_list = []
 	n_clones_list = []
 	Delta_d_list = []
-	pdf_list = []
 	n_r_list = []
 	
 	this_iter = 1
@@ -429,44 +369,28 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		print '\t\t======= ITERATION #%s =======' % this_iter
 		# get Vmax,dc ; density-weighted Vmax for n_clone calculation
 		if this_iter == 1:
-			Delta_d = np.ones_like(d_mid, dtype=np.float64)
+			Delta_d = np.ones_like(V_mid, dtype=np.float64)
 		else:
-			n_r = np.asarray(np.histogram(ddraw, bins=d_base)[0], dtype=np.float32)
+			n_r = np.asarray(np.histogram((Om/3.)*ddraw**3., bins=V_base)[0], dtype=np.float32)
 			Delta_d = Nrand * n_g / n_r
 		delta_mask = ~np.isnan(Delta_d) & ~np.isinf(Delta_d)
+		print '\t\tfrac(delta==nan/inf) = %.2f'%frac(~delta_mask)
 		Vmax_dc = Om * np.trapz( d_mid[delta_mask]**2. \
 								* Delta_d[delta_mask] \
 								* windows.T[delta_mask].T, \
 								x=d_mid[delta_mask], axis=1)
-		#Vmax_dc = Vmax / Vmax_dc
-
-		Vmax_dc_list.append(Vmax_dc)
 
 		bad_Vmaxdc = np.isnan(Vmax_dc) | np.isinf(Vmax_dc) | (Vmax_dc <= 0)
 		if this_iter > 1:
 			prev_N = n_clones.sum()
-		n_clones = np.asarray(np.round(Nrand * Vmax / Vmax_dc), dtype=int)
+			n_clones = np.asarray(np.round(Nrand * Vmax / Vmax_dc), dtype=int)
+		else:
+			n_clones = np.repeat(Nrand, len(Vmax))
 		n_clones[bad_Vmaxdc] = 0
-		n_clones[n_clones < 0] = 0
-		n_clones_list.append(n_clones)
+		n_clones[n_clones < 0] = Nrand
 		print '\t\ttotal N clones = %s'%n_clones.sum()
 		if this_iter > 1:
 			print '\t\t\t\ti.e. %+d'%(n_clones.sum() - prev_N)
-
-		#Nrand_idcol = np.repeat(idcol, n_clones)
-		#Nrand_dobs = np.repeat(dobs, n_clones)
-		#Nrand_maxcol = np.repeat(maxcol, n_clones)
-		#Nrand_Vmax = np.repeat(Vmax, n_clones)
-		#Nrand_lolim = np.repeat(lolim, n_clones)
-		#Nrand_hilim = np.repeat(hilim, n_clones)
-
-		#Nrand_maxcol[Nrand_dobs > Nrand_maxcol] = Nrand_dobs[Nrand_dobs > Nrand_maxcol]
-		#badmax = ((Nrand_maxcol == -99.) |
-		#		  (Nrand_hilim == -99.) |
-		#		  (Nrand_lolim == -99.) |
-		#		  (Nrand_dobs < 30.) | (Nrand_maxcol < 30.) |
-		#		  (Nrand_dobs > dmax) |
-		#		  (Nrand_lolim == Nrand_hilim))
 
 		ddraw, clone_ids = [], []
 		for i in tqdm(range(len(n_clones)), desc='\t\tcloning', ncols=100):
@@ -474,18 +398,35 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			if n_clones[i] == 0:
 				continue
 
-			if not windowed:
+			if not windowed or this_iter == 1:
+				# draw uniformly from the allowed volume
 				Vdraw = np.random.rand(n_clones[i]) * (hilim_vol[i] - lolim_vol[i]) + lolim_vol[i]
 			else:
-				Vdraw = np.random.rand(n_clones[i]*10) * (hilim_vol[i] - lolim_vol[i]) + lolim_vol[i]
-				window_at_Vdraw = np.interp(np.sort(Vdraw), V_mid, windows[i])
+				# over-draw uniformly and reject excess clones according to window function
+				Vdraw1 = np.random.rand(n_clones[i]*100) * (hilim_vol[i] - lolim_vol[i]) + lolim_vol[i]
+
+			if windowed or dspec is not None:
+				if dspec:
+					# create a window from n(zsp | zph)
+					zph_bin = np.digitize(get_z(dobs), zph_bins) - 1
+					zsp_dstn, zsp_bin = np.histogram(zspec[(zspec > zph_bins[zph_bin]) & (zspec <= zph_bins[zph_bin+1])],
+													 bins='auto', density=1)
+					dsp_bin = get_d(zsp_bin)
+					Vsp = Om/3. * midpoints(dsp_bin)**3.
+					dsp_dstn = smooth(get_d(zsp_dstn), 3)
+					window_at_Vdraw = np.interp(Vdraw1, Vsp, dsp_dstn)
+				elif windowed:
+					# use Gaussian window
+					window_at_Vdraw = np.interp(Vdraw1, V_mid, windows[i])
 				if window_at_Vdraw.sum() == 0:
-					print 'galaxy', idcol[i], 'window is too small?'
+					# skip bad windows
+					print 'galaxy', idcol[i], 'at z=%.3f'%get_z(dobs[i]), ' -- window is too small?'
 					continue
 				window_at_Vdraw /= window_at_Vdraw.sum()
-				Vdraw = np.random.choice(Vdraw, p=window_at_Vdraw, size=n_clones[i])
+				Vdraw = np.random.choice(Vdraw1, p=window_at_Vdraw, size=n_clones[i])
 
 			ddraw_i = (3.*Vdraw/Om)**(1./3.)
+			assert all(ddraw_i <= hilim[i]) and all(ddraw_i >= lolim[i]), "z-limiting of clones is broken!"
 			for ddi in ddraw_i:
 				ddraw.append(ddi)
 				clone_ids.append(idcol[i])
@@ -494,54 +435,9 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		clone_ids = np.array(clone_ids).flatten()
 		assert len(ddraw) == len(clone_ids), "cloning going wrong!"
 
-	#	if windowed:
-	#		# draw from truncated [-2, 2] Gaussian
-	#		#tnorm = stats.truncnorm(-2, 2, loc=0, scale=1) # this draw needs to be weighted as chi^2?
-	#		#rtnorm = tnorm.rvs(size=len(Nrand_dobs))
-	#		# convert draws to window-volumes
-	#		#rvols = np.abs(rtnorm) * window_vol
-	#		# calculate limits for the volumes and take as the distance-draws
-	#		#lims = get_volume_limits(Nrand_dobs, volume=rvols)
-	#		#ddraw = np.where(rtnorm < 0, lims[0], lims[2])
-
-	#		# draw n_clones from each comoving distance probdens function
-	#		vdraw = []
-	#		for pdf, nc in tqdm(zip(pdfs, n_clones), desc='\t\tfilling windows', ncols=100):
-	#			if nc != 0:
-	#				draw = np.random.choice(V_mid_fine, p=pdf, size=nc) \
-	#						+ (np.random.rand(nc) - 0.5) * Vres
-	#				vdraw.append(draw)
-	#			else:
-	#				continue
-	#		vdraw = np.concatenate(vdraw)
-
-	#		vdraw[badmax] = -99. # set unwanted to -99
-
-	#		# reflect out-of-bounds draws in the boundaries
-	#		#print '\t\treflecting at boundaries..'
-	#		#oob = ~badmax & ((ddraw < Nrand_lolim) | (ddraw > Nrand_hilim))
-	#		#oob1 = len(oob)
-	#		#while any(oob):
-	#		#	ddraw[ddraw < Nrand_lolim] += 2.*(Nrand_lolim[ddraw < Nrand_lolim] - ddraw[ddraw < Nrand_lolim])
-	#		#	ddraw[ddraw > Nrand_hilim] += 2.*(Nrand_hilim[ddraw > Nrand_hilim] - ddraw[ddraw > Nrand_hilim])
-	#		#	oob = ~badmax & ((ddraw < Nrand_lolim) | (ddraw > Nrand_hilim))
-	#		#	if oob.sum() < oob1 and oob.sum() != 0:
-	#		#		print oob.sum()
-	#		#		oob1 = oob.sum()
-	#	else:
-	#		# draw from d^2 (== growth of volume element) between [0, upperlimit]
-	#		ddraw = np.random.power(3, n_clones.sum()) * Nrand_hilim
-	#		while any(ddraw[~badmax] < Nrand_lolim[~badmax]):
-	#			ddraw[ddraw < Nrand_lolim] = np.random.power(3, (ddraw < Nrand_lolim).sum()) * Nrand_hilim[ddraw < Nrand_lolim]
-	#		#vdraw = np.random.rand(n_clones.sum()) * Nrand_Vmax
-	#		#ddraw = get_volume_depth(vdraw, area=area)
-	#		ddraw[badmax] = -99.
-	#		vdraw = get_volume(ddraw, area=area)
-
-
 		Delta_d_list.append(Delta_d)
-		try: pdf_list.append(pdf)
-		except: pass
+		Vmax_dc_list.append(Vmax_dc)
+		n_clones_list.append(n_clones)	
 		try: n_r_list.append(n_r)
 		except: pass
 		this_iter += 1
@@ -553,16 +449,13 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		h5_diag.create_dataset('d_mid', data=d_mid)
 		h5_diag.create_dataset('Delta_d', data=Delta_d_list)
 		h5_diag.create_dataset('n_clones', data=n_clones_list)
-		#try: h5_diag.create_dataset('pdf', data=pdf_list)
-		#except: pass
 		h5_diag.create_dataset('n_r', data=n_r_list)
 		h5_diag.create_dataset('Om', data=Om)
 		h5_diag.close()
 
-	mask = ddraw > 0.
+	mask = ddraw != -99.
 	zdraw = np.ones_like(ddraw) * -99.
-	#ddraw = get_volume_depth(vdraw, area=area)
-	zdraw[mask] = get_z(ddraw[mask])
+	zdraw[mask] = get_z(np.abs(ddraw[mask]))
 
 	randoms_id_z = np.column_stack((clone_ids, zdraw))
 	return randoms_id_z
@@ -580,9 +473,10 @@ def main(args):
 	for cat_path in args.catalogues:
 		print 'reading %s..' % cat_path
 		cat = fits.open(cat_path)[1].data
+		cat = cat[np.argsort(cat[args.idcol])]
 		t = Table(cat)
 
-		if args.refresh_zmax and not args.zmax_col:
+		if args.refresh_zmax and not args.zmax_col and not args.zph_max:
 			# establish zmax per detection band
 			for mcol, mlim, kcorr, blim in zip(args.magcols, args.maglims, args.kcorrs, args.brightlim):
 				print '\t"%s" at limit: %s' % (mcol, mlim)
@@ -619,12 +513,12 @@ def main(args):
 			mask = (zcol > 0)
 
 			# apply any weighting
-			if args.zweight is None:
-				wcol = None
-				bins = 'auto'
-			else:
-				wcol = cat[args.zweight]
-				bins = np.linspace(zcol[mask].min(), zcol[mask].max(), 40)
+			#if args.zweight is None:
+			#	wcol = None
+			#	bins = 'auto'
+			#else:
+			#	wcol = cat[args.zweight]
+			#	bins = np.linspace(zcol[mask].min(), zcol[mask].max(), 40)
 
 			# construct redshift distribution per band
 			#print '\t\tcloning..'
@@ -635,8 +529,12 @@ def main(args):
 				else:
 					zmax_col = args.zmax_col
 
-				maxcol = get_d(cat[zmax_col])
+				if not args.zph_max:
+					maxcol = get_d(cat[zmax_col])
+				else:
+					maxcol = get_d(zmax_draw)
 				dobs = get_d(zcol)
+
 				if blim is not None:
 					zmin_col = mcol+'_fl%.1f_zmin'%blim
 					mincol = get_d(cat[zmin_col])
@@ -675,6 +573,7 @@ def main(args):
 			rand_hdu.writeto(out, overwrite=1)
 
 	print 'done!'
+	return out
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
@@ -784,6 +683,11 @@ if __name__ == '__main__':
 		type=float,
 		default=0.,
 		help='include a scalar evolution term (float), default=0')
+	parser.add_argument(
+		'-zph_max',
+		type=str,
+		nargs=2,
+		help='2 args: (1) path to .zmaxtable file, (2) number of zmax vectors to sample')
 	args = parser.parse_args()
 
 	#if args.kcorrs is None:
@@ -792,7 +696,23 @@ if __name__ == '__main__':
 		args.id = '_'+args.id
 	if args.brightlim is None:
 		args.brightlim = [None]*len(args.maglims)
-	main(args)
+
+	if args.zph_max:
+		zmaxtable_h5 = h5py.File(args.zph_max[0], 'r')
+		zmaxtable = zmaxtable_h5['zmax'][:]
+		zmax_id = zmaxtable_h5['ID'][:]
+		Ndraws = int(args.zph_max[1])
+		orig_id = args.id
+		draws = []
+		for x in np.random.choice(range(zmaxtable.shape[1]), replace=False, size=Ndraws):
+			zmax_draw = zmaxtable[:, x]
+			args.id = orig_id + '_%s'%str(x).zfill(2)
+			outfile_x = main(args)
+			draws.append(outfile_x)
+		files = ' '.join(draws)
+		os.system('stilts -verbose tcat in=%s ofmt=fits out=%s'%(files, outfile_x.replace(args.id,orig_id)))
+	else:
+		main(args)
 
 
 
@@ -918,3 +838,44 @@ if __name__ == '__main__':
 #		return fine_Mmatrix, fine_zgrid
 #	else:
 #		return minima
+
+#def get_volume_limits(d, area=180., volume=3.5e6):
+#	# get asymmetric LoS limits for a given
+#	# volume centred on each galaxy with distance d
+#	Om = sqdeg2ster(area)
+#
+#	def invvol(r1, vol):
+#		r2 = ((3. * vol / Om) + r1**3.) ** (1./3.)
+#		# calculate asymmetric limits of volume -- see notes
+#		with warnings.catch_warnings():
+#			warnings.simplefilter("ignore")
+#			new_r1 = ((3.*r1**3. - r2**3.) / 2.) ** (1./3.)
+#		new_r2 = ((r1**3. + r2**3.) / 2.) ** (1./3.)
+#		# fix NaNs in new_r1 -- make positive for the cube-root, and then negative again
+#		badr1 = np.isnan(new_r1)
+#		try:
+#			new_r1[badr1] = (-(3.*r1[badr1]**3. - r2[badr1]**3.) / 2.) ** (1./3.)
+#		except IndexError:
+#			new_r1[badr1] = (-(3.*r1**3. - r2[badr1]**3.) / 2.) ** (1./3.)
+#		new_r1[badr1] *= -1.
+#		# for symmetric limits (will override the above):
+#		#new_r1 = 2.*r1 - r2
+#		#new_r2 = r2
+#		return [new_r1, r1, new_r2]
+#
+#	widths = np.asarray(invvol(d, volume)).squeeze()
+#
+#	return widths
+#
+#def get_volume_depth(volume, area=180.):
+#	Om = sqdeg2ster(area)
+#	return (3. * volume / Om)**(1./3.)
+#
+#def get_volume(limits, area=180.):
+#	# get volume defined by limits, for a given area
+#	Om = sqdeg2ster(area)
+#	if type(limits) == np.array and len(limits) == 2:
+#		volume = (Om / 3.) * (limits[1]**3. - limits[0]**3.)
+#	else:
+#		volume = (Om / 3.) * limits**3.
+#	return volume
