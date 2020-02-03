@@ -20,18 +20,20 @@ idcol = sys.argv[5]
 #cmask = ((cat['absmag_r'] > -26) &
 #		(cat['absmag_r'] < -17)	&
 cmask = ((cat[zcol] > 0.02) &
-		(cat[magcol+'_fl19.8_zmax'] > 0.))
+		#(cat[magcol+'_fl19.8_zmax'] > 0.))
+		(cat[magcol+'_fl22.5_zmax'] > 0.))
 rmask = ((rand[magcol+'_cloneZ'] > 0.0) &
 		 (np.isin(rand[magcol+'_cloneID'], cat[cmask][idcol]))) # so rmask has cmask built-in
 
 
-cutcol = 'logmstar'
+#cutcol = 'logmstar'
+cutcol = 'lp_mi'
 Nbin = 3
 percs = np.percentile(cat[cutcol], np.linspace(2., 98., Nbin+1))
 sels = [(cat[cutcol] > percs[i]) & (cat[cutcol] < percs[i+1]) & cmask for i in range(Nbin)]
 labs = ['%.1f < %s < %.1f' % (percs[i], cutcol, percs[i+1]) for i in range(Nbin)]
 if cat[zcol].max() > 1.2:
-	zmax = 1.25
+	zmax = 0.85
 else:
 	zmax = cat[zcol].max()
 nbin = 50
