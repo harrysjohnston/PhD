@@ -1406,6 +1406,12 @@ if __name__ == "__main__":
 		np.savetxt(join(catalog.new_root,catalog.labels[i]+'_galZs.txt'),sample_z)
 		if i>3:
 			swot_z.append(catalog.save_swotfiles(sample,catalog.labels[i]))
+
+	from astropy.table import Table
+	for i in range(len(catalog.samples)):
+		t = Table(catalog.samples[i])
+		t.write(join(catalog.new_root, catalog.labels[i]+'.fits'), overwrite=1)
+
 	print('=======================\tSAVING TO DIRECTORY: %s'%catalog.new_root)
 	if args.densColours:
 		samz_keys = ['z2_r', 'z2_b', 'z1_r', 'z1_b']
@@ -1691,8 +1697,10 @@ if __name__ == "__main__":
 
 		cuts = 'z-cut: %s'%args.zCut
 
+		from astropy.table import Table
 		for i, sample in enumerate(catalog2.samples):
 			label = catalog2.labels[i]
+			Table(catalog2.samples[i]).write(join(catalog.new_root, catalog2.labels[i]+'.fits'), overwrite=1)
 			if ((args.zCut==None)&('lowZ' in label))|((args.cCut==None)&('Blue' in label)):
 				print('no z/colour-cut; skipping %s...'%label)
 			else:

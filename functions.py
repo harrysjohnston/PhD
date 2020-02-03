@@ -29,6 +29,11 @@ from astropy import units as u
 from astropy.cosmology import FlatLambdaCDM as FLCDM
 MICEcosmo = FLCDM(Om0=0.25, H0=70, Ob0=0.044)
 cosmo = FLCDM(Om0=0.3, H0=70)
+cmd = lambda x: cosmo.comoving_distance(x).value * cosmo.h
+zg = np.linspace(0., 10., 10000)
+dg = cmd(zg)
+get_d = lambda z: interp1d(zg, dg, bounds_error=0, fill_value=-99.)(z)
+get_z = lambda d: interp1d(dg, zg, bounds_error=0, fill_value=-99.)(d)
 cMpc = MICEcosmo.comoving_distance
 from os import listdir, mkdir
 from os.path import join, isdir, basename, normpath, dirname
@@ -116,6 +121,11 @@ fd0 = lambda x: x / x.mean() - 1.
 p50 = lambda x: np.percentile(x, 50.)
 mod = lambda ra: np.where(ra > 300., ra - 360., ra)
 nn = lambda x: x[~np.isnan(x) & ~np.isinf(x)]
+n2n = lambda x: np.nan_to_num(x)
+def smooth(y, box_pts):
+    box = np.ones(box_pts)/box_pts
+    y_smooth = np.convolve(y, box, mode='same')
+    return y_smooth
 
 def plotfile(path, **kwargs):
 	t, w = np.loadtxt(path, **kwargs).T[:2]
