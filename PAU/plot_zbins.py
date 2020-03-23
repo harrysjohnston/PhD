@@ -5,10 +5,10 @@ mpl.rcParams['xtick.labelsize'] = 14
 mpl.rcParams['ytick.labelsize'] = 14
 if len(sys.argv) < 6:
 	print '\n1: catalogue\
-		   \n2: randoms\
-		   \n3: redshift column\
-		   \n4: magnitude column\
-		   \n5: ID column\n'
+		   \n2: redshift column\
+		   \n3: magnitude column\
+		   \n4: ID column\
+		   \n5+: randoms files\n'
 	sys.exit()
 
 cat = fopen(sys.argv[1])

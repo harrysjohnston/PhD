@@ -3,8 +3,9 @@ from numpy import log10
 from scipy import stats
 from astropy.io import fits
 from astropy.table import Table
-from astropy.cosmology import FlatLambdaCDM
+from astropy.cosmology import FlatLambdaCDM as FLCDM
 from scipy.interpolate import interp1d, interp2d, InterpolatedUnivariateSpline
+import os
 import h5py
 import argparse
 import warnings
@@ -14,7 +15,7 @@ import astropy.units as u
 import scipy.optimize as so
 fitscol = fits.Column
 pchoice = np.random.choice
-cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
+cosmo = FLCDM(Om0=0.25, H0=70, Ob0=0.044)
 cmd = lambda x: cosmo.comoving_distance(x).value * cosmo.h
 zg = np.linspace(0., 10., 10000)
 dg = cmd(zg)
@@ -292,9 +293,10 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 	dmin, dmax = cmd([zmin, zmax])
 	Vminimum = (Om/3.) * dmin**3.
 	Vmaximum = (Om/3.) * dmax**3.
-	print '\t\t(', (dobs > maxcol).sum(), 'objects observed beyond calculated maximum -- REMOVING )'
-	maxcol[dobs > maxcol] = -99.#dobs[dobs > maxcol]
 	maxcol[maxcol < dmin] = -99.
+	if dspec is not None:
+		print '\t\t(', (dobs > maxcol).sum(), 'objects observed beyond calculated maximum -- REMOVING )'
+		maxcol[dobs > maxcol] = -99.#dobs[dobs > maxcol]
 	if mincol is not None:
 		print '\t\t(', (dobs < mincol).sum(), 'objects observed closer than bright limit -- REMOVING )'
 		mincol[dobs < mincol] = -99.#dobs[dobs < mincol]
@@ -404,20 +406,18 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			else:
 				# over-draw uniformly and reject excess clones according to window function
 				Vdraw1 = np.random.rand(n_clones[i]*100) * (hilim_vol[i] - lolim_vol[i]) + lolim_vol[i]
-
-			if windowed or dspec is not None:
-				if dspec:
-					# create a window from n(zsp | zph)
-					zph_bin = np.digitize(get_z(dobs), zph_bins) - 1
-					zsp_dstn, zsp_bin = np.histogram(zspec[(zspec > zph_bins[zph_bin]) & (zspec <= zph_bins[zph_bin+1])],
-													 bins='auto', density=1)
-					dsp_bin = get_d(zsp_bin)
-					Vsp = Om/3. * midpoints(dsp_bin)**3.
-					dsp_dstn = smooth(get_d(zsp_dstn), 3)
-					window_at_Vdraw = np.interp(Vdraw1, Vsp, dsp_dstn)
-				elif windowed:
+#				if dspec:
+#					# create a window from n(zsp | zph)
+#					zph_bin = np.digitize(get_z(dobs), zph_bins) - 1
+#					zsp_dstn, zsp_bin = np.histogram(zspec[(zspec > zph_bins[zph_bin]) & (zspec <= zph_bins[zph_bin+1])],
+#													 bins='auto', density=1)
+#					dsp_bin = get_d(zsp_bin)
+#					Vsp = Om/3. * midpoints(dsp_bin)**3.
+#					dsp_dstn = smooth(get_d(zsp_dstn), 3)
+#					window_at_Vdraw = np.interp(Vdraw1, Vsp, dsp_dstn)
+				#if windowed:
 					# use Gaussian window
-					window_at_Vdraw = np.interp(Vdraw1, V_mid, windows[i])
+				window_at_Vdraw = np.interp(Vdraw1, V_mid, windows[i])
 				if window_at_Vdraw.sum() == 0:
 					# skip bad windows
 					print 'galaxy', idcol[i], 'at z=%.3f'%get_z(dobs[i]), ' -- window is too small?'
@@ -528,6 +528,11 @@ def main(args):
 					zmax_col = mcol+'_fl%.1f_zmax'%mlim
 				else:
 					zmax_col = args.zmax_col
+				if blim is not None:
+					zmin_col = mcol+'_fl%.1f_zmin'%blim
+					mincol = get_d(cat[zmin_col])
+				else:
+					mincol = None
 
 				if not args.zph_max:
 					maxcol = get_d(cat[zmax_col])
@@ -535,11 +540,13 @@ def main(args):
 					maxcol = get_d(zmax_draw)
 				dobs = get_d(zcol)
 
-				if blim is not None:
-					zmin_col = mcol+'_fl%.1f_zmin'%blim
-					mincol = get_d(cat[zmin_col])
-				else:
-					mincol = None
+				if len(maxcol) != len(dobs):
+					idcut1 = np.isin(idcol, zmax_id)
+					idcut2 = np.isin(zmax_id, idcol)
+					idcol, dobs = idcol[idcut1], dobs[idcut1]
+					if mincol: mincol = mincol[idcut1]
+					maxcol = maxcol[idcut2]
+
 				randoms_id_z = clone_galaxies(idcol, maxcol, args.Nrand, zlims=args.zlims, window_vol=args.window, area=args.area, dres=args.dres,
 											  dobs=dobs, Niter=args.niter, load_windows=args.load_windows, runid=args.id, mincol=mincol)
 				randoms_comoving = get_d(randoms_id_z[:, 1])
@@ -710,7 +717,17 @@ if __name__ == '__main__':
 			outfile_x = main(args)
 			draws.append(outfile_x)
 		files = ' '.join(draws)
-		os.system('stilts -verbose tcat in=%s ofmt=fits out=%s'%(files, outfile_x.replace(args.id,orig_id)))
+		cats = []
+		import os
+		for fil in draws:
+			cats.append(fits.open(fil)[1].data)
+			os.system('rm '+fil)
+		mcat = Table(np.concatenate(cats))
+		mcat.write(outfile_x.replace(args.id,orig_id), format='fits', overwrite=1)
+		#os.system('module load astro/apr2019/starjava ; \
+		#		   stilts -verbose tcat in="%s" ofmt=fits out=%s'%(files, outfile_x.replace(args.id,orig_id)))
+		#for f in files:
+		#	os.system('rm '+f)
 	else:
 		main(args)
 
