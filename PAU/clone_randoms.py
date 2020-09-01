@@ -263,7 +263,7 @@ def get_tgauss_window(d, hilim, lolim, area=180., volume=3.5e6, V_base=None, zma
 			vol_draw = np.abs(vol_draw)
 			x += 1
 			if x > 200:
-				print 'flattening window for zmax = %.4f galaxy' % get_z(hilim)
+				#print 'flattening window for zmax = %.4f galaxy' % get_z(hilim)
 				window_fn = np.ones_like(V_mid, dtype=float)
 				window_fn[(V_mid < lolim_vol) | (V_mid > hilim_vol)] = 0.
 				return np.stack((V_mid, window_fn))
@@ -282,8 +282,8 @@ def get_tgauss_window(d, hilim, lolim, area=180., volume=3.5e6, V_base=None, zma
 	window_fn = np.stack((V_mid, window_fn))
 	return window_fn
 
-def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=180., dspec=None,
-				   dobs=None, dres=1., Niter=15, load_windows=True, runid='', mincol=None):
+def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=180., dspec=None, save_diag=False,
+				   dobs=None, drawn_dobs=None, dres=1., Niter=15, load_windows=True, runid='', mincol=None):
 	# take arrays of IDs and max distances/redshifts
 	# draw Nrand redshifts from quadratic/fitted distribution [0, {d/z}max] per galaxy
 	windowed = window_vol is not None
@@ -294,17 +294,19 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 	Vminimum = (Om/3.) * dmin**3.
 	Vmaximum = (Om/3.) * dmax**3.
 	maxcol[maxcol < dmin] = -99.
-	if dspec is not None:
-		print '\t\t(', (dobs > maxcol).sum(), 'objects observed beyond calculated maximum -- REMOVING )'
-		maxcol[dobs > maxcol] = -99.#dobs[dobs > maxcol]
-	if mincol is not None:
-		print '\t\t(', (dobs < mincol).sum(), 'objects observed closer than bright limit -- REMOVING )'
-		mincol[dobs < mincol] = -99.#dobs[dobs < mincol]
-	else:
-		mincol = dmin * np.ones_like(maxcol)
 	if dspec:
 		zph_bins = np.arange(zmin, zmax+0.1, step=0.1)
 		zspec = get_z(dspec)
+	if drawn_dobs is None:
+		drawn_dobs = dobs
+	if dspec is not None:
+		print '\t\t(', (drawn_dobs > maxcol).sum(), 'objects observed beyond calculated maximum -- REMOVING )'
+		maxcol[drawn_dobs > maxcol] = -99.#drawn_dobs[drawn_dobs > maxcol]
+	if mincol is not None:
+		print '\t\t(', (drawn_dobs < mincol).sum(), 'objects observed closer than bright limit -- REMOVING )'
+		mincol[drawn_dobs < mincol] = -99.#drawn_dobs[drawn_dobs < mincol]
+	else:
+		mincol = dmin * np.ones_like(maxcol)
 
 	# get limits; zmax/zmin or survey edges
 	upps = np.stack((maxcol, np.ones_like(maxcol)*dmax))
@@ -338,14 +340,14 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 				load_failed = True
 		if (not load_windows) or load_failed:
 			# get truncated Gaussian window per object
-			windows = [get_tgauss_window(dobs[i], hilim[i], lolim[i], volume=1.*window_vol, V_base=V_base, zmax=zmax, area=area)
-						for i in tqdm(range(len(dobs)), desc='\t\twindowing', ncols=100)]
+			windows = [get_tgauss_window(drawn_dobs[i], hilim[i], lolim[i], volume=1.*window_vol, V_base=V_base, zmax=zmax, area=area)
+						for i in tqdm(range(len(drawn_dobs)), desc='\t\twindowing', ncols=100)]
 			windows = np.array(windows)[:, 1, :]
 			assert (not all(np.isnan(windows.flatten()))), "Windowing failed! All windows are NaN; d > dmax or bad limits"
 
-		with h5py.File('windows%s.h5'%runid, 'w') as f:
-			f.create_dataset('windows', data=windows)
-			f.close()
+		#with h5py.File('windows%s.h5'%runid, 'w') as f:
+		#	f.create_dataset('windows', data=windows)
+		#	f.close()
 
 	# windows in volume coords
 	flat_windows = np.ones([len(maxcol), len(V_mid)], dtype=np.float32)
@@ -406,17 +408,6 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 			else:
 				# over-draw uniformly and reject excess clones according to window function
 				Vdraw1 = np.random.rand(n_clones[i]*100) * (hilim_vol[i] - lolim_vol[i]) + lolim_vol[i]
-#				if dspec:
-#					# create a window from n(zsp | zph)
-#					zph_bin = np.digitize(get_z(dobs), zph_bins) - 1
-#					zsp_dstn, zsp_bin = np.histogram(zspec[(zspec > zph_bins[zph_bin]) & (zspec <= zph_bins[zph_bin+1])],
-#													 bins='auto', density=1)
-#					dsp_bin = get_d(zsp_bin)
-#					Vsp = Om/3. * midpoints(dsp_bin)**3.
-#					dsp_dstn = smooth(get_d(zsp_dstn), 3)
-#					window_at_Vdraw = np.interp(Vdraw1, Vsp, dsp_dstn)
-				#if windowed:
-					# use Gaussian window
 				window_at_Vdraw = np.interp(Vdraw1, V_mid, windows[i])
 				if window_at_Vdraw.sum() == 0:
 					# skip bad windows
@@ -442,16 +433,17 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 		except: pass
 		this_iter += 1
 
-	with h5py.File('diagnostics_clonerandoms%s.h5'%runid, 'w') as h5_diag:
-		h5_diag.create_dataset('Vmax', data=Vmax)
-		h5_diag.create_dataset('Vmax_dc', data=Vmax_dc_list)
-		h5_diag.create_dataset('V_mid', data=V_mid)
-		h5_diag.create_dataset('d_mid', data=d_mid)
-		h5_diag.create_dataset('Delta_d', data=Delta_d_list)
-		h5_diag.create_dataset('n_clones', data=n_clones_list)
-		h5_diag.create_dataset('n_r', data=n_r_list)
-		h5_diag.create_dataset('Om', data=Om)
-		h5_diag.close()
+	if save_diag:
+		with h5py.File('diagnostics_clonerandoms%s.h5'%runid, 'w') as h5_diag:
+			h5_diag.create_dataset('Vmax', data=Vmax)
+			h5_diag.create_dataset('Vmax_dc', data=Vmax_dc_list)
+			h5_diag.create_dataset('V_mid', data=V_mid)
+			h5_diag.create_dataset('d_mid', data=d_mid)
+			h5_diag.create_dataset('Delta_d', data=Delta_d_list)
+			h5_diag.create_dataset('n_clones', data=n_clones_list)
+			h5_diag.create_dataset('n_r', data=n_r_list)
+			h5_diag.create_dataset('Om', data=Om)
+			h5_diag.close()
 
 	mask = ddraw != -99.
 	zdraw = np.ones_like(ddraw) * -99.
@@ -459,14 +451,6 @@ def clone_galaxies(idcol, maxcol, Nrand=10, zlims=None, window_vol=None, area=18
 
 	randoms_id_z = np.column_stack((clone_ids, zdraw))
 	return randoms_id_z
-
-#def mask_randoms(args):
-	# expand randoms from 1x1 sky-box into catalogue footprint
-	# create mutliple boxes for disjoint footprints?
-	# use jackknife code to identify these?
-	# apply a mask to resulting window
-# OR
-	# write code to sample from fitted 2D ra/dec distributions?
 
 def main(args):
 	print '\n'
@@ -534,11 +518,13 @@ def main(args):
 				else:
 					mincol = None
 
+				dobs = get_d(zcol)
 				if not args.zph_max:
 					maxcol = get_d(cat[zmax_col])
+					drawn_dobs = None
 				else:
-					maxcol = get_d(zmax_draw)
-				dobs = get_d(zcol)
+					maxcol = get_d(args.zmax_draw)
+					drawn_dobs = dobs = get_d(args.zspec_draw)
 
 				if len(maxcol) != len(dobs):
 					idcut1 = np.isin(idcol, zmax_id)
@@ -547,8 +533,8 @@ def main(args):
 					if mincol: mincol = mincol[idcut1]
 					maxcol = maxcol[idcut2]
 
-				randoms_id_z = clone_galaxies(idcol, maxcol, args.Nrand, zlims=args.zlims, window_vol=args.window, area=args.area, dres=args.dres,
-											  dobs=dobs, Niter=args.niter, load_windows=args.load_windows, runid=args.id, mincol=mincol)
+				randoms_id_z = clone_galaxies(idcol, maxcol, args.Nrand, zlims=args.zlims, window_vol=args.window, area=args.area, dres=args.dres, save_diag=args.save_diag,
+											  dobs=dobs, drawn_dobs=drawn_dobs, Niter=args.niter, load_windows=args.load_windows, runid=args.id, mincol=mincol)
 				randoms_comoving = get_d(randoms_id_z[:, 1])
 
 				random_cols.append(fitscol(array=np.asarray(randoms_id_z[:, 0], dtype=np.int32), name=mcol+'_cloneID', format='K'))
@@ -695,6 +681,11 @@ if __name__ == '__main__':
 		type=str,
 		nargs=2,
 		help='2 args: (1) path to .zmaxtable file, (2) number of zmax vectors to sample')
+	parser.add_argument(
+		'-save_diag',
+		type=int,
+		default=0,
+		help='(1) save diagnostics or (0) not (default)')
 	args = parser.parse_args()
 
 	#if args.kcorrs is None:
@@ -705,194 +696,56 @@ if __name__ == '__main__':
 		args.brightlim = [None]*len(args.maglims)
 
 	if args.zph_max:
+		import os
+		import multiprocessing as mp
+		from glob import glob
 		zmaxtable_h5 = h5py.File(args.zph_max[0], 'r')
 		zmaxtable = zmaxtable_h5['zmax'][:]
+		zspectable = zmaxtable_h5['zspec'][:]
+		if zmaxtable.shape[0] > zmaxtable.shape[1]:
+			zmaxtable = zmaxtable.T
+		if zspectable.shape[0] > zspectable.shape[1]:
+			zspectable = zspectable.T
 		zmax_id = zmaxtable_h5['ID'][:]
+		zmaxtable = zmaxtable[:, np.argsort(zmax_id)]
+		zspectable = zspectable[:, np.argsort(zmax_id)]
 		Ndraws = int(args.zph_max[1])
+		indices = np.random.choice(len(zmaxtable), replace=False, size=Ndraws)
 		orig_id = args.id
-		draws = []
-		for x in np.random.choice(range(zmaxtable.shape[1]), replace=False, size=Ndraws):
-			zmax_draw = zmaxtable[:, x]
+
+		def ensemble_randoms(x):
+			setattr(args, 'zmax_draw', zmaxtable[x])
+			setattr(args, 'zspec_draw', zspectable[x])
 			args.id = orig_id + '_%s'%str(x).zfill(2)
 			outfile_x = main(args)
-			draws.append(outfile_x)
-		files = ' '.join(draws)
+			return outfile_x
+
+		if mp.cpu_count() > 1:
+			pool = mp.Pool(mp.cpu_count())
+			draws = pool.map(ensemble_randoms, indices)
+			pool.close()
+		else:
+			draws = []
+			for x in indices:
+				draws.append(ensemble_randoms(x))
+
 		cats = []
-		import os
 		for fil in draws:
 			cats.append(fits.open(fil)[1].data)
-			os.system('rm '+fil)
+
 		mcat = Table(np.concatenate(cats))
-		mcat.write(outfile_x.replace(args.id,orig_id), format='fits', overwrite=1)
-		#os.system('module load astro/apr2019/starjava ; \
-		#		   stilts -verbose tcat in="%s" ofmt=fits out=%s'%(files, outfile_x.replace(args.id,orig_id)))
-		#for f in files:
-		#	os.system('rm '+f)
+		if args.o is None:
+			out = args.catalogues[0].replace('.fits', '_CloneZIDRandoms.fits')
+		else:
+			out = args.o
+		if args.id is not None:
+			out = out.replace('.fits', '%s.fits'%args.id)
+
+		mcat.write(out, format='fits', overwrite=1)
+		for fil in draws:
+			os.system('rm '+fil)
 	else:
 		main(args)
 
 
 
-
-
-#def dmax(lim, M_, ceiling=np.inf, Mcorr=None):
-#	# maximum distance of absolute M galaxy in Mpc, given apparent mag lim
-#	if Mcorr is not None:
-#		M = M_ + Mcorr
-#	else:
-#		M = M_.copy()
-#	dist = 10. ** (0.2 * (lim - M + 5.)) # parsecs
-#	dist /= 1e6
-#	bad_M = (M < -30.) | (M > -10.) # conservative removal of non-galaxy objects
-#	dist = np.where(bad_M, -99., dist)
-#	try:
-#		dist = np.where(dist > ceiling, ceiling, dist)
-#	except:
-#		dist = np.where(dist > ceiling.value, ceiling.value, dist)
-#	return dist
-#
-#def get_zmax_hdu(cat, mcol, mlim, zcol, ceiling=None, kcorrs=None):
-#	print '\t"%s" at limit: %s' % (mcol, mlim)
-#
-#	# calculate maximum distance to each galaxy
-#	mag = cat[mcol]
-#	if kcorrs is None:
-#		kcorr = np.zeros_like(mag)
-#	else:
-#		kcorr = cat[kcorrs]
-#		print '\t"%s" correction: mean mag %.2f -> %.2f' % (kcorrs, mag.mean(), (mag-kcorr).mean())
-#	max_distance = dmax(mlim, mag, Mcorr=-kcorr) #, Mcorr=-5*log10(0.7)) for a cosmolgy-correction
-#	max_redshift = np.zeros_like(max_distance)
-#	mask = max_distance > 0
-#
-#	# interpolate these onto the maximum redshift at which the object would be observed
-#	zmin, zmax = 0., 6.
-#	z_grid = np.linspace(zmin, zmax, 100)
-#	distance_grid = cmd(z_grid)
-#	max_redshift[mask] = interp1d_(max_distance[mask], distance_grid, z_grid)
-#	max_redshift[~mask] = -99.
-#	max_distance[~mask] = -99.
-#	zmax_colname = mcol+'_fl%.1f_zmax'%mlim
-#	dmax_colname = mcol+'_fl%.1f_dmax'%mlim
-#	max_cols = [fitscol(array=max_redshift, format='D', name=zmax_colname),
-#				fitscol(array=max_distance, format='D', name=dmax_colname)]
-#	# create fits table from new+old columns
-#	for col in max_cols:
-#		if col.name in cat.columns.names:
-#			cat.columns.del_col(col.name)
-#	max_cols = fits.ColDefs(max_cols)
-#	hdu = fits.BinTableHDU.from_columns(max_cols + cat.columns)
-#	return hdu
-
-	# draw from fit to redshift distribution of real galaxies
-	#if zg is not None and Pz is not None:
-		#pass
-		#for i in tqdm(range(Nrand), desc='\t\tclone batches', ascii=True, ncols=100):
-		#	zdraw = pchoice(zg, p=Pz, size=Ngal)
-		#	mask = maxcol > 0
-		#	nbad = (zdraw[mask] > maxcol[mask]).sum() # number of long-draws
-		#	dnbad = nbad*1
-		#	while nbad > 0:
-		#		#print nbad
-		#		badz = np.where((zdraw > maxcol) & mask)[0]
-		#		if dnbad <= 10: # if re-draws are slowing down, loop over remaining draws with truncated P(z)
-		#			for bz in badz:
-		#				zg1, Pz1 = zg[zg < maxcol[bz]], Pz[zg < maxcol[bz]]
-		#				Pz1 /= Pz1.sum()
-		#				zdraw[bz] = pchoice(zg1, p=Pz1, size=1)[0]
-		#		else: # otherwise keep re-drawing
-		#			zdraw[badz] = pchoice(zg, p=Pz, size=len(badz))
-		#		dnbad = nbad - (zdraw[mask] > maxcol[mask]).sum()
-		#		nbad = (zdraw[mask] > maxcol[mask]).sum()
-		#	zdraw[~mask] = -99.
-		#	id_zdraw = np.column_stack((idcol.copy(), zdraw))
-		#	randoms_id_z[i*Ngal:(i+1)*Ngal] = id_zdraw
-		#mask = maxcol > 0
-		#mask = np.array(list(mask) * Nrand)
-		#randoms_id_z[:, 1] = np.where(mask, randoms_id_z[:, 1], -99.)
-		#return randoms_id_z
-
-#def get_zmax(z, obsmag, kcorr, fluxlimit):
-#	distmod = cosmo.distmod(z).value
-#
-#	absmag = obsmag - distmod - kcorr
-#	max_distmod = fluxlimit - absmag
-#	max_distance = 10. ** (max_distmod/5. - 5.) # Mpc
-#
-#	zgrid = np.linspace(z.min(), z.max(), 200)
-#	dgrid = cmd(zgrid).value
-#	max_redshift = interp1d_(max_distance, dgrid, zgrid)
-#	max_redshift = np.where(np.isnan(max_redshift) | np.isinf(max_redshift), -99., max_redshift)
-#	return max_redshift
-#
-#def find_M_crossing(M_, fluxlimit, kcorrs, Mgrid=0):
-#	print '\tk-correcting for M(z)..'
-#	# define analytical absolute flux-limit
-#	Mlim_z = lambda z: fluxlimit - 5.*log10(cmd(z).value * 1e6 / 10.)
-#
-#	# apply k-corrections to get M(z) per galaxy
-#	zgrid = np.unique(kcorrs['z'])
-#	kmatrix = np.zeros([len(zgrid), len(M_)])
-#	for i, zpoint in enumerate(zgrid):
-#		maggy_ratio = kcorrs['maggy_ratio'][np.where(kcorrs['z'] == zpoint)[0]].values
-#		kcorrection = -2.5 * log10(maggy_ratio)
-#		kmatrix[i] += kcorrection
-#	Mmatrix = kmatrix + M_
-#
-#	# interpolate onto a finer redshift grid and find the
-#	# redshift intersection of M(z) and the flux-limit
-#	print '\tfinding flux-limit intersection..'
-#	fine_zgrid = np.linspace(0.001, zgrid[-1], 10*len(zgrid))
-#	fine_Mmatrix = interp1d(zgrid, Mmatrix, axis=0)(fine_zgrid)
-#	Mlim = Mlim_z(fine_zgrid)
-#	Mz_minus_Mlim = (fine_Mmatrix.T - Mlim).T
-#	minima = fine_zgrid[np.argmin(abs(Mz_minus_Mlim), axis=0)]
-#	mask = (M_ < -26) | (M_ > -15) # remove intrinsically very faint/bright objects
-#	minima[mask] = -99.
-#
-#	print '\tdone.'
-#	if Mgrid:
-#		return fine_Mmatrix, fine_zgrid
-#	else:
-#		return minima
-
-#def get_volume_limits(d, area=180., volume=3.5e6):
-#	# get asymmetric LoS limits for a given
-#	# volume centred on each galaxy with distance d
-#	Om = sqdeg2ster(area)
-#
-#	def invvol(r1, vol):
-#		r2 = ((3. * vol / Om) + r1**3.) ** (1./3.)
-#		# calculate asymmetric limits of volume -- see notes
-#		with warnings.catch_warnings():
-#			warnings.simplefilter("ignore")
-#			new_r1 = ((3.*r1**3. - r2**3.) / 2.) ** (1./3.)
-#		new_r2 = ((r1**3. + r2**3.) / 2.) ** (1./3.)
-#		# fix NaNs in new_r1 -- make positive for the cube-root, and then negative again
-#		badr1 = np.isnan(new_r1)
-#		try:
-#			new_r1[badr1] = (-(3.*r1[badr1]**3. - r2[badr1]**3.) / 2.) ** (1./3.)
-#		except IndexError:
-#			new_r1[badr1] = (-(3.*r1**3. - r2[badr1]**3.) / 2.) ** (1./3.)
-#		new_r1[badr1] *= -1.
-#		# for symmetric limits (will override the above):
-#		#new_r1 = 2.*r1 - r2
-#		#new_r2 = r2
-#		return [new_r1, r1, new_r2]
-#
-#	widths = np.asarray(invvol(d, volume)).squeeze()
-#
-#	return widths
-#
-#def get_volume_depth(volume, area=180.):
-#	Om = sqdeg2ster(area)
-#	return (3. * volume / Om)**(1./3.)
-#
-#def get_volume(limits, area=180.):
-#	# get volume defined by limits, for a given area
-#	Om = sqdeg2ster(area)
-#	if type(limits) == np.array and len(limits) == 2:
-#		volume = (Om / 3.) * (limits[1]**3. - limits[0]**3.)
-#	else:
-#		volume = (Om / 3.) * limits**3.
-#	return volume

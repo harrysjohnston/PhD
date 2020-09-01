@@ -59,7 +59,7 @@ for ranf in randlist:
 
 plt.xlim(0., cat[zcol].max())
 ax[0].legend(fontsize=14, frameon=0)
-ax[1].set_xlabel(r'$z_{\rm{rand}}$')
+ax[1].set_xlabel(r'$z_{\rm{rand.}}$')
 for a in ax:
 	a.set_ylabel('PDF')
 plt.show()

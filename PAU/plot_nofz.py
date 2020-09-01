@@ -17,6 +17,7 @@ idcol = sys.argv[4]
 ranlist = np.sort(sys.argv[5:])
 
 cat = fopen(catpath)
+cat = cat[cat[zcol] > 0]
 f, ax = plt.subplots(figsize=(7,6))
 plt.hist(cat[zcol], alpha=0.4, bins=60, normed=1)
 #ranlist = np.sort(glob('%s_Clone*'%catpath.replace('.fits','')))

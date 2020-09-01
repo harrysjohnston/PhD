@@ -55,6 +55,9 @@ def kids():
 def pau():
 	os.chdir('/share/splinter/hj/PhD/PAU')
 	print('/share/splinter/hj/PhD/PAU')
+def ecc():
+	os.chdir('/share/splinter/hj/PhD/EuclidCCRedshifts')
+	print('/share/splinter/hj/PhD/EuclidCCRedshifts')
 import matplotlib as mpl
 mpl.rcParams['xtick.labelsize'] = 12
 mpl.rcParams['ytick.labelsize'] = 12
@@ -85,6 +88,8 @@ sys.path.append("~/PhD/PAU")
 sys.path.append("~/PhD/KiDS_PhotometricClustering")
 sys.path.append("~/PhD/KiDS_PhotometricClustering/Randoms")
 import skyknife
+import kmeans_radec
+from kmeans_radec import KMeans, kmeans_sample
 try:
 	#import MCplotter as mcp
 	import MakeRandoms as MR

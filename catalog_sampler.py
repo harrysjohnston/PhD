@@ -309,10 +309,16 @@ class RealCatalogue:
 				fs = np.ones(len(sample))
 			Mr = sample[self.headers['absmag_r']]
 			Mr = np.where(fs >= 1., Mr - 2.5*np.log10(fs), Mr)
-			if key in self.keys[:4]:
-				self.Rmags.append(np.mean(Mr + 22.))
 
-			Sprops['L_%s'%key] = 10**(-0.4 * np.mean(Mr + 22.))
+			if self.SDSS:
+				pivot = 22. + 5.*np.log10(0.7)
+			else:
+				pivot = 22.
+
+			if key in self.keys[:4]:
+				self.Rmags.append(np.mean(Mr + pivot))
+
+			Sprops['L_%s'%key] = 10**(-0.4 * np.mean(Mr + pivot))
 			Sprops['Z_%s'%key] = np.mean(sample[self.headers['z']])
 			if colour_ is None:
 				if self.DEI:
@@ -441,6 +447,7 @@ class RealCatalogue:
 			outfile_root = outfile_root_ + "_allz"
 
 		self.new_root = outfile_root
+		pickle.dump(self.Sprops, open(join(self.new_root, 'SampleProps.p'), 'w'))
 		if not isdir(outfile_root):
 			mkdir(outfile_root)
 
