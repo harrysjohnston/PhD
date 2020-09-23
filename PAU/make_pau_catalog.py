@@ -49,14 +49,14 @@ plt.scatter(i[tb], (u-i)[tb], c='b', s=0.01, alpha=0.1)
 plt.xlabel('$i$')
 plt.ylabel('$u-i$')
 plt.xlim(-27, -12)
-plt.ylim(-0.1, 4.4)
+plt.ylim(0.1, 4.5)
 h = [
 	new_handle(marker='.',c='r',ls='',label='PAUS W3 red'),
 	new_handle(marker='.',c='b',ls='',label='PAUS W3 blue'),
 	new_handle(c='C1',ls='-',label='$u-i=1.138-0.038i$')
 ]
 l = ['PAUS W3 red', 'PAUS W3 blue', '$u-i=1.138-0.038i$']
-plt.legend(h,l,fontsize=14,title='LePhare')
+plt.legend(h,l,fontsize=14,title='LePhare',frameon=0)
 #plt.show()
 plt.tight_layout()
 plt.savefig('PAU_CMD_LePhare.png', bbox_inches='tight')
@@ -74,13 +74,13 @@ plt.scatter(i[tb], (u-i)[tb], c='b', s=0.01, alpha=0.1)
 plt.xlabel('$i$')
 plt.ylabel('$u-i$')
 plt.xlim(-27, -12)
-plt.ylim(-0.1, 4.4)
+plt.ylim(0.1, 4.5)
 h = [
 	new_handle(marker='.',c='r',ls='',label='PAUS W3 red'),
 	new_handle(marker='.',c='b',ls='',label='PAUS W3 blue')
 ]
 l = ['PAUS W3 red', 'PAUS W3 blue']
-plt.legend(h,l,fontsize=14,title='Cigale 2-cluster')
+plt.legend(h,l,fontsize=14,title='Cigale 2-cluster',frameon=0)
 #plt.show()
 plt.tight_layout()
 #plt.savefig('PAU_CMD_Cigale_2cluster.png', bbox_inches='tight')
@@ -95,14 +95,14 @@ plt.scatter(i[tg], (u-i)[tg], c='g', s=0.01, alpha=0.1)
 plt.xlabel('$i$')
 #plt.ylabel('$u-i$')
 plt.xlim(-27, -12)
-plt.ylim(-0.1, 4.4)
+plt.ylim(0.1, 4.5)
 h = [
 	new_handle(marker='.',c='r',ls='',label='PAUS W3 red'),
 	new_handle(marker='.',c='b',ls='',label='PAUS W3 blue'),
 	new_handle(marker='.',c='g',ls='',label='PAUS W3 green')
 ]
 l = ['PAUS W3 red', 'PAUS W3 blue', 'PAUS W3 green']
-plt.legend(h,l,fontsize=14,title='Cigale 3-cluster')
+plt.legend(h,l,fontsize=14,title='Cigale 3-cluster',frameon=0)
 #plt.show()
 plt.tight_layout()
 plt.savefig('PAU_CMD_Cigale.png', bbox_inches='tight')

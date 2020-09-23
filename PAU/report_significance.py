@@ -1,15 +1,17 @@
 from functions import *
 
-Njk = 12
+Njk = int(sys.argv[1])
 off_diag = 1
 plot = 1
+drop_largerp = 1
 print '\n'
-print 'Njk =', Njk, 'hard-coded!'
+print 'Njk =', Njk
 print 'off-diagonals =', bool(off_diag), 'hard-coded!'
 print 'plot =', bool(plot), 'hard-coded!'
+print 'exclude largest-rp bin =', bool(drop_largerp), 'hard-coded!'
 
 rep_dict = {}
-for dire in sys.argv[1:]:
+for dire in sys.argv[2:]:
 	rep_dict[dire] = {}
 	try:
 		wgp_r = ascii.read(join(dire, 'wgp_red.dat'))
@@ -20,6 +22,14 @@ for dire in sys.argv[1:]:
 		wgx_b_cov = np.loadtxt(join(dire, 'wgp_blue_wgcross.cov'))
 	except IOError:
 		continue
+
+	if drop_largerp:
+		wgp_r = wgp_r[:-1]
+		wgp_b = wgp_b[:-1]
+		wgp_r_cov = wgp_r_cov[:-1][:, :-1]
+		wgp_b_cov = wgp_b_cov[:-1][:, :-1]
+		wgx_r_cov = wgx_r_cov[:-1][:, :-1]
+		wgx_b_cov = wgx_b_cov[:-1][:, :-1]
 
 	if not off_diag:
 		wgp_r_cov = np.diag(wgp_r_cov) * np.identity(len(wgp_r_cov))
@@ -59,12 +69,12 @@ if plot:
 			  iter(range(100)),
 			  iter(range(100))]
 	labels = [[],[],[]]
-	for dire in np.sort(sys.argv[1:]):
+	for dire in np.sort(sys.argv[2:]):
 		if 'LePhare' in dire: acol = 0
 		elif 'Cigale_3cluster' in dire: acol = 1
 		elif 'Cigale_2cluster' in dire:	acol = 2
 		x = next(axis_x[acol])
-		dire_lab = dire
+		dire_lab = basename(dire)
 		for pattern in ['OUTPUTS_PAUS_','LePhare_','Cigale_2cluster_','Cigale_3cluster_','normi_']:
 			dire_lab = dire_lab.replace(pattern, '')
 		dire_lab = dire_lab.replace('fibonacci_', 'dyn-$\Pi-$')
@@ -86,14 +96,14 @@ if plot:
 	ax[1, 0].set_xticklabels(labels[0], rotation=60, ha='right', rotation_mode='anchor', fontsize=9)
 	ax[1, 1].set_xticklabels(labels[1], rotation=60, ha='right', rotation_mode='anchor', fontsize=9)
 	ax[1, 2].set_xticklabels(labels[2], rotation=60, ha='right', rotation_mode='anchor', fontsize=9)
-	ax[0, 0].set_ylabel(r'$w_{\rm{g+}}$ detection / $\sigma$', fontsize=14)
-	ax[1, 0].set_ylabel(r'$w_{\rm{g\times}}$ detection / $\sigma$', fontsize=14)
+	ax[0, 0].set_ylabel(r'$w_{\rm{g+}}$ detection $[\sigma]$', fontsize=14)
+	ax[1, 0].set_ylabel(r'$w_{\rm{g\times}}$ detection $[\sigma]$', fontsize=14)
 	ax[0, 0].set_title('LePhare')
 	ax[0, 1].set_title('Cigale 3-cluster')
 	ax[0, 2].set_title('Cigale 2-cluster')
 	for a in ax.flatten():
 		a.tick_params(which='minor', bottom=0, top=0)
-		a.set_yticks([-1,0,1,2,3,4,5])
+		a.set_yticks(range(10))
 		a.autoscale()
 		a.axhline(2, ls=':', c='k')
 		a.axhline(3, ls='--', c='k')
@@ -102,10 +112,14 @@ if plot:
 			for j in range(len(labels[i])):
 				if 'Qz50' in labels[i][j]:
 					a.axvspan(j-0.5, j+0.5, color='grey', alpha=0.2, lw=0)
+				if 'dyn' in labels[i][j]:
+					a.axvspan(j-0.5, j+0.5, facecolor='none', edgecolor='cyan', hatch='\\\\\\\\', alpha=0.6, lw=0)
+				if 'zph' in labels[i][j]:
+					a.axvspan(j-0.5, j+0.5, facecolor='none', edgecolor='cyan', hatch='////', alpha=0.6, lw=0)
 	plt.tight_layout()
 	plt.subplots_adjust(hspace=0, wspace=0)
-	plt.savefig('PAUS_IA_summary_fig.pdf', bbox_inches='tight')
-	plt.savefig('PAUS_IA_summary_fig.png', bbox_inches='tight')
+	plt.savefig('summary_plots/PAUS_IA_summary_Njk%s_fig.pdf'%Njk, bbox_inches='tight')
+	plt.savefig('summary_plots/PAUS_IA_summary_Njk%s_fig.png'%Njk, bbox_inches='tight')
 	plt.show()
 	
 

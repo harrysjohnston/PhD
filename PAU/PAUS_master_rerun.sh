@@ -24,7 +24,7 @@ set randoms = ('PAUS_KSB_CloneZIDRandoms_6e6_uniqK_Q-0.2.fits'\
 			   'PAUS_KSB_CloneZIDRandoms_Unwindowed_uniqK_Q-0.2_.pergaldz0.04_zph.fits'\
 )
 set rand_ids = ('windowed' 'unwindowed' 'zph-windowed' 'zph-unwindowed')
-@ Njk = 12
+@ Njk = 24
 set jobscript_dir = $1
 
 if (-d $jobscript_dir) then
@@ -36,8 +36,9 @@ sed "s/JOBSCRIPT_DIR/$jobscript_dir/g" run_jobs.sh > $jobscript_dir/run_jobs.sh
 @ x = 0
 foreach rand_idx (`seq 1 1 4`)
 foreach colors ('LePhare' 'Cigale_2cluster' 'Cigale_3cluster' 'Cigale_3cluster_normi')
-foreach Pibin ('uniform' 'fibonacci')
-foreach qzselect ('true' 'false')
+#foreach Pibin ('uniform' 'fibonacci')
+foreach Pibin ('Pimax80' 'Pimax260')# 'finerpbins')
+foreach qzselect ('false')#'true'
 	@ x += 1
 	# shorthand colors
 	set colors1 = `echo $colors:as/_//:as/igale//:as/luster//:as/hare//:as/e//`
@@ -57,6 +58,13 @@ foreach qzselect ('true' 'false')
 		set pi_arg = 'wgplus_config.rpar_edges="0.,1.,2.,3.,4.,5.,7.,9.,11.,13.,15.,20.,25.,30.,35.,40.,60.,80.,100.,120.,140.,180.,220."'
 	else if ($Pibin == 'fibonacci') then
 		set pi_arg = 'wgplus_config.rpar_edges="0.,1.,2.,3.,5.,8.,13.,21.,34.,55.,89.,144.,233."'
+	else if ($Pibin == 'Pimax80') then
+		set pi_arg = 'wgplus_config.min_rpar=-80. wgplus_config.max_rpar=80. wgplus_config.nbin_rpar=40'
+	else if ($Pibin == 'Pimax260') then
+		set pi_arg = 'wgplus_config.min_rpar=-260. wgplus_config.max_rpar=260. wgplus_config.nbin_rpar=130'
+	# add best Pi-bin setup to these args
+	else if ($Pibin == 'finerpbins') then
+		set pi_arg = 'wgplus_config.max_sep=18. wgplus_config.nbins=7'
 	endif
 	# specify catalogues
 	set data_arg = "catalogs.data1=PAUS_KSB.fits"
@@ -84,9 +92,9 @@ foreach qzselect ('true' 'false')
 	else
 		set save_arg = '-save_cats 0'
 	endif
-	# skip total/wgg correlations
-	set idx_args_r = "-index 0"
-	set idx_args_b = "-index 1"
+	# skip total correlations
+	set idx_args_r = "-index 0 3"
+	set idx_args_b = "-index 1 4"
 
 	set call = "\npython w_pipeline.py $config_r $base_args $idx_args_r $save_arg \
 					-p $r_arg $pi_arg $jk_arg $data_arg $rand_arg wgplus_config.save_3d=1 \
@@ -112,7 +120,7 @@ end
 end
 end
 
-sbatch -p CORES16 --job-name=PAUSzphcorrs -c 16 --mem=120G -t 7-00:00:00 --array=1-$x%4 $jobscript_dir/run_jobs.sh
+sbatch --dependency=afterok:60088 -p CORES16 --job-name=PAUSzphcorrs -c 16 --mem=120G -t 7-00:00:00 --array=1-$x%8 $jobscript_dir/run_jobs.sh
 
 
 

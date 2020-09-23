@@ -37,10 +37,10 @@ mkdir $jobscript_dir
 sed "s/JOBSCRIPT_DIR/$jobscript_dir/g" run_jobs.sh > $jobscript_dir/run_jobs.sh
 
 @ x = 0
-foreach rand_idx (`seq 1 1 5`)
-foreach zcolname ('zphot_2' 'Z_TONRY')
-#foreach Pibin ('uniform' 'fibonacci' 'uniform_dPi' 'uniform_Pimax' 'uniform_dPi_Pimax')
-foreach Pibin ('uniform_dPi' 'uniform_Pimax' 'uniform_dPi_Pimax')
+foreach rand_idx (`seq 1 1 4`)
+foreach zcolname ('zphot_2')# 'Z_TONRY')
+foreach Pibin ('uniform' 'fibonacci')# 'uniform_dPi' 'uniform_Pimax' 'uniform_dPi_Pimax')
+#foreach Pibin ('uniform_dPi' 'uniform_Pimax' 'uniform_dPi_Pimax')
 	@ x += 1
 	# short zcolname
 	set zcolname1 = `echo $zcolname:as/_// |  tr "[:upper:]" "[:lower:]"`
@@ -89,7 +89,7 @@ foreach Pibin ('uniform_dPi' 'uniform_Pimax' 'uniform_dPi_Pimax')
 	if ($rand_idx == 5) then
 		set rand_arg = "catalogs.rand1=$randoms[$rand_idx] wgplus_config.rand_r_col=comoving catalogs.rand_cuts1='idmatch(r1, d1, CATAID, CATAID) & (z > 0.02) & (z < 0.5)' catalogs.rand_cuts2='idmatch(r2, d2, CATAID, CATAID) & (z > 0.02) & (z < 0.5)'"
 	endif
-	# skip all-colour correlations
+	# skip total correlations
 	set idx_args = "-index 0 1 3 4"
 	# make config file
 	sed "s/REDSHIFT_COLNAME/$zcolname/g" GAMA_correlation_template.ini > corr_${zcolname}_GAMA_correlations.ini
@@ -119,7 +119,7 @@ end
 end
 end
 
-sbatch -p CORES16 --job-name=GAMAzphcorrs -c 16 --mem=47G -t 7-00:00:00 --array=1-$x%6 $jobscript_dir/run_jobs.sh
+sbatch --dependency=afterok:59927 -p CORES16 --job-name=GAMAzphcorrs -c 16 --mem=47G -t 7-00:00:00 --array=1-$x%6 $jobscript_dir/run_jobs.sh
 
 
 

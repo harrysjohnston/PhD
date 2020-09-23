@@ -22,6 +22,11 @@ if __name__ == '__main__':
 		type=int,
 		default=0,
 		help='1 = do plots for wgx (default=0)')
+	parser.add_argument(
+		'-paper',
+		type=int,
+		default=0,
+		help='1 = do plots the paper (i.e. remove extra labels etc.)')
 	args = parser.parse_args()
 signal_id = ['wgplus','wgcross'][args.wgx]
 
@@ -34,9 +39,13 @@ ax2.set_yscale('log')
 ax1.axhline(0, c='k', lw=0.6)
 axins.axhline(0, c='k', lw=0.6)
 if 'qz' in args.paus:
-	ax1.set_title('PAUS W3 -- best 50%% Qz (%s)'%args.paus.replace('OUTPUTS_',''))
+	ax1.set_title('PAUS W3 -- best 50%% Qz (%s)'%args.paus.replace('OUTPUTS_PAUS_','').replace('_qz50','').replace('_', '--'))
+	if args.paper:
+		ax1.set_title(r'PAUS W3 -- best 50% Qz in $0.1<z_{\rm{phot.}}<0.8$')
 else:
-	ax1.set_title('PAUS W3 -- all galaxies (%s)'%args.paus.replace('OUTPUTS_',''))
+	ax1.set_title('PAUS W3 -- all galaxies (%s)'%args.paus.replace('OUTPUTS_PAUS_','').replace('_', '--'))
+	if args.paper:
+		ax1.set_title(r'PAUS W3 -- all galaxies in $0.1<z_{\rm{phot.}}<0.8$')
 
 ddict = {}
 ddict['GAMA'] = {}
@@ -87,7 +96,10 @@ for cat in ['PAUS', 'GAMA']:
 				else:
 					s *= 0.99
 			for sig in ['wgp', 'wgg']:
-				dat = ddict[cat][dire][sig+'_'+col+'.dat']
+				try: dat = ddict[cat][dire][sig+'_'+col+'.dat']
+				except:
+					print '\n', cat, dire, sig+'_'+col+'.dat', 'failed!'
+					continue
 				if cat == 'GAMA': dat = dat[:-1]
 				if sig == 'wgp':
 					try:
@@ -113,9 +125,16 @@ axins.set_xticklabels(['0.2','1.0','3.0'], fontdict={'fontsize':11})
 #axins.set_yticklabels([])
 mark_inset(ax1, axins, loc1=1, loc2=3, fc='none', ec='k', alpha=0.4, lw=0.5)
 h, l = ax1.get_legend_handles_labels()
-ax2.legend(h, l, ncol=3, loc='best', fontsize=12, frameon=0)
+ax2.legend(h, l, ncol=3, loc='best', fontsize=13, frameon=0)
 ax1.set_ylim(-1.8, 1.4)
-#ax2.set_ylim(0.3, 1e3)
+ax2.set_ylim(0.9, None)
+
+maxrp = 18.
+xlim = ax1.get_xlim()
+ax1.axvspan(maxrp, xlim[1], facecolor='none', lw=0, edgecolor='grey', hatch='////', alpha=0.5)
+ax2.axvspan(maxrp, xlim[1], facecolor='none', lw=0, edgecolor='grey', hatch='////', alpha=0.5)
+ax1.set_xlim(*xlim)
+
 if not args.wgx:
 	ax1.set_ylabel(r'$r_{p}^{0.8}w_{\rm{g+}}\,[h^{-1}\rm{Mpc}]^{1.8}$')
 else:
@@ -125,7 +144,7 @@ ax2.set_xlabel(r'$r_{p}\,\,[h^{-1}\rm{Mpc}]$')
 plt.tight_layout()
 plt.subplots_adjust(hspace=0)
 plt.show()
-outname = 'PAUvsGAMA_figure_%s_%s'%(args.paus.replace('OUTPUTS_','').strip('/'), args.gama[1].replace('OUTPUTS_','').strip('/'))
+outname = 'PAUvsGAMA_figure_%s_%s'%(basename(args.paus).replace('OUTPUTS_','').strip('/'), args.gama[1].replace('OUTPUTS_','').strip('/'))
 
 if not args.wgx:
 	plt.savefig('master_figures/'+outname+'.png', bbox_inches='tight')

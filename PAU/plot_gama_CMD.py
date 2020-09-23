@@ -18,13 +18,13 @@ plt.scatter(i[~tr], (u-i)[~tr], c='b', s=0.01, alpha=0.1)
 plt.xlabel('$i$')
 plt.ylabel('$u-i$')
 plt.xlim(-27, -12)
-plt.ylim(-0.1, 4.1)
+plt.ylim(0.1, 4.5)
 h = [
     new_handle(marker='.',c='r',ls='',label='GAMA red'),
     new_handle(marker='.',c='b',ls='',label='GAMA blue')]
     #new_handle(c='C1',ls='-',label='$g-r=0.66$')]
 l = ['GAMA red', 'GAMA blue']#, '$g-r=0.66$']
-plt.legend(h,l,fontsize=14)
+plt.legend(h,l,fontsize=14,frameon=0)
 plt.tight_layout()
 plt.show()
 plt.savefig('GAMA_CMD.png', bbox_inches='tight')
