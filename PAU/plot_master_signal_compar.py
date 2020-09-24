@@ -146,6 +146,7 @@ ax1[0].set_ylim(-0.9, 1.4)
 ax1[1].set_ylim(-0.6, 0.5)
 for a in ax2:
 	a.set_ylim(0.9, 1.2e3)
+ax2[1].set_yticks(np.logspace(0,2,3))
 
 maxrp = 18.
 xlim = ax1[0].get_xlim()
