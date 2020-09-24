@@ -6,7 +6,7 @@ cat = fopen('PAUS_KSB.fits')
 f, ax = plt.subplots(2, sharex=True, figsize=(6,9))
 plt.sca(ax[0])
 hb = plt.hexbin(cat['ZBEST'], log10(cat['qz']),
-    C=cat['red_sequence_Cigale_2cluster'],
+    C=cat['red_sequence_LePhare'],
     extent=[0,1.8,-1.6,2.3],
     gridsize=200,
     cmap='coolwarm')
@@ -19,7 +19,7 @@ plt.tight_layout()
 
 plt.sca(ax[1])
 hb = plt.scatter(cat['ZBEST'], cat['bcnz_zb'],
-    c=cat['red_sequence_Cigale_2cluster'],
+    c=cat['red_sequence_LePhare'],
     s=0.2, alpha=1,
     cmap='coolwarm')
 plt.plot([0,1.6],[0,1.6],'y--',lw=1.2,alpha=0.7)

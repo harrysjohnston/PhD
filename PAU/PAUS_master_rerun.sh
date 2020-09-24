@@ -37,7 +37,7 @@ sed "s/JOBSCRIPT_DIR/$jobscript_dir/g" run_jobs.sh > $jobscript_dir/run_jobs.sh
 foreach rand_idx (`seq 1 1 4`)
 foreach colors ('LePhare' 'Cigale_2cluster' 'Cigale_3cluster' 'Cigale_3cluster_normi')
 #foreach Pibin ('uniform' 'fibonacci')
-foreach Pibin ('Pimax80' 'Pimax260')# 'finerpbins')
+foreach Pibin ('Pimax140') #('Pimax80' 'Pimax260')# 'finerpbins')
 foreach qzselect ('false')#'true'
 	@ x += 1
 	# shorthand colors
@@ -60,6 +60,8 @@ foreach qzselect ('false')#'true'
 		set pi_arg = 'wgplus_config.rpar_edges="0.,1.,2.,3.,5.,8.,13.,21.,34.,55.,89.,144.,233."'
 	else if ($Pibin == 'Pimax80') then
 		set pi_arg = 'wgplus_config.min_rpar=-80. wgplus_config.max_rpar=80. wgplus_config.nbin_rpar=40'
+	else if ($Pibin == 'Pimax140') then
+		set pi_arg = 'wgplus_config.min_rpar=-140. wgplus_config.max_rpar=140. wgplus_config.nbin_rpar=70'
 	else if ($Pibin == 'Pimax260') then
 		set pi_arg = 'wgplus_config.min_rpar=-260. wgplus_config.max_rpar=260. wgplus_config.nbin_rpar=130'
 	# add best Pi-bin setup to these args
@@ -120,7 +122,7 @@ end
 end
 end
 
-sbatch --dependency=afterok:60088 -p CORES16 --job-name=PAUSzphcorrs -c 16 --mem=120G -t 7-00:00:00 --array=1-$x%8 $jobscript_dir/run_jobs.sh
+sbatch -p CORES16 --job-name=PAUSzphcorrs -c 16 --mem=120G -t 7-00:00:00 --array=1-$x%8 $jobscript_dir/run_jobs.sh
 
 
 

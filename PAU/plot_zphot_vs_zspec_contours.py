@@ -43,7 +43,7 @@ remove_patterns = [
 	'K1000_SML_CloneZIDRandoms_',
 	'_gama_McNaughtK_Q-0.7',
 	'_pergaldz0.03',
-	'_zph', '_', '.fits',
+	'_zph', '_', '.fits','5e6'
 ]
 
 ran_phsp_list = []
@@ -55,7 +55,7 @@ for rfi, rf in enumerate(ranlist):
 		rf_ = rf_.replace(patt, '')
 	rf_ = rf_.lower()
 	if rf_ != 'unwindowed':
-		rf_ += ' windowed randoms'
+		rf_ += 'windowed randoms'
 	else:
 		rf_ += ' randoms'
 	ran_names.append(rf_)
