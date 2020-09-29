@@ -21,6 +21,7 @@ for dire in sys.argv[2:]:
 		wgp_b_cov = np.loadtxt(join(dire, 'wgp_blue_wgplus.cov'))
 		wgx_b_cov = np.loadtxt(join(dire, 'wgp_blue_wgcross.cov'))
 	except IOError:
+		print dire, 'failed'
 		continue
 
 	if drop_largerp:

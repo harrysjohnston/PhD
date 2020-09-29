@@ -269,7 +269,7 @@ def get_tgauss_window(d, hilim, lolim, area=180., volume=3.5e6, V_base=None, zma
 				return np.stack((V_mid, window_fn))
 				#break
 
-		# bin, smooth and normalise for the pdf
+		# bin and normalise for the pdf
 		vol_minmax = minmax(vol_draw)
 		window_fn, bin_edges = np.histogram(vol_draw, bins='auto')
 		window_fn = np.interp(V_mid, midpoints(bin_edges), window_fn)

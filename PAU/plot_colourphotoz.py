@@ -7,7 +7,7 @@ zp = cat['bcnz_zb']
 zs = cat['ZBEST']
 reds = cat['red_sequence_LePhare']
 c = (zs > 0) & (zp > 0)
-col = cat['u_abs'] - cat['i_abs']
+col = cat['lp_mu'] - cat['lp_mi']
 c1 = c & (cat['qz'] < np.percentile(cat['qz'][c],50))
 c2 = c# & (cat['qz'] >= np.percentile(cat['qz'][c],50))
 delta_norm = (zp-zs)/(1+zs)
@@ -15,7 +15,7 @@ delta_norm = (zp-zs)/(1+zs)
 f, ax = plt.subplots()
 hb = plt.hexbin(col[c2], delta_norm[c2],
     alpha=0.6,
-	extent=[0,4.5,-0.05,0.05],
+	extent=[0.2,2.8,-0.05,0.05],
 	gridsize=100,
 	linewidths=0,
 	bins='log',
@@ -46,7 +46,7 @@ plt.annotate(r'$\sigma_{68}\sim%.4f (%.4f)$'%(np.diff(blue_68ci)[0]/2., np.diff(
 plt.ylim(-0.05, 0.05)
 plt.axhline(0, c='k', ls='--', lw=1.3, zorder=10)
 plt.xlabel(r'$u-i$')
-plt.ylabel(r'$(z_{\rm{phot.}}-z_{\rm{spec.}}) / (1 + z_{\rm{spec.}})$', fontsize=15)
+plt.ylabel(r'$(z_{\rm{phot.}}-z_{\rm{spec.}}) \,/\, (1 + z_{\rm{spec.}})$', fontsize=15)
 plt.tight_layout()
 plt.show()
 

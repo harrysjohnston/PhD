@@ -100,11 +100,11 @@ for cat in ['PAUS', 'GAMA']:
 				if 'ztonry' not in dire.lower().replace('_','') or 'zphot' in dire:
 					s *= 1.01
 					lab += r' $z_{\rm{phot.}}$'
-					if col == 'red': coli = 'salmon'
+					if col == 'red': coli = 'orange'
 					if col == 'blue': coli = 'deepskyblue'
 				else:
 					s *= 0.99
-					if col == 'red': coli = 'firebrick'
+					if col == 'red': coli = 'maroon'
 					if col == 'blue': coli = 'darkblue'
 			else:
 				coli = col
@@ -137,19 +137,44 @@ x1, x2, y1, y2 = 0.12, 5.3, -0.16, 0.15
 #axins.set_xticklabels(['0.2','1.0','3.0'], fontdict={'fontsize':11})
 ##axins.set_yticklabels([])
 #mark_inset(ax1, #axins, loc1=1, loc2=3, fc='none', ec='k', alpha=0.4, lw=0.5)
-h1, l1 = ax1[0].get_legend_handles_labels()
-h2, l2 = ax1[1].get_legend_handles_labels()
-h = h1 + h2
-l = l1 + l2
-ax2[0].legend(h, l, ncol=1, loc='best', fontsize=13, frameon=0)
+#h1, l1 = ax1[0].get_legend_handles_labels()
+#h2, l2 = ax1[1].get_legend_handles_labels()
+#h = h1 + h2
+#l = l1 + l2
+ax2[0].legend(ncol=1, loc='best', fontsize=16, frameon=0)
+ax2[1].legend(ncol=1, loc='best', fontsize=16, frameon=0)
 ax1[0].set_ylim(-0.9, 1.4)
 ax1[1].set_ylim(-0.6, 0.5)
 for a in ax2:
 	a.set_ylim(0.9, 1.2e3)
 ax2[1].set_yticks(np.logspace(0,2,3))
+xlim = ax1[0].get_xlim()
+
+th_rp_ = np.loadtxt(PHD+'/cosmosis_new/PAUS_NLA_model_Ab1/projected_matter_intrinsic_1_1/theta.txt')
+cut = (th_rp_ > 6) & (th_rp_ < 50)
+cut1 = (th_rp_ > 0.1) & (th_rp_ < 6)
+th_rp = th_rp_[cut]
+th_rp1 = th_rp_[cut1]
+flist = np.sort(glob(PHD+'/cosmosis_new/PAUS_NLA_model_Ab[136]/wgp_z2_r/wgp_r_minus.txt'))
+th_h = []
+for i, curvefile in enumerate(flist):
+	curve_ = np.loadtxt(curvefile)
+	curve = curve_[cut]
+	curve1 = curve_[cut1]
+	col = plt.cm.winter(np.linspace(0.1, 0.9, len(flist)))[i]
+	#lst = ['-','--','-.'][i]
+	lst = [(0,(5,1)), (0,(5,3)), (0,(5,5))][i]
+	l, = ax1[0].plot(th_rp, th_rp**0.8*curve, '-', c=col, zorder=0, lw=1.7, ls=lst)
+	th_h.append(l)
+	ax1[0].plot(th_rp1, th_rp1**0.8*curve1, '-', c='gray', zorder=0, lw=0.5, ls='-')
+th_l = [
+	r'NLA: $A_{\rm{IA}}b_{\rm{g}} = 1$',
+	r'NLA: $A_{\rm{IA}}b_{\rm{g}} = 3$',
+	r'NLA: $A_{\rm{IA}}b_{\rm{g}} = 6$',
+]
+ax1[0].legend(th_h[::-1], th_l[::-1], loc='lower center', frameon=0, fontsize=11)
 
 maxrp = 18.
-xlim = ax1[0].get_xlim()
 for a in ax.flatten():
 	a.axvspan(maxrp, xlim[1], facecolor='none', lw=0, edgecolor='grey', hatch='////', alpha=0.5)
 ax1[0].set_xlim(*xlim)
