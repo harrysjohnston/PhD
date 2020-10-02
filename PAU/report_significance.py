@@ -25,12 +25,13 @@ for dire in sys.argv[2:]:
 		continue
 
 	if drop_largerp:
-		wgp_r = wgp_r[:-1]
-		wgp_b = wgp_b[:-1]
-		wgp_r_cov = wgp_r_cov[:-1][:, :-1]
-		wgp_b_cov = wgp_b_cov[:-1][:, :-1]
-		wgx_r_cov = wgx_r_cov[:-1][:, :-1]
-		wgx_b_cov = wgx_b_cov[:-1][:, :-1]
+		cut = wgp_r['rnom'] < 18.
+		wgp_r = wgp_r[cut]
+		wgp_b = wgp_b[cut]
+		wgp_r_cov = wgp_r_cov[cut][:, cut]
+		wgp_b_cov = wgp_b_cov[cut][:, cut]
+		wgx_r_cov = wgx_r_cov[cut][:, cut]
+		wgx_b_cov = wgx_b_cov[cut][:, cut]
 
 	if not off_diag:
 		wgp_r_cov = np.diag(wgp_r_cov) * np.identity(len(wgp_r_cov))
