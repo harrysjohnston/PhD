@@ -706,45 +706,45 @@ def ellipses_2sigma(cov, ids, xy=(-1.019, 0.0), nsigma=2, **kwargs):
 	ells = []
 	for i in np.arange(nsigma)+1:
 		i = int(i)
-		exec 'a%s, b%s, t%s, a_width = ellipse_params(cov, ids, CLsigma=%s)' % (i, i, i, i)
+		exec('a%s, b%s, t%s, a_width = ellipse_params(cov, ids, CLsigma=%s)' % (i, i, i, i))
 		if a_width:
-			exec 'ell%s = Ellipse(xy=xy, width=a%s, height=b%s, angle=t%s)' % (i, i, i, i)
+			exec('ell%s = Ellipse(xy=xy, width=a%s, height=b%s, angle=t%s)' % (i, i, i, i))
 		else:
-			exec 'ell%s = Ellipse(xy=xy, width=b%s, height=a%s, angle=t%s)' % (i, i, i, i)
-		exec "ells.append(ell%s)" % i
+			exec('ell%s = Ellipse(xy=xy, width=b%s, height=a%s, angle=t%s)' % (i, i, i, i))
+		exec("ells.append(ell%s)" % i)
 	return ells
 
 def make_plot_grid(params, labsz, ticksz, reverse=0):
-    mpl.rcParams['xtick.labelsize'] = ticksz
-    mpl.rcParams['xtick.direction'] = 'in'
-    mpl.rcParams['xtick.top'] = True
-    mpl.rcParams['xtick.major.size'] = 6
-    mpl.rcParams['xtick.minor.size'] = 3.0
-    mpl.rcParams['xtick.minor.visible'] = True
-    mpl.rcParams['ytick.labelsize'] = ticksz
-    mpl.rcParams['ytick.direction'] = 'in'
-    mpl.rcParams['ytick.right'] = True
-    mpl.rcParams['ytick.major.size'] = 6
-    mpl.rcParams['ytick.minor.size'] = 3.0
-    mpl.rcParams['ytick.minor.visible'] = True
-    mpl.rcParams['axes.labelsize'] = labsz
-    mpl.rcParams['axes.linewidth'] = 1.5
+	mpl.rcParams['xtick.labelsize'] = ticksz
+	mpl.rcParams['xtick.direction'] = 'in'
+	mpl.rcParams['xtick.top'] = True
+	mpl.rcParams['xtick.major.size'] = 6
+	mpl.rcParams['xtick.minor.size'] = 3.0
+	mpl.rcParams['xtick.minor.visible'] = True
+	mpl.rcParams['ytick.labelsize'] = ticksz
+	mpl.rcParams['ytick.direction'] = 'in'
+	mpl.rcParams['ytick.right'] = True
+	mpl.rcParams['ytick.major.size'] = 6
+	mpl.rcParams['ytick.minor.size'] = 3.0
+	mpl.rcParams['ytick.minor.visible'] = True
+	mpl.rcParams['axes.labelsize'] = labsz
+	mpl.rcParams['axes.linewidth'] = 1.5
 
-    #if params[-1] == 'P': params = params[:-1]
-    nparam = len(params)
-    print('nparam = %s'%nparam)
+	#if params[-1] == 'P': params = params[:-1]
+	nparam = len(params)
+	print('nparam = %s'%nparam)
 
-    f = plt.figure(figsize=(18,18))
-    gs = gridspec.GridSpec(nparam, nparam)
-    axes = []
-    axids = []
-    if 'beta_1_1' in params:
+	f = plt.figure(figsize=(18,18))
+	gs = gridspec.GridSpec(nparam, nparam)
+	axes = []
+	axids = []
+	if 'beta_1_1' in params:
 		params1 = [p.replace('a', 'ab') if p.startswith('a_') else p for p in params]
 		fparams = [fancy_params[i] for i in params1]
-    else:
+	else:
 		fparams = [fancy_params[i] for i in params]
-    for x in range(nparam):
-        for y in range(nparam):
+	for x in range(nparam):
+		for y in range(nparam):
 
 			if reverse:
 				#axid = 'ax%s%s' % (str(y).zfill(2), str(x).zfill(2))
@@ -753,19 +753,19 @@ def make_plot_grid(params, labsz, ticksz, reverse=0):
 				if 'ax%s%s' % ('_%s_'%params[x], '_%s_'%params[y]) in axids:
 					continue
 
-				exec '%s = plt.subplot(gs[%i, %i])' % (axid, x, y)
-				exec 'plt.setp(%s.get_xticklabels(), visible=False)' %(axid)
-				exec 'plt.setp(%s.get_yticklabels(), visible=False)' %(axid)
-				exec '%s.xaxis.tick_top()'%axid
-				exec '%s.yaxis.tick_right()'%axid
+				exec('%s = plt.subplot(gs[%i, %i])' % (axid, x, y))
+				exec('plt.setp(%s.get_xticklabels(), visible=False)' %(axid))
+				exec('plt.setp(%s.get_yticklabels(), visible=False)' %(axid))
+				exec('%s.xaxis.tick_top()'%axid)
+				exec('%s.yaxis.tick_right()'%axid)
 				if x==0:
-					exec 'plt.setp(%s.get_xticklabels(), visible=True, rotation=45)' %(axid)
-					exec '%s.set_xlabel(r"%s")' % (axid, fparams[y])
+					exec('plt.setp(%s.get_xticklabels(), visible=True, rotation=45)' %(axid))
+					exec('%s.set_xlabel(r"%s")' % (axid, fparams[y]))
 				if (y==(nparam-1)) & (x!=(nparam-1)):
-					exec 'plt.setp(%s.get_yticklabels(), visible=True)' %(axid)
-					exec '%s.set_ylabel(r"%s")' % (axid, fparams[x])
+					exec('plt.setp(%s.get_yticklabels(), visible=True)' %(axid))
+					exec('%s.set_ylabel(r"%s")' % (axid, fparams[x]))
 				if x==y:
-					exec '%s.tick_params(left=0, right=0)' %(axid)
+					exec('%s.tick_params(left=0, right=0)' %(axid))
 
 			else:
 				#axid = 'ax%s%s' % (str(x).zfill(2), str(y).zfill(2))
@@ -774,25 +774,25 @@ def make_plot_grid(params, labsz, ticksz, reverse=0):
 				if 'ax%s%s' % ('_%s_'%params[y], '_%s_'%params[x]) in axids:
 					continue
 
-				exec '%s = plt.subplot(gs[%i, %i])' % (axid, y, x)
+				exec('%s = plt.subplot(gs[%i, %i])' % (axid, y, x))
 				if y!=(nparam-1) | (y==(nparam-1)&(x==(nparam-1))):
-					exec 'plt.setp(%s.get_xticklabels(), visible=False)' %(axid)
+					exec('plt.setp(%s.get_xticklabels(), visible=False)' %(axid))
 				else:
-					exec '%s.set_xlabel(r"%s")' % (axid, fparams[x])
-					exec 'plt.setp(%s.get_xticklabels(), rotation=45, visible=True)' %(axid)
+					exec('%s.set_xlabel(r"%s")' % (axid, fparams[x]))
+					exec('plt.setp(%s.get_xticklabels(), rotation=45, visible=True)' %(axid))
 				if x!=0 | ((x==0)&(y==0)):
-					exec 'plt.setp(%s.get_yticklabels(), visible=False)' %(axid)
+					exec('plt.setp(%s.get_yticklabels(), visible=False)' %(axid))
 				else:
-					exec '%s.set_ylabel(r"%s")' % (axid, fparams[y])
+					exec('%s.set_ylabel(r"%s")' % (axid, fparams[y]))
 				if x==y:
-					exec '%s.tick_params(which="both", left=0, right=0)' % axid
+					exec('%s.tick_params(which="both", left=0, right=0)' % axid)
 
-			#exec '%s.annotate("%s", xy=(0.6,0.6), xycoords="axes fraction", ha="center", va="center")' % (axid, axid)
-			exec 'axes.append(%s)' % (axid)
+			#exec('%s.annotate("%s", xy=(0.6,0.6), xycoords="axes fraction", ha="center", va="center")' % (axid, axid))
+			exec('axes.append(%s)' % (axid))
 			axids.append(axid)
-    #plt.tight_layout()
-    #plt.subplots_adjust(wspace=0, hspace=0)
-    return dict(zip(axids, axes))
+	#plt.tight_layout()
+	#plt.subplots_adjust(wspace=0, hspace=0)
+	return dict(zip(axids, axes))
 
 def find_clevels(Z, *fracs):
 # normalise the grid
@@ -979,7 +979,7 @@ def posterior_grid(mcmc_file, params=None, axes=None, burn=0.3, fill=1, colors=(
 					y_ticks, y_tlabs = tick_ranger( axk.get_yticks() )
 					axk.set_yticks( y_ticks )
 					axk.set_yticklabels( y_tlabs )
-				#exec 'axk.annotate("%.3f", xy=(0.4,0.4), xycoords="axes fraction", ha="center", va="center")' % (pearson_r(np.cov(p1,p2))[0,1])
+				#exec('axk.annotate("%.3f", xy=(0.4,0.4), xycoords="axes fraction", ha="center", va="center")' % (pearson_r(np.cov(p1,p2))[0,1]))
 			else:
 				#axk.hist(p1, bins=100, normed=True, histtype='step', color=colors[1], weights=w_copy, lw=1.5)
 				histc, histb = np.histogram(p1, bins=100, density=1, weights=w_copy)
@@ -1001,7 +1001,7 @@ def posterior_grid(mcmc_file, params=None, axes=None, burn=0.3, fill=1, colors=(
 				#else: axk.set_title( r"%s$=%.3f_{-%.3f}^{+%.3f}$"%(params[i], ci_mean, abs(ci_mean-ci_low), abs(ci_high-ci_mean)),
 				#					fontsize=labelsize, y=1.05, x=0.05, loc='left')
 
-				#exec 'axk.annotate("%.3f", xy=(0.4,0.4), xycoords="axes fraction", ha="center", va="center")' % p1.mean()
+				#exec('axk.annotate("%.3f", xy=(0.4,0.4), xycoords="axes fraction", ha="center", va="center")' % p1.mean())
 
 			#mx, sdx = p1.mean(), p1.std()
 			#my, sdy = p2.mean(), p2.std()
@@ -1115,7 +1115,7 @@ def fisher_grid(fish_file, maxlikes, apply_priors=0, axes=None, params=None, lab
 				x_ticks, x_tlabs = tick_ranger(x_baseline)
 				axk.set_xticks( x_ticks )
 				axk.set_xticklabels( x_tlabs )
-			#exec 'axk.annotate("%.3f", xy=(0.6,0.2), xycoords="axes fraction", ha="center", va="center")' % (pearson_r(cov.copy())[i, j])
+			#exec('axk.annotate("%.3f", xy=(0.6,0.2), xycoords="axes fraction", ha="center", va="center")' % (pearson_r(cov.copy())[i, j]))
 			keys.append(key)
 
 	return plt.gcf(), axes
