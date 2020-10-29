@@ -315,7 +315,7 @@ def corr_mat(cov, title=None, cmap='RdYlGn', zero_norm=1):
 	R = pearson_r(cov.copy())
 	f, ax = plt.subplots()
 	if zero_norm:
-		c = ax.imshow(R, norm=MidpointNormalize(midpoint=0), cmap=cmap)
+		c = ax.imshow(R, norm=MidpointNormalize(midpoint=0), cmap=cmap, vmin=-1., vmax=1.)
 	else:
 		c = ax.imshow(R, cmap=cmap)
 	plt.figure(f.number)
